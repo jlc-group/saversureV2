@@ -1,0 +1,115 @@
+# Saversure V2 - Cursor Rules
+
+---
+
+## DEPLOYMENT ARCHITECTURE (READ-ONLY INFO)
+
+This workspace is PART of a larger server structure at D:\Server\.
+You do NOT have access to deploy/, nginx/, or PM2 configs from here.
+
+### Folder Structure
+
+```
+D:\Server\
++-- apps\saversureV2\    <- YOU ARE HERE (development only)
+|   +-- backend\         <- Go API (Gin)
+|   +-- frontend\        <- Next.js Admin Portal
+|   +-- docker-compose.yml  <- Redis + NATS
+|
++-- deploy\saversure-api\    <- PRODUCTION Go binary
++-- deploy\saversure-admin\  <- PRODUCTION Next.js standalone
+|
++-- run\saversureV2\
+|   +-- .env.dev         <- Dev environment
+|   +-- .env.prod        <- Prod environment
+|
++-- nginx\conf\sites-enabled\
+|   +-- saversure.jlcgroup.co.conf
+|
++-- ecosystem.config.js  <- PM2 configuration
+```
+
+### Port & Domain
+
+| Environment | Component | Port | Domain |
+|-------------|-----------|------|--------|
+| Development | API | 30400 | localhost:30400 |
+| Development | Admin | 30401 | localhost:30401 |
+| Production | API | 30400 | - |
+| Production | Admin | 30401 | saversure.jlcgroup.co |
+
+---
+
+## BUILD & DEPLOY RULES (CRITICAL!)
+
+### This workspace is for DEVELOPMENT only
+
+**NEVER** deploy directly from this workspace.
+
+### What You CAN Do Here:
+- Write code
+- Test locally (go run ./cmd/api for backend, npm run dev for frontend)
+- Run migrations (go run ./cmd/migrate up)
+- Commit & Push (source code only, NOT dist/ or binary!)
+
+### What You CANNOT Do Here:
+- go build for production
+- pm2 start/restart/stop
+- Copy to deploy/ folder
+- Edit nginx configs
+- Run on production ports
+
+### Correct Workflow:
+
+1. Write code
+2. Test: `go run ./cmd/api` (port 30400) / `npm run dev` (port 30401)
+3. Commit & Push: `git add . && git commit && git push`
+4. **STOP** - Tell user to deploy from D:\Server workspace
+
+### If User Asks to "Deploy":
+
+Respond with:
+> "This workspace cannot deploy. Please:
+> 1. Push your changes: git push
+> 2. Open D:\Server workspace (or server-monitor at localhost:59100)
+> 3. Deploy from there using Git Pull > Deploy"
+
+---
+
+## TECHNOLOGY STACK
+
+- **Backend:** Go 1.24 + Gin framework
+- **Frontend:** Next.js 15 + TypeScript + Tailwind CSS v4
+- **Database:** PostgreSQL 18 (database: saversure)
+- **Cache:** Redis 7 (Docker container: saversure-redis)
+- **Queue:** NATS JetStream (Docker container: saversure-nats)
+- **Object Storage:** MinIO (shared, port 59300)
+
+## KEY ARCHITECTURE RULES
+
+1. **Zero Oversell**: Use 2-phase reservation with `SELECT FOR UPDATE` (see internal/redemption/)
+2. **Immutable Ledger**: point_ledger table has triggers preventing UPDATE/DELETE
+3. **Multi-Tenant**: Every query MUST filter by tenant_id
+4. **Idempotency**: All critical endpoints require Idempotency-Key header
+5. **On-Scan Code Creation**: QR codes are NOT pre-stored; only batch metadata is stored
+6. **PDPA Compliance**: User registration requires consent recording
+
+## RUNNING LOCALLY
+
+```bash
+# Start infrastructure (Redis + NATS)
+docker compose up -d
+
+# Run backend
+cd backend
+cp ../../run/saversureV2/.env.dev .env
+go run ./cmd/api
+
+# Run frontend (separate terminal)
+cd frontend
+npm run dev
+
+# Run migrations
+cd backend
+go run ./cmd/migrate up
+```

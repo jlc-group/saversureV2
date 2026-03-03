@@ -1,0 +1,36 @@
+# Go
+backend/tmp/
+backend/vendor/
+
+# Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Build outputs
+backend/dist/
+backend/bin/
+backend/api.exe
+frontend/dist/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker volumes
+redis-data/
+nats-data/
+
+# Test
+coverage/
+*.test
+*.out
