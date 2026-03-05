@@ -40,6 +40,48 @@ func (h *Handler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": tenants})
 }
 
+func (h *Handler) GetByID(c *gin.Context) {
+	t, err := h.svc.GetByID(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "tenant_not_found"})
+		return
+	}
+	c.JSON(http.StatusOK, t)
+}
+
+func (h *Handler) GetCurrent(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	if tenantID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing_tenant"})
+		return
+	}
+	t, err := h.svc.GetByID(c.Request.Context(), tenantID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "tenant_not_found"})
+		return
+	}
+	c.JSON(http.StatusOK, t)
+}
+
+func (h *Handler) UpdateCurrent(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	if tenantID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing_tenant"})
+		return
+	}
+	var input UpdateInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		return
+	}
+	t, err := h.svc.Update(c.Request.Context(), tenantID, input)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, t)
+}
+
 func (h *Handler) Update(c *gin.Context) {
 	id := c.Param("id")
 	var input UpdateInput

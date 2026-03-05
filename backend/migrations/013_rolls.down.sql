@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS rolls;
+ALTER TABLE batches DROP COLUMN IF EXISTS codes_per_roll;

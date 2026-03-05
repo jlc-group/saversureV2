@@ -76,7 +76,7 @@ func (s *Service) Reserve(ctx context.Context, tenantID, userID string, input Re
 
 	// Debit points from user
 	if err := s.ledgerSvc.Debit(ctx, tx, tenantID, userID, pointCost, "redemption", input.RewardID,
-		fmt.Sprintf("Redeemed reward (reserved)")); err != nil {
+		fmt.Sprintf("Redeemed reward (reserved)"), "point"); err != nil {
 		return nil, fmt.Errorf("debit points: %w", err)
 	}
 

@@ -1,0 +1,14 @@
+DROP INDEX IF EXISTS idx_leaderboard_ranking;
+DROP INDEX IF EXISTS idx_scan_history_user_date;
+DROP INDEX IF EXISTS idx_scan_history_tenant;
+DROP INDEX IF EXISTS idx_notifications_tenant_user;
+DROP INDEX IF EXISTS idx_coupon_codes_claim;
+DROP INDEX IF EXISTS idx_user_missions_incomplete;
+DROP INDEX IF EXISTS idx_user_missions_user;
+DROP INDEX IF EXISTS idx_reservations_status;
+DROP INDEX IF EXISTS idx_reservations_user;
+DROP INDEX IF EXISTS idx_batches_prefix;
+DROP INDEX IF EXISTS idx_codes_scanned_at;
+DROP INDEX IF EXISTS idx_codes_tenant_batch_serial;
+DROP INDEX IF EXISTS idx_point_ledger_tenant_type;
+DROP INDEX IF EXISTS idx_point_ledger_user_time;

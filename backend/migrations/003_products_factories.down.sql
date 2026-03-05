@@ -1,0 +1,4 @@
+ALTER TABLE batches DROP COLUMN IF EXISTS product_id;
+ALTER TABLE batches DROP COLUMN IF EXISTS factory_id;
+DROP TABLE IF EXISTS factories;
+DROP TABLE IF EXISTS products;

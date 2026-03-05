@@ -48,6 +48,39 @@ services:
       timeout: 3s
       retries: 3
 
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: saversure-api
+    ports:
+      - "30400:30400"
+    environment:
+      APP_ENV: development
+      APP_HOST: 0.0.0.0
+      APP_PORT: "30400"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: saversure
+      DB_USER: saversure_app
+      DB_PASSWORD: julaherb789
+      DB_SSLMODE: disable
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      NATS_URL: nats://nats:4222
+      JWT_SECRET: saversure-dev-jwt-secret-change-in-prod-2026
+      HMAC_SECRET: saversure-dev-hmac-2026
+    env_file:
+      - ../../run/saversureV2/.env.dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   pg-data:
   redis-data:

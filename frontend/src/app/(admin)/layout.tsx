@@ -19,10 +19,12 @@ export default function AdminLayout({
   }, [router]);
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-[var(--md-surface-dim)]">
       <Sidebar />
-      <main className="flex-1 p-8 bg-gray-50 overflow-auto">
-        {children}
+      <main className="flex-1 overflow-auto">
+        <div className="max-w-[1400px] mx-auto p-8">
+          {children}
+        </div>
       </main>
     </div>
   );

@@ -1,0 +1,8 @@
+DROP INDEX IF EXISTS idx_users_v1_id;
+DROP INDEX IF EXISTS idx_users_flag;
+DROP INDEX IF EXISTS idx_users_province;
+
+ALTER TABLE users DROP COLUMN IF EXISTS v1_user_id;
+ALTER TABLE users DROP COLUMN IF EXISTS customer_flag;
+ALTER TABLE users DROP COLUMN IF EXISTS occupation;
+ALTER TABLE users DROP COLUMN IF EXISTS province;

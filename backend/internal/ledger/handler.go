@@ -37,3 +37,25 @@ func (h *Handler) GetHistory(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"data": entries})
 }
+
+func (h *Handler) RefundPoints(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	adminUserID := c.GetString("user_id")
+
+	var input struct {
+		UserID string `json:"user_id" binding:"required"`
+		Amount int    `json:"amount" binding:"required,min=1"`
+		Reason string `json:"reason" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	entry, err := h.svc.RefundPoints(c.Request.Context(), tenantID, input.UserID, input.Amount, input.Reason, adminUserID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, entry)
+}

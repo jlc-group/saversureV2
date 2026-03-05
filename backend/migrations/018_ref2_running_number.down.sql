@@ -1,0 +1,4 @@
+DROP INDEX IF EXISTS idx_batches_ref2_range;
+ALTER TABLE batches DROP COLUMN IF EXISTS ref2_end;
+ALTER TABLE batches DROP COLUMN IF EXISTS ref2_start;
+ALTER TABLE tenants DROP COLUMN IF EXISTS ref2_next;

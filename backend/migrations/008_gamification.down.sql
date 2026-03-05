@@ -1,0 +1,5 @@
+DROP TABLE IF EXISTS leaderboard;
+DROP TABLE IF EXISTS user_badges;
+DROP TABLE IF EXISTS badges;
+DROP TABLE IF EXISTS user_missions;
+DROP TABLE IF EXISTS missions;

@@ -34,3 +34,16 @@ nats-data/
 coverage/
 *.test
 *.out
+
+# Temp / extracted
+.docx_extract/
+charter-extracted.txt
+saversure-charter-v2.zip
+0
+
+# Consumer app build artifacts
+consumer/node_modules/
+consumer/.next/
+
+# Large SQL dumps (V1 backup data)
+backup/*.sql

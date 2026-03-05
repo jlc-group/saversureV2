@@ -18,11 +18,39 @@ import (
 	"saversure/internal/campaign"
 	"saversure/internal/code"
 	"saversure/internal/config"
+	"saversure/internal/coupon"
+	"saversure/internal/customer"
+	"saversure/internal/dashboard"
+	"saversure/internal/apikey"
+	"saversure/internal/branding"
+	"saversure/internal/currency"
+	"saversure/internal/donation"
+	"saversure/internal/engine"
+	"saversure/internal/factory"
+	"saversure/internal/gamification"
+	"saversure/internal/geo"
 	"saversure/internal/inventory"
 	"saversure/internal/ledger"
+	"saversure/internal/luckydraw"
 	mw "saversure/internal/middleware"
+	"saversure/internal/news"
+	"saversure/internal/notification"
+	"saversure/internal/otp"
+	"saversure/internal/profile"
+	"saversure/internal/product"
+	"saversure/internal/promotion"
+	"saversure/internal/qc"
+	"saversure/internal/roll"
 	"saversure/internal/redemption"
+	"saversure/internal/reward"
+	"saversure/internal/scanhistory"
+	"saversure/internal/staff"
+	"saversure/internal/support"
 	"saversure/internal/tenant"
+	"saversure/internal/tier"
+	"saversure/internal/transaction"
+	"saversure/internal/upload"
+	"saversure/internal/webhook"
 	"saversure/pkg/cache"
 	"saversure/pkg/database"
 	qrhmac "saversure/pkg/hmac"
@@ -71,24 +99,78 @@ func main() {
 	// --- Services ---
 	tenantSvc := tenant.NewService(db)
 	authSvc := auth.NewService(db, cfg.JWT.Secret, cfg.JWT.AccessTTL, cfg.JWT.RefreshTTL)
+	rollSvc := roll.NewService(db)
 	campaignSvc := campaign.NewService(db)
-	batchSvc := batch.NewService(db, signer)
+	batchSvc := batch.NewService(db, signer, rollSvc)
 	inventorySvc := inventory.NewService(db)
+	couponSvc := coupon.NewService(db)
 	ledgerSvc := ledger.NewService(db)
 	auditSvc := audit.NewService(db)
-	codeSvc := code.NewService(db, signer, ledgerSvc)
+	promoSvc := promotion.NewService(db)
+	codeSvc := code.NewService(db, signer, ledgerSvc, promoSvc)
 	redemptionSvc := redemption.NewService(db, inventorySvc, ledgerSvc)
+
+	missionEngine := engine.NewMissionEngine(db)
+	notifEngine := engine.NewNotificationEngine(db)
+	_ = missionEngine // will be wired into scan/redeem handlers
+	_ = notifEngine
 
 	// --- Handlers ---
 	tenantHandler := tenant.NewHandler(tenantSvc)
 	authHandler := auth.NewHandler(authSvc)
 	campaignHandler := campaign.NewHandler(campaignSvc)
-	batchHandler := batch.NewHandler(batchSvc)
+	batchHandler := batch.NewHandler(batchSvc, db)
 	inventoryHandler := inventory.NewHandler(inventorySvc)
+	couponHandler := coupon.NewHandler(couponSvc)
 	ledgerHandler := ledger.NewHandler(ledgerSvc)
 	auditHandler := audit.NewHandler(auditSvc)
 	codeHandler := code.NewHandler(codeSvc)
+	qcHandler := qc.NewHandler(db)
+	rollHandler := roll.NewHandler(rollSvc)
 	redemptionHandler := redemption.NewHandler(redemptionSvc)
+	rewardHandler := reward.NewHandler(db)
+	dashboardHandler := dashboard.NewHandler(db)
+	scanHistoryHandler := scanhistory.NewHandler(db)
+	transactionHandler := transaction.NewHandler(db)
+	customerHandler := customer.NewHandler(db)
+	profileHandler := profile.NewHandler(db)
+	staffHandler := staff.NewHandler(db)
+	productHandler := product.NewHandler(db)
+	promoHandler := promotion.NewHandler(promoSvc)
+	factoryHandler := factory.NewHandler(db)
+	newsHandler := news.NewHandler(db)
+	supportHandler := support.NewHandler(db)
+	luckyDrawHandler := luckydraw.NewHandler(db)
+	donationHandler := donation.NewHandler(db)
+	notifHandler := notification.NewHandler(db)
+	currencyHandler := currency.NewHandler(db)
+	apiKeyHandler := apikey.NewHandler(db)
+	webhookHandler := webhook.NewHandler(db)
+	gamifyHandler := gamification.NewHandler(db)
+	tierHandler := tier.NewHandler(db)
+	brandingHandler := branding.NewHandler(db)
+	geoSvc := geo.NewService(db)
+	geoHandler := geo.NewHandler(geoSvc)
+
+	var uploadHandler *upload.Handler
+	if cfg.MinIO.AccessKey != "" {
+		uh, err := upload.NewHandler(upload.Config{
+			Endpoint:  cfg.MinIO.Endpoint,
+			AccessKey: cfg.MinIO.AccessKey,
+			SecretKey: cfg.MinIO.SecretKey,
+			Bucket:    cfg.MinIO.Bucket,
+			UseSSL:    cfg.MinIO.UseSSL,
+			PublicURL: cfg.MinIO.PublicURL,
+		})
+		if err != nil {
+			slog.Warn("MinIO not available (upload disabled)", "error", err)
+		} else {
+			uploadHandler = uh
+			slog.Info("MinIO connected", "endpoint", cfg.MinIO.Endpoint)
+		}
+	} else {
+		slog.Warn("MinIO not configured (upload disabled)")
+	}
 
 	// --- Router ---
 	if cfg.App.Env == "production" {
@@ -115,8 +197,26 @@ func main() {
 	authRoutes := api.Group("/auth")
 	{
 		authRoutes.POST("/register", authHandler.Register)
+		authRoutes.POST("/register-consumer", authHandler.RegisterConsumer)
 		authRoutes.POST("/login", authHandler.Login)
+		authRoutes.POST("/login-phone", authHandler.LoginByPhone)
 		authRoutes.POST("/refresh", authHandler.Refresh)
+	}
+
+	// --- OTP (public, no auth) ---
+	if cfg.SMS.Host != "" && cfg.SMS.Username != "" && cfg.SMS.Password != "" && cfg.SMS.OTCOtcID != "" {
+		antsClient := otp.NewAntsClient(cfg.SMS.Host, cfg.SMS.Username, cfg.SMS.Password, cfg.SMS.OTCOtcID)
+		otpSvc := otp.NewService(antsClient, rdb)
+		otpHandler := otp.NewHandler(otpSvc)
+		authSvc.SetOTPVerifier(otpSvc)
+		otpRoutes := api.Group("/otp")
+		{
+			otpRoutes.POST("/request", otpHandler.Request)
+			otpRoutes.POST("/verify", otpHandler.Verify)
+		}
+		slog.Info("OTP (Ants SMS) enabled")
+	} else {
+		slog.Warn("OTP disabled: SMS credentials not configured")
 	}
 
 	// --- Protected routes ---
@@ -129,7 +229,16 @@ func main() {
 	{
 		tenantRoutes.POST("", tenantHandler.Create)
 		tenantRoutes.GET("", tenantHandler.List)
+		tenantRoutes.GET("/:id", tenantHandler.GetByID)
 		tenantRoutes.PATCH("/:id", tenantHandler.Update)
+	}
+
+	// Settings (Brand Admin) - ใช้ tenant_id จาก JWT โดยตรง ไม่ต้องผ่าน TenantIsolation
+	settingsRoutes := protected.Group("/settings")
+	settingsRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		settingsRoutes.GET("/tenant", tenantHandler.GetCurrent)
+		settingsRoutes.PATCH("/tenant", tenantHandler.UpdateCurrent)
 	}
 
 	// Routes that require tenant context
@@ -153,6 +262,7 @@ func main() {
 	{
 		batchRoutes.POST("", batchHandler.Create)
 		batchRoutes.GET("", batchHandler.List)
+		batchRoutes.GET("/:id/export", batchHandler.Export)
 		batchRoutes.PATCH("/:id/status", batchHandler.UpdateStatus)
 		batchRoutes.POST("/:id/recall", batchHandler.Recall)
 	}
@@ -166,11 +276,43 @@ func main() {
 		rewardRoutes.PATCH("/:id/inventory", inventoryHandler.UpdateInventory)
 	}
 
+	// Coupon code pool (Brand Admin)
+	couponRoutes := tenanted.Group("/coupons")
+	couponRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		couponRoutes.POST("/import", couponHandler.Import)
+		couponRoutes.GET("", couponHandler.List)
+		couponRoutes.GET("/:rewardId/available", couponHandler.CountAvailable)
+		couponRoutes.DELETE("/:rewardId/unclaimed", couponHandler.DeleteUnclaimed)
+	}
+
 	// QR Scan (Public users, rate limited)
 	scanRoutes := tenanted.Group("/scan")
 	scanRoutes.Use(mw.RateLimit(rdb, "scan", cfg.RateLimit.Scan, time.Minute))
 	{
 		scanRoutes.POST("", codeHandler.Scan)
+	}
+
+	// Roll Management (Admin / Factory)
+	rollRoutes := tenanted.Group("/rolls")
+	rollRoutes.Use(mw.RequireRole("super_admin", "brand_admin", "factory_user"))
+	{
+		rollRoutes.GET("", rollHandler.List)
+		rollRoutes.GET("/stats", rollHandler.GetStats)
+		rollRoutes.GET("/:id", rollHandler.GetByID)
+		rollRoutes.POST("/:id/map", rollHandler.MapProduct)
+		rollRoutes.POST("/:id/unmap", rollHandler.Unmap)
+		rollRoutes.POST("/:id/qc", rollHandler.QCReview)
+		rollRoutes.PATCH("/:id/status", rollHandler.UpdateStatus)
+		rollRoutes.POST("/bulk-map", rollHandler.BulkMap)
+		rollRoutes.POST("/bulk-status", rollHandler.BulkUpdateStatus)
+	}
+
+	// QC Verify (Factory / QC staff)
+	qcRoutes := tenanted.Group("/qc")
+	qcRoutes.Use(mw.RequireRole("super_admin", "brand_admin", "factory_user"))
+	{
+		qcRoutes.GET("/verify", qcHandler.Verify)
 	}
 
 	// Redemption (rate limited, idempotent)
@@ -188,6 +330,13 @@ func main() {
 		pointsRoutes.GET("/history", ledgerHandler.GetHistory)
 	}
 
+	// Point Refund (Admin)
+	refundRoutes := tenanted.Group("/points/refund")
+	refundRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		refundRoutes.POST("", ledgerHandler.RefundPoints)
+	}
+
 	// Audit (Super Admin)
 	auditRoutes := tenanted.Group("/audit")
 	auditRoutes.Use(mw.RequireRole("super_admin"))
@@ -195,13 +344,284 @@ func main() {
 		auditRoutes.GET("", auditHandler.List)
 	}
 
+	// Geolocation (Admin)
+	geoRoutes := tenanted.Group("/geo")
+	geoRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		geoRoutes.GET("/reverse", geoHandler.ReverseGeocode)
+		geoRoutes.POST("/backfill", geoHandler.BackfillProvinces)
+	}
+
+	// Scan History (Admin)
+	scanHistoryRoutes := tenanted.Group("/scan-history")
+	scanHistoryRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		scanHistoryRoutes.GET("", scanHistoryHandler.List)
+		scanHistoryRoutes.GET("/:id", scanHistoryHandler.GetByID)
+	}
+
+	// Redeem Transactions (Admin)
+	txnRoutes := tenanted.Group("/redeem-transactions")
+	txnRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		txnRoutes.GET("", transactionHandler.List)
+		txnRoutes.GET("/export", transactionHandler.ExportCSV)
+		txnRoutes.PATCH("/:id", transactionHandler.UpdateStatus)
+	}
+
+	// Customer Management (Admin)
+	customerRoutes := tenanted.Group("/customers")
+	customerRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		customerRoutes.GET("", customerHandler.List)
+		customerRoutes.GET("/:id/detail", customerHandler.GetDetail)
+		customerRoutes.GET("/:id", customerHandler.GetByID)
+		customerRoutes.PATCH("/:id", customerHandler.Update)
+	}
+
 	// Dashboard
 	dashboardRoutes := tenanted.Group("/dashboard")
 	dashboardRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
 	{
-		dashboardRoutes.GET("/summary", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{"message": "dashboard coming soon"})
-		})
+		dashboardRoutes.GET("/summary", dashboardHandler.Summary)
+		dashboardRoutes.GET("/scan-chart", dashboardHandler.ScanChart)
+		dashboardRoutes.GET("/top-products", dashboardHandler.TopProducts)
+		dashboardRoutes.GET("/funnel", dashboardHandler.ConversionFunnel)
+		dashboardRoutes.GET("/geo-heatmap", dashboardHandler.GeoHeatmap)
+		dashboardRoutes.GET("/recent-activity", dashboardHandler.RecentActivity)
+	}
+
+	// Staff Management (Brand Admin+)
+	staffRoutes := tenanted.Group("/staff")
+	staffRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		staffRoutes.GET("", staffHandler.List)
+		staffRoutes.POST("", staffHandler.Create)
+		staffRoutes.PATCH("/:id", staffHandler.Update)
+		staffRoutes.DELETE("/:id", staffHandler.Delete)
+	}
+
+	// Product Management
+	productRoutes := tenanted.Group("/products")
+	productRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		productRoutes.GET("", productHandler.List)
+		productRoutes.POST("", productHandler.Create)
+		productRoutes.POST("/import", productHandler.ImportCSV)
+		productRoutes.PATCH("/:id", productHandler.Update)
+		productRoutes.DELETE("/:id", productHandler.Delete)
+	}
+
+	// Promotions (Brand Admin)
+	promoRoutes := tenanted.Group("/promotions")
+	promoRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		promoRoutes.GET("", promoHandler.List)
+		promoRoutes.GET("/:id", promoHandler.GetByID)
+		promoRoutes.POST("", promoHandler.Create)
+		promoRoutes.PATCH("/:id", promoHandler.Update)
+		promoRoutes.DELETE("/:id", promoHandler.Delete)
+		promoRoutes.POST("/:id/submit", promoHandler.Submit)
+		promoRoutes.POST("/:id/approve", promoHandler.Approve)
+		promoRoutes.POST("/:id/reject", promoHandler.Reject)
+		promoRoutes.POST("/:id/deactivate", promoHandler.Deactivate)
+		promoRoutes.POST("/:id/reactivate", promoHandler.Reactivate)
+	}
+
+	// Factory Management
+	factoryRoutes := tenanted.Group("/factories")
+	factoryRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		factoryRoutes.GET("", factoryHandler.List)
+		factoryRoutes.POST("", factoryHandler.Create)
+		factoryRoutes.PATCH("/:id", factoryHandler.Update)
+		factoryRoutes.DELETE("/:id", factoryHandler.Delete)
+	}
+
+	// News Management (Admin)
+	newsAdminRoutes := tenanted.Group("/news")
+	newsAdminRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		newsAdminRoutes.GET("", newsHandler.List)
+		newsAdminRoutes.GET("/:id", newsHandler.GetByID)
+		newsAdminRoutes.POST("", newsHandler.Create)
+		newsAdminRoutes.PATCH("/:id", newsHandler.Update)
+		newsAdminRoutes.DELETE("/:id", newsHandler.Delete)
+	}
+
+	// Support Cases (Admin)
+	supportAdminRoutes := tenanted.Group("/support/cases")
+	supportAdminRoutes.Use(mw.RequireRole("super_admin", "brand_admin", "brand_staff"))
+	{
+		supportAdminRoutes.GET("", supportHandler.ListCases)
+		supportAdminRoutes.GET("/:id", supportHandler.GetCase)
+		supportAdminRoutes.PATCH("/:id", supportHandler.UpdateCase)
+		supportAdminRoutes.POST("/:id/reply", supportHandler.Reply)
+	}
+
+	// Support Cases (Consumer)
+	supportUserRoutes := tenanted.Group("/support/my-cases")
+	{
+		supportUserRoutes.GET("", supportHandler.ListUserCases)
+		supportUserRoutes.POST("", supportHandler.CreateCase)
+		supportUserRoutes.GET("/:id", supportHandler.GetCase)
+		supportUserRoutes.POST("/:id/reply", supportHandler.Reply)
+	}
+
+	// Lucky Draw (Admin)
+	luckyDrawAdminRoutes := tenanted.Group("/lucky-draw")
+	luckyDrawAdminRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		luckyDrawAdminRoutes.GET("", luckyDrawHandler.ListCampaigns)
+		luckyDrawAdminRoutes.GET("/:id", luckyDrawHandler.GetCampaign)
+		luckyDrawAdminRoutes.POST("", luckyDrawHandler.CreateCampaign)
+		luckyDrawAdminRoutes.PATCH("/:id", luckyDrawHandler.UpdateCampaign)
+		luckyDrawAdminRoutes.POST("/:id/prizes", luckyDrawHandler.AddPrize)
+		luckyDrawAdminRoutes.DELETE("/:id/prizes/:prizeId", luckyDrawHandler.DeletePrize)
+		luckyDrawAdminRoutes.POST("/:id/draw", luckyDrawHandler.DrawWinners)
+		luckyDrawAdminRoutes.GET("/:id/winners", luckyDrawHandler.GetWinners)
+	}
+
+	// Point Currencies (Admin)
+	currencyRoutes := tenanted.Group("/currencies")
+	currencyRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		currencyRoutes.GET("", currencyHandler.List)
+		currencyRoutes.POST("", currencyHandler.Create)
+		currencyRoutes.PATCH("/:id", currencyHandler.Update)
+		currencyRoutes.DELETE("/:id", currencyHandler.Delete)
+		currencyRoutes.POST("/:code/convert", currencyHandler.Convert)
+	}
+
+	// Donation (Admin)
+	donationAdminRoutes := tenanted.Group("/donations")
+	donationAdminRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		donationAdminRoutes.GET("", donationHandler.List)
+		donationAdminRoutes.POST("", donationHandler.Create)
+		donationAdminRoutes.PATCH("/:id", donationHandler.Update)
+		donationAdminRoutes.GET("/:id/history", donationHandler.GetHistory)
+	}
+
+	// Notifications
+	notifRoutes := tenanted.Group("/notifications")
+	{
+		notifRoutes.GET("", notifHandler.List)
+		notifRoutes.GET("/unread-count", notifHandler.UnreadCount)
+		notifRoutes.PATCH("/:id/read", notifHandler.MarkRead)
+		notifRoutes.POST("/read-all", notifHandler.MarkAllRead)
+	}
+
+	// Reward Tiers (Admin)
+	tierRoutes := tenanted.Group("/tiers")
+	tierRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		tierRoutes.GET("", tierHandler.List)
+		tierRoutes.POST("", tierHandler.Create)
+		tierRoutes.PATCH("/:id", tierHandler.Update)
+		tierRoutes.DELETE("/:id", tierHandler.Delete)
+	}
+
+	// Branding (Admin)
+	brandingRoutes := tenanted.Group("/branding")
+	brandingRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		brandingRoutes.GET("", brandingHandler.Get)
+		brandingRoutes.PUT("", brandingHandler.Update)
+	}
+
+	// API Keys (Admin)
+	apiKeyRoutes := tenanted.Group("/api-keys")
+	apiKeyRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		apiKeyRoutes.GET("", apiKeyHandler.List)
+		apiKeyRoutes.POST("", apiKeyHandler.Create)
+		apiKeyRoutes.PATCH("/:id/revoke", apiKeyHandler.Revoke)
+		apiKeyRoutes.DELETE("/:id", apiKeyHandler.Delete)
+	}
+
+	// Webhooks (Admin)
+	webhookRoutes := tenanted.Group("/webhooks")
+	webhookRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		webhookRoutes.GET("", webhookHandler.List)
+		webhookRoutes.POST("", webhookHandler.Create)
+		webhookRoutes.PATCH("/:id", webhookHandler.Update)
+		webhookRoutes.DELETE("/:id", webhookHandler.Delete)
+		webhookRoutes.GET("/:id/secret", webhookHandler.GetSecret)
+		webhookRoutes.GET("/:id/logs", webhookHandler.GetLogs)
+		webhookRoutes.POST("/:id/test", webhookHandler.Test)
+	}
+
+	// Gamification — Missions & Badges (Admin)
+	missionRoutes := tenanted.Group("/missions")
+	missionRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		missionRoutes.GET("", gamifyHandler.ListMissions)
+		missionRoutes.POST("", gamifyHandler.CreateMission)
+		missionRoutes.PATCH("/:id", gamifyHandler.UpdateMission)
+		missionRoutes.DELETE("/:id", gamifyHandler.DeleteMission)
+	}
+
+	badgeRoutes := tenanted.Group("/badges")
+	badgeRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		badgeRoutes.GET("", gamifyHandler.ListBadges)
+		badgeRoutes.POST("", gamifyHandler.CreateBadge)
+		badgeRoutes.DELETE("/:id", gamifyHandler.DeleteBadge)
+	}
+
+	// File Upload (requires MinIO)
+	if uploadHandler != nil {
+		uploadRoutes := tenanted.Group("/upload")
+		uploadRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+		{
+			uploadRoutes.POST("/image", uploadHandler.UploadImage)
+			uploadRoutes.POST("/file", uploadHandler.UploadFile)
+		}
+	}
+
+	// Public APIs (consumer-facing — no role restriction)
+	publicRoutes := tenanted.Group("/public")
+	{
+		publicRoutes.GET("/rewards", rewardHandler.ListPublic)
+		publicRoutes.GET("/rewards/:id", rewardHandler.GetDetail)
+		publicRoutes.GET("/news", newsHandler.ListPublished)
+		publicRoutes.GET("/lucky-draw", luckyDrawHandler.ListActiveCampaigns)
+		publicRoutes.GET("/lucky-draw/:id", luckyDrawHandler.GetCampaign)
+		publicRoutes.GET("/lucky-draw/:id/winners", luckyDrawHandler.GetWinners)
+		publicRoutes.GET("/donations", donationHandler.ListActive)
+		publicRoutes.GET("/missions", gamifyHandler.ListActiveMissions)
+		publicRoutes.GET("/leaderboard", gamifyHandler.GetLeaderboard)
+		publicRoutes.GET("/badges", gamifyHandler.ListBadges)
+		publicRoutes.GET("/tiers", tierHandler.List)
+		publicRoutes.GET("/branding", brandingHandler.GetPublic)
+	}
+
+	// Consumer Profile (self)
+	profileRoutes := tenanted.Group("/profile")
+	{
+		profileRoutes.GET("", profileHandler.GetProfile)
+		profileRoutes.PATCH("", profileHandler.UpdateProfile)
+		profileRoutes.GET("/addresses", profileHandler.ListAddresses)
+		profileRoutes.POST("/addresses", profileHandler.CreateAddress)
+		profileRoutes.PATCH("/addresses/:id", profileHandler.UpdateAddress)
+		profileRoutes.DELETE("/addresses/:id", profileHandler.DeleteAddress)
+		profileRoutes.PATCH("/addresses/:id/default", profileHandler.SetDefaultAddress)
+	}
+
+	// User-specific actions (consumer)
+	myRoutes := tenanted.Group("/my")
+	{
+		myRoutes.POST("/lucky-draw/:id/register", luckyDrawHandler.Register)
+		myRoutes.GET("/lucky-draw/:id/tickets", luckyDrawHandler.GetUserTickets)
+		myRoutes.POST("/donations/:id/donate", donationHandler.Donate)
+		myRoutes.GET("/balances", currencyHandler.GetMultiBalance)
+		myRoutes.GET("/missions", gamifyHandler.GetUserMissions)
+		myRoutes.GET("/badges", gamifyHandler.GetUserBadges)
+		myRoutes.GET("/tier", tierHandler.GetUserTier)
+		myRoutes.GET("/pdpa", authHandler.GetPDPA)
+		myRoutes.POST("/pdpa/withdraw", authHandler.WithdrawPDPA)
 	}
 
 	// --- Server ---

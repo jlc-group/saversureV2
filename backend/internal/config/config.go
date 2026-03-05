@@ -14,8 +14,16 @@ type Config struct {
 	NATS     NATSConfig
 	JWT      JWTConfig
 	MinIO    MinIOConfig
+	SMS      SMSConfig
 	HMAC     HMACConfig
 	RateLimit RateLimitConfig
+}
+
+type SMSConfig struct {
+	Host     string
+	Username string
+	Password string
+	OTCOtcID string
 }
 
 type AppConfig struct {
@@ -69,6 +77,7 @@ type MinIOConfig struct {
 	SecretKey string
 	Bucket    string
 	UseSSL    bool
+	PublicURL string
 }
 
 type HMACConfig struct {
@@ -109,8 +118,8 @@ func Load() (*Config, error) {
 		},
 		JWT: JWTConfig{
 			Secret:     getEnv("JWT_SECRET", ""),
-			AccessTTL:  getEnvDuration("JWT_ACCESS_TTL", 15*time.Minute),
-			RefreshTTL: getEnvDuration("JWT_REFRESH_TTL", 7*24*time.Hour),
+			AccessTTL:  getEnvDuration("JWT_ACCESS_TTL", 8*time.Hour),
+			RefreshTTL: getEnvDuration("JWT_REFRESH_TTL", 30*24*time.Hour),
 		},
 		MinIO: MinIOConfig{
 			Endpoint:  getEnv("MINIO_ENDPOINT", "localhost:59300"),
@@ -118,6 +127,13 @@ func Load() (*Config, error) {
 			SecretKey: getEnv("MINIO_SECRET_KEY", ""),
 			Bucket:    getEnv("MINIO_BUCKET", "saversure-dev"),
 			UseSSL:    getEnvBool("MINIO_USE_SSL", false),
+			PublicURL: getEnv("MINIO_PUBLIC_URL", "http://localhost:59300"),
+		},
+		SMS: SMSConfig{
+			Host:     getEnv("SMS_HOST", ""),
+			Username: getEnv("SMS_USERNAME", ""),
+			Password: getEnv("SMS_PASSWORD", ""),
+			OTCOtcID: getEnv("SMS_OTP_OTC_ID", ""),
 		},
 		HMAC: HMACConfig{
 			Secret: getEnv("HMAC_SECRET", ""),
