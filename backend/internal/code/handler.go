@@ -15,6 +15,50 @@ func NewHandler(svc *Service) *Handler {
 	return &Handler{svc: svc}
 }
 
+func (h *Handler) Lookup(c *gin.Context) {
+	code := c.Query("code")
+	if code == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": "code query parameter is required"})
+		return
+	}
+	result, err := h.svc.Lookup(c.Request.Context(), c.GetString("tenant_id"), code)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "lookup_failed", "message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) ResolveRef1(c *gin.Context) {
+	code := c.Query("code")
+	if code == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": "code query parameter is required"})
+		return
+	}
+	tenantID := c.GetString("tenant_id")
+	if tenantID == "" {
+		tenantID = c.GetHeader("X-Tenant-ID")
+	}
+	if tenantID == "" {
+		tid, err := h.svc.ResolveTenantFromCode(c.Request.Context(), code)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not_found", "message": "Code not found"})
+			return
+		}
+		tenantID = tid
+	}
+	result, err := h.svc.ResolveRef1(c.Request.Context(), tenantID, code)
+	if err != nil {
+		if errors.Is(err, ErrInvalidCode) || errors.Is(err, ErrBatchNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not_found", "message": "Code not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "resolve_failed", "message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
 func (h *Handler) Scan(c *gin.Context) {
 	var input ScanInput
 	if err := c.ShouldBindJSON(&input); err != nil {

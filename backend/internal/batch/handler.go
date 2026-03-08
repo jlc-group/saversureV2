@@ -2,6 +2,7 @@ package batch
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -82,7 +83,8 @@ func (h *Handler) Recall(c *gin.Context) {
 	c.JSON(http.StatusOK, batch)
 }
 
-// Export generates CSV/JSON export for batch (for printer)
+// Export generates CSV/ZIP/JSON export for batch (for printer)
+// Query params: format (csv|zip|json), roll, start_serial, end_serial, lot_size, codes_per_file
 func (h *Handler) Export(c *gin.Context) {
 	tenantID := c.GetString("tenant_id")
 	batchID := c.Param("id")
@@ -102,52 +104,38 @@ func (h *Handler) Export(c *gin.Context) {
 	if lotSize <= 0 {
 		lotSize = 10000
 	}
-
 	if v := c.Query("lot_size"); v != "" {
-		n, parseErr := strconv.ParseInt(v, 10, 64)
-		if parseErr != nil || n <= 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": "lot_size must be positive integer"})
-			return
+		if n, e := strconv.ParseInt(v, 10, 64); e == nil && n > 0 {
+			lotSize = n
 		}
-		lotSize = n
 	}
 
 	startSerial := int64(0)
 	endSerial := int64(0)
 	if v := c.Query("start_serial"); v != "" {
-		n, parseErr := strconv.ParseInt(v, 10, 64)
-		if parseErr != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": "start_serial must be integer"})
-			return
+		if n, e := strconv.ParseInt(v, 10, 64); e == nil {
+			startSerial = n
 		}
-		startSerial = n
 	}
 	if v := c.Query("end_serial"); v != "" {
-		n, parseErr := strconv.ParseInt(v, 10, 64)
-		if parseErr != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": "end_serial must be integer"})
-			return
+		if n, e := strconv.ParseInt(v, 10, 64); e == nil {
+			endSerial = n
 		}
-		endSerial = n
 	}
 
-	// roll has priority over explicit start/end
 	roll := int64(0)
 	if v := c.Query("roll"); v != "" {
-		n, parseErr := strconv.ParseInt(v, 10, 64)
-		if parseErr != nil || n <= 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": "roll must be positive integer"})
-			return
-		}
-		roll = n
-		startSerial = batch.SerialStart + (roll-1)*lotSize
-		endSerial = startSerial + lotSize - 1
-		if startSerial > batch.SerialEnd {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": "roll is out of range for this batch"})
-			return
-		}
-		if endSerial > batch.SerialEnd {
-			endSerial = batch.SerialEnd
+		if n, e := strconv.ParseInt(v, 10, 64); e == nil && n > 0 {
+			roll = n
+			startSerial = batch.SerialStart + (roll-1)*lotSize
+			endSerial = startSerial + lotSize - 1
+			if startSerial > batch.SerialEnd {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": "roll is out of range"})
+				return
+			}
+			if endSerial > batch.SerialEnd {
+				endSerial = batch.SerialEnd
+			}
 		}
 	}
 	if startSerial == 0 {
@@ -157,38 +145,63 @@ func (h *Handler) Export(c *gin.Context) {
 		endSerial = batch.SerialEnd
 	}
 
-	records, err := h.svc.ExportCodes(c.Request.Context(), tenantID, batchID, tenantSettings, campaignSettings, ExportOptions{
-		StartSerial: startSerial,
-		EndSerial:   endSerial,
-		LotSize:     lotSize,
-	})
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "export_failed", "message": err.Error()})
-		return
+	codesPerFile := int64(40000)
+	if v := c.Query("codes_per_file"); v != "" {
+		if n, e := strconv.ParseInt(v, 10, 64); e == nil && n > 0 {
+			codesPerFile = n
+		}
 	}
 
+	opts := ExportOptions{StartSerial: startSerial, EndSerial: endSerial, LotSize: lotSize}
+	totalCodes := endSerial - startSerial + 1
+
 	switch format {
-	case "json":
+	case "zip":
+		c.Header("Content-Type", "application/zip")
+		fileName := batch.Prefix + "_export.zip"
+		if roll > 0 {
+			fileName = batch.Prefix + "_roll" + strconv.FormatInt(roll, 10) + ".zip"
+		}
+		c.Header("Content-Disposition", "attachment; filename="+fileName)
+		c.Status(http.StatusOK)
+
+		zipW := codegen.NewZipExporter(c.Writer, codesPerFile)
+		if err := h.svc.StreamExportZip(c.Request.Context(), tenantID, batchID, tenantSettings, campaignSettings, opts, zipW); err != nil {
+			slog.Error("zip export failed", "batch_id", batchID, "error", err)
+		}
+
+	case "csv":
+		c.Header("Content-Type", "text/csv; charset=utf-8")
+		fileName := batch.Prefix + "_export.csv"
+		if roll > 0 {
+			fileName = batch.Prefix + "_roll" + strconv.FormatInt(roll, 10) + ".csv"
+		}
+		c.Header("Content-Disposition", "attachment; filename="+fileName)
+		c.Status(http.StatusOK)
+
+		if err := h.svc.StreamExportCodes(c.Request.Context(), tenantID, batchID, tenantSettings, campaignSettings, opts, c.Writer, codesPerFile); err != nil {
+			slog.Error("csv export failed", "batch_id", batchID, "error", err)
+		}
+
+	default:
+		if totalCodes > 200000 {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "too_large_for_json",
+				"message": "JSON export limited to 200K rows. Use format=csv or format=zip",
+				"total":   totalCodes,
+			})
+			return
+		}
+		records, err := h.svc.ExportCodes(c.Request.Context(), tenantID, batchID, tenantSettings, campaignSettings, opts)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "export_failed", "message": err.Error()})
+			return
+		}
 		c.JSON(http.StatusOK, gin.H{
 			"data":  records,
 			"total": len(records),
-			"meta": gin.H{
-				"lot_size":     lotSize,
-				"roll":         roll,
-				"start_serial": startSerial,
-				"end_serial":   endSerial,
-			},
+			"meta":  gin.H{"lot_size": lotSize, "roll": roll, "start_serial": startSerial, "end_serial": endSerial},
 		})
-	case "csv":
-		c.Header("Content-Type", "text/csv; charset=utf-8")
-		fileName := "batch_export.csv"
-		if roll > 0 {
-			fileName = "batch_roll_" + strconv.FormatInt(roll, 10) + ".csv"
-		}
-		c.Header("Content-Disposition", "attachment; filename="+fileName)
-		c.String(http.StatusOK, codegen.RecordsToCSV(records))
-	default:
-		c.JSON(http.StatusOK, gin.H{"data": records, "total": len(records)})
 	}
 }
 

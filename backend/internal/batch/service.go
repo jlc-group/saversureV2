@@ -3,6 +3,7 @@ package batch
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -369,4 +370,206 @@ func (s *Service) ExportCodes(ctx context.Context, tenantID, batchID string, ten
 	}
 
 	return records, nil
+}
+
+// StreamExportCodes streams CSV records directly to writer without buffering all in memory.
+// Supports unlimited batch size. Calls onRecord for each generated record (e.g. for ZIP splitting).
+func (s *Service) StreamExportCodes(ctx context.Context, tenantID, batchID string, tenantSettings, campaignSettings map[string]any, opts ExportOptions, w io.Writer, codesPerFile int64) error {
+	b, err := s.GetByID(ctx, tenantID, batchID)
+	if err != nil {
+		return err
+	}
+	if b.Ref2Start == nil || b.Ref2End == nil {
+		return fmt.Errorf("batch has no ref2 range")
+	}
+
+	cfg := codegen.ConfigFromTenantSettings(tenantSettings)
+	cfg = cfg.MergeWith(codegen.ConfigFromCampaignSettings(campaignSettings))
+
+	baseURL := cfg.ScanBaseURL
+	if baseURL == "" {
+		baseURL = "https://scan.saversure.com"
+	}
+
+	startSerial := b.SerialStart
+	endSerial := b.SerialEnd
+	if opts.StartSerial > 0 {
+		startSerial = opts.StartSerial
+	}
+	if opts.EndSerial > 0 {
+		endSerial = opts.EndSerial
+	}
+	if startSerial < b.SerialStart {
+		startSerial = b.SerialStart
+	}
+	if endSerial > b.SerialEnd {
+		endSerial = b.SerialEnd
+	}
+	if endSerial < startSerial {
+		return fmt.Errorf("invalid serial range")
+	}
+
+	lotSize := opts.LotSize
+	if lotSize <= 0 {
+		lotSize = cfg.LotSize
+	}
+	if lotSize <= 0 {
+		lotSize = 10000
+	}
+
+	hmacLen := cfg.HMACLength
+	if hmacLen <= 0 {
+		hmacLen = 8
+	}
+
+	csvW := codegen.NewCSVWriter(w)
+	codegen.WriteCSVHeader(csvW)
+
+	for serial := startSerial; serial <= endSerial; serial++ {
+		offset := serial - b.SerialStart
+		ref2Running := *b.Ref2Start + offset
+
+		runningNumber := serial
+		if cfg.Ref1MinValue > 0 {
+			runningNumber = cfg.Ref1MinValue + offset
+		}
+
+		var code, url string
+		if cfg.CompactCode {
+			code = s.signer.GenerateCompactCode(b.Prefix, serial, hmacLen)
+			if cfg.URLFormat == "path" {
+				url = fmt.Sprintf("%s/%s", baseURL, code)
+			} else {
+				url = fmt.Sprintf("%s?code=%s", baseURL, code)
+			}
+		} else {
+			code = s.signer.GenerateCode(b.Prefix, serial)
+			url = fmt.Sprintf("%s?code=%s", baseURL, code)
+		}
+
+		lotNum := offset/lotSize + 1
+		codegen.WriteCSVRecord(csvW, codegen.ExportRecord{
+			SerialNumber: serial,
+			Code:         code,
+			Ref1:         codegen.GenerateRef1(runningNumber, cfg),
+			Ref2:         codegen.GenerateRef2(ref2Running),
+			URL:          url,
+			LotNumber:    fmt.Sprintf("LOT%04d", lotNum),
+		})
+
+		if serial%10000 == 0 {
+			csvW.Flush()
+		}
+	}
+	csvW.Flush()
+	return csvW.Error()
+}
+
+// StreamExportZip streams a ZIP file containing multiple CSVs split by codesPerFile.
+func (s *Service) StreamExportZip(ctx context.Context, tenantID, batchID string, tenantSettings, campaignSettings map[string]any, opts ExportOptions, zipW *codegen.ZipExporter) error {
+	b, err := s.GetByID(ctx, tenantID, batchID)
+	if err != nil {
+		return err
+	}
+	if b.Ref2Start == nil || b.Ref2End == nil {
+		return fmt.Errorf("batch has no ref2 range")
+	}
+
+	cfg := codegen.ConfigFromTenantSettings(tenantSettings)
+	cfg = cfg.MergeWith(codegen.ConfigFromCampaignSettings(campaignSettings))
+
+	baseURL := cfg.ScanBaseURL
+	if baseURL == "" {
+		baseURL = "https://scan.saversure.com"
+	}
+
+	startSerial := b.SerialStart
+	endSerial := b.SerialEnd
+	if opts.StartSerial > 0 {
+		startSerial = opts.StartSerial
+	}
+	if opts.EndSerial > 0 {
+		endSerial = opts.EndSerial
+	}
+	if startSerial < b.SerialStart {
+		startSerial = b.SerialStart
+	}
+	if endSerial > b.SerialEnd {
+		endSerial = b.SerialEnd
+	}
+	if endSerial < startSerial {
+		return fmt.Errorf("invalid serial range")
+	}
+
+	lotSize := opts.LotSize
+	if lotSize <= 0 {
+		lotSize = cfg.LotSize
+	}
+	if lotSize <= 0 {
+		lotSize = 10000
+	}
+
+	hmacLen := cfg.HMACLength
+	if hmacLen <= 0 {
+		hmacLen = 8
+	}
+
+	codesPerFile := zipW.CodesPerFile
+	if codesPerFile <= 0 {
+		codesPerFile = 40000
+	}
+
+	fileIdx := int64(1)
+	rowInFile := int64(0)
+
+	fileName := fmt.Sprintf("%s_%d.csv", b.Prefix, fileIdx)
+	if err := zipW.StartFile(fileName); err != nil {
+		return err
+	}
+
+	for serial := startSerial; serial <= endSerial; serial++ {
+		if rowInFile >= codesPerFile {
+			zipW.FlushCSV()
+			fileIdx++
+			rowInFile = 0
+			fileName = fmt.Sprintf("%s_%d.csv", b.Prefix, fileIdx)
+			if err := zipW.StartFile(fileName); err != nil {
+				return err
+			}
+		}
+
+		offset := serial - b.SerialStart
+		ref2Running := *b.Ref2Start + offset
+
+		runningNumber := serial
+		if cfg.Ref1MinValue > 0 {
+			runningNumber = cfg.Ref1MinValue + offset
+		}
+
+		var code, url string
+		if cfg.CompactCode {
+			code = s.signer.GenerateCompactCode(b.Prefix, serial, hmacLen)
+			if cfg.URLFormat == "path" {
+				url = fmt.Sprintf("%s/%s", baseURL, code)
+			} else {
+				url = fmt.Sprintf("%s?code=%s", baseURL, code)
+			}
+		} else {
+			code = s.signer.GenerateCode(b.Prefix, serial)
+			url = fmt.Sprintf("%s?code=%s", baseURL, code)
+		}
+
+		lotNum := offset/lotSize + 1
+		zipW.WriteRecord(codegen.ExportRecord{
+			SerialNumber: serial,
+			Code:         code,
+			Ref1:         codegen.GenerateRef1(runningNumber, cfg),
+			Ref2:         codegen.GenerateRef2(ref2Running),
+			URL:          url,
+			LotNumber:    fmt.Sprintf("LOT%04d", lotNum),
+		})
+		rowInFile++
+	}
+	zipW.FlushCSV()
+	return zipW.Close()
 }

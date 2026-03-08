@@ -8,15 +8,22 @@ import (
 )
 
 type Config struct {
-	App      AppConfig
-	DB       DBConfig
-	Redis    RedisConfig
-	NATS     NATSConfig
-	JWT      JWTConfig
-	MinIO    MinIOConfig
-	SMS      SMSConfig
-	HMAC     HMACConfig
+	App       AppConfig
+	DB        DBConfig
+	Redis     RedisConfig
+	NATS      NATSConfig
+	JWT       JWTConfig
+	MinIO     MinIOConfig
+	SMS       SMSConfig
+	HMAC      HMACConfig
 	RateLimit RateLimitConfig
+	LINE      LINEConfig
+}
+
+type LINEConfig struct {
+	ChannelID     string
+	ChannelSecret string
+	CallbackURL   string
 }
 
 type SMSConfig struct {
@@ -142,6 +149,11 @@ func Load() (*Config, error) {
 			Scan:     getEnvInt("RATE_LIMIT_SCAN", 10),
 			Redeem:   getEnvInt("RATE_LIMIT_REDEEM", 5),
 			Transfer: getEnvInt("RATE_LIMIT_TRANSFER", 3),
+		},
+		LINE: LINEConfig{
+			ChannelID:     getEnv("LINE_CHANNEL_ID", ""),
+			ChannelSecret: getEnv("LINE_CHANNEL_SECRET", ""),
+			CallbackURL:   getEnv("LINE_CALLBACK_URL", "http://localhost:30403/auth/line/callback"),
 		},
 	}
 

@@ -20,8 +20,9 @@ func (h *Handler) List(c *gin.Context) {
 	tenantID := c.GetString("tenant_id")
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	factoryType := c.Query("factory_type")
 
-	factories, total, err := h.svc.List(c.Request.Context(), tenantID, limit, offset)
+	factories, total, err := h.svc.List(c.Request.Context(), tenantID, limit, offset, factoryType)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

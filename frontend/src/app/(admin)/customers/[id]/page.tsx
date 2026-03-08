@@ -261,12 +261,12 @@ export default function CustomerDetailPage() {
       </div>
 
       {/* Point Ledger */}
-      <div className="bg-white dark:bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] border border-gray-200 dark:border-[var(--md-outline-variant)] overflow-hidden">
+      <div className="bg-white dark:bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] border border-gray-200 dark:border-[var(--md-outline-variant)] overflow-x-auto">
         <h2 className="text-[16px] font-medium text-[var(--md-on-surface)] px-6 py-4 border-b border-[var(--md-outline-variant)]">
           Point Ledger
         </h2>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[800px]">
             <thead>
               <tr className="border-b border-[var(--md-outline-variant)]">
                 <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase">Type</th>
@@ -304,12 +304,12 @@ export default function CustomerDetailPage() {
       </div>
 
       {/* Scan History */}
-      <div className="bg-white dark:bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] border border-gray-200 dark:border-[var(--md-outline-variant)] overflow-hidden">
+      <div className="bg-white dark:bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] border border-gray-200 dark:border-[var(--md-outline-variant)] overflow-x-auto">
         <h2 className="text-[16px] font-medium text-[var(--md-on-surface)] px-6 py-4 border-b border-[var(--md-outline-variant)]">
           Scan History
         </h2>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[800px]">
             <thead>
               <tr className="border-b border-[var(--md-outline-variant)]">
                 <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase">Campaign</th>
@@ -345,12 +345,12 @@ export default function CustomerDetailPage() {
       </div>
 
       {/* Redemptions */}
-      <div className="bg-white dark:bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] border border-gray-200 dark:border-[var(--md-outline-variant)] overflow-hidden">
+      <div className="bg-white dark:bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] border border-gray-200 dark:border-[var(--md-outline-variant)] overflow-x-auto">
         <h2 className="text-[16px] font-medium text-[var(--md-on-surface)] px-6 py-4 border-b border-[var(--md-outline-variant)]">
           Redemptions
         </h2>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[800px]">
             <thead>
               <tr className="border-b border-[var(--md-outline-variant)]">
                 <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase">Reward</th>

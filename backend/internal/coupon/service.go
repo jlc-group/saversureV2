@@ -84,8 +84,23 @@ func (s *Service) ClaimNext(ctx context.Context, tenantID, rewardID, userID stri
 	}
 	defer tx.Rollback(ctx)
 
+	c, err := s.ClaimNextTx(ctx, tx, tenantID, rewardID, userID)
+	if err != nil {
+		return "", err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return "", fmt.Errorf("commit: %w", err)
+	}
+
+	return c, nil
+}
+
+// ClaimNextTx claims a coupon inside an existing transaction so callers can
+// keep reward confirmation and coupon assignment atomic.
+func (s *Service) ClaimNextTx(ctx context.Context, tx pgx.Tx, tenantID, rewardID, userID string) (string, error) {
 	var id, c string
-	err = tx.QueryRow(ctx,
+	err := tx.QueryRow(ctx,
 		`SELECT id, code FROM coupon_codes
 		 WHERE reward_id = $1 AND tenant_id = $2 AND claimed_by IS NULL
 		 ORDER BY created_at ASC
@@ -106,10 +121,6 @@ func (s *Service) ClaimNext(ctx context.Context, tenantID, rewardID, userID stri
 	)
 	if err != nil {
 		return "", fmt.Errorf("update coupon: %w", err)
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return "", fmt.Errorf("commit: %w", err)
 	}
 
 	return c, nil

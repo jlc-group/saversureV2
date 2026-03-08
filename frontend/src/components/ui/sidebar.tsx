@@ -315,13 +315,26 @@ const navGroups: NavGroup[] = [
   },
 ];
 
+const STORAGE_KEY = "sidebar_collapsed";
+
 export default function Sidebar() {
   const pathname = usePathname();
   const [user, setUser] = useState<ReturnType<typeof getUser>>(null);
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     setUser(getUser());
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved === "true") setCollapsed(true);
+    } catch { /* SSR safe */ }
   }, []);
+
+  const toggleCollapse = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    try { localStorage.setItem(STORAGE_KEY, String(next)); } catch { /* ignore */ }
+  };
 
   const userRole = user?.role || "";
   const filterByRole = (item: NavItem) => {
@@ -331,36 +344,50 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-[280px] bg-[var(--md-surface)] min-h-screen flex flex-col border-r border-[var(--md-outline-variant)]">
+    <aside
+      className={`
+        ${collapsed ? "w-[72px]" : "w-[280px]"}
+        bg-[var(--md-surface)] min-h-screen flex flex-col
+        border-r border-[var(--md-outline-variant)]
+        transition-all duration-300 ease-in-out flex-shrink-0
+      `}
+    >
       {/* Header */}
-      <div className="px-6 pt-6 pb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-[var(--md-radius-md)] bg-[var(--md-primary)] flex items-center justify-center">
-            <svg viewBox="0 0 24 24" fill="white" className="w-5 h-5">
-              <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" />
-            </svg>
-          </div>
-          <div>
-            <h1 className="text-[16px] font-semibold text-[var(--md-on-surface)] leading-tight tracking-[-0.2px]">
+      <div className={`flex items-center ${collapsed ? "justify-center px-2" : "px-4"} pt-4 pb-3`}>
+        <button
+          onClick={toggleCollapse}
+          className="w-10 h-10 flex items-center justify-center rounded-[var(--md-radius-md)] hover:bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)] transition-colors flex-shrink-0"
+          title={collapsed ? "ขยาย sidebar" : "ย่อ sidebar"}
+        >
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+            <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
+          </svg>
+        </button>
+        {!collapsed && (
+          <div className="ml-2 overflow-hidden">
+            <h1 className="text-[16px] font-semibold text-[var(--md-on-surface)] leading-tight tracking-[-0.2px] whitespace-nowrap">
               Saversure
             </h1>
-            <p className="text-[11px] text-[var(--md-on-surface-variant)] mt-0.5">Admin Panel v2.0</p>
+            <p className="text-[11px] text-[var(--md-on-surface-variant)] mt-0.5 whitespace-nowrap">Admin Panel v2.0</p>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 pb-2 overflow-y-auto">
-        <div className="space-y-5">
+      <nav className="flex-1 px-2 pb-2 overflow-y-auto overflow-x-hidden">
+        <div className="space-y-4">
           {navGroups.map((group) => {
             const visibleItems = group.items.filter(filterByRole);
             if (visibleItems.length === 0) return null;
 
             return (
               <div key={group.label}>
-                <p className="px-4 mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--md-on-surface-variant)]/70">
-                  {group.label}
-                </p>
+                {!collapsed && (
+                  <p className="px-3 mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--md-on-surface-variant)]/70 whitespace-nowrap overflow-hidden">
+                    {group.label}
+                  </p>
+                )}
+                {collapsed && <div className="border-t border-[var(--md-outline-variant)] mx-2 my-1" />}
                 <div className="space-y-[2px]">
                   {visibleItems.map((item) => {
                     const isActive =
@@ -371,8 +398,10 @@ export default function Sidebar() {
                       <Link
                         key={item.href}
                         href={item.href}
+                        title={collapsed ? item.label : undefined}
                         className={`
-                          flex items-center gap-3 h-[44px] px-4 rounded-[var(--md-radius-xl)]
+                          flex items-center ${collapsed ? "justify-center" : "gap-3"} h-[40px] ${collapsed ? "px-0 mx-auto w-[48px]" : "px-3"}
+                          rounded-[var(--md-radius-xl)]
                           text-[14px] font-medium transition-all duration-200
                           ${
                             isActive
@@ -384,9 +413,13 @@ export default function Sidebar() {
                         <span className={`flex-shrink-0 ${isActive ? "text-[var(--md-primary)]" : "text-[var(--md-on-surface-variant)]"}`}>
                           {item.icon}
                         </span>
-                        <span className="tracking-[0.1px]">{item.label}</span>
-                        {isActive && (
-                          <span className="ml-auto w-[6px] h-[6px] rounded-full bg-[var(--md-primary)]" />
+                        {!collapsed && (
+                          <>
+                            <span className="tracking-[0.1px] whitespace-nowrap overflow-hidden">{item.label}</span>
+                            {isActive && (
+                              <span className="ml-auto w-[6px] h-[6px] rounded-full bg-[var(--md-primary)] flex-shrink-0" />
+                            )}
+                          </>
                         )}
                       </Link>
                     );
@@ -399,37 +432,58 @@ export default function Sidebar() {
       </nav>
 
       {/* User section */}
-      <div className="px-3 pb-4">
-        <div className="border-t border-[var(--md-outline-variant)] pt-3">
-          <div className="flex items-center gap-3 px-4 py-2">
-            <div className="w-9 h-9 rounded-full bg-[var(--md-primary)] flex items-center justify-center">
-              <span className="text-[13px] font-medium text-white">
-                {user?.role?.[0]?.toUpperCase() || "?"}
-              </span>
+      <div className="px-2 pb-3">
+        <div className="border-t border-[var(--md-outline-variant)] pt-2">
+          {collapsed ? (
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-9 h-9 rounded-full bg-[var(--md-primary)] flex items-center justify-center" title={user?.role?.replace("_", " ") || "User"}>
+                <span className="text-[13px] font-medium text-white">
+                  {user?.role?.[0]?.toUpperCase() || "?"}
+                </span>
+              </div>
+              <button
+                onClick={logout}
+                title="Sign Out"
+                className="w-9 h-9 flex items-center justify-center rounded-full text-[var(--md-error)] hover:bg-[var(--md-error-light)] transition-all duration-200"
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-[18px] h-[18px]">
+                  <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" />
+                </svg>
+              </button>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-medium text-[var(--md-on-surface)] truncate capitalize">
-                {user?.role?.replace("_", " ") || "Unknown"}
-              </p>
-              <p className="text-[11px] text-[var(--md-on-surface-variant)] truncate">
-                {user?.tenant_id?.slice(0, 8) || ""}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={logout}
-            className="
-              flex items-center gap-3 w-full h-[40px] px-4 mt-1
-              rounded-[var(--md-radius-xl)] text-[13px] font-medium
-              text-[var(--md-error)] hover:bg-[var(--md-error-light)]
-              transition-all duration-200
-            "
-          >
-            <svg viewBox="0 0 24 24" fill="currentColor" className="w-[18px] h-[18px]">
-              <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" />
-            </svg>
-            Sign Out
-          </button>
+          ) : (
+            <>
+              <div className="flex items-center gap-3 px-3 py-2">
+                <div className="w-9 h-9 rounded-full bg-[var(--md-primary)] flex items-center justify-center flex-shrink-0">
+                  <span className="text-[13px] font-medium text-white">
+                    {user?.role?.[0]?.toUpperCase() || "?"}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-medium text-[var(--md-on-surface)] truncate capitalize">
+                    {user?.role?.replace("_", " ") || "Unknown"}
+                  </p>
+                  <p className="text-[11px] text-[var(--md-on-surface-variant)] truncate">
+                    {user?.tenant_id?.slice(0, 8) || ""}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={logout}
+                className="
+                  flex items-center gap-3 w-full h-[36px] px-3 mt-1
+                  rounded-[var(--md-radius-xl)] text-[13px] font-medium
+                  text-[var(--md-error)] hover:bg-[var(--md-error-light)]
+                  transition-all duration-200
+                "
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-[18px] h-[18px]">
+                  <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" />
+                </svg>
+                Sign Out
+              </button>
+            </>
+          )}
         </div>
       </div>
     </aside>

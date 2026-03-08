@@ -153,8 +153,8 @@ export default function RewardsPage() {
       )}
 
       {/* Table */}
-      <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 overflow-hidden">
-        <table className="w-full">
+      <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 overflow-x-auto">
+        <table className="w-full min-w-[800px]">
           <thead>
             <tr className="border-b border-[var(--md-outline-variant)]">
               <th className="text-left px-6 py-3.5 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Reward</th>

@@ -33,7 +33,7 @@ export default function NewsPage() {
     image_url: "",
     link_url: "",
     position: 0,
-    type: "news" as const,
+    type: "news" as "news" | "banner",
   };
   const [form, setForm] = useState(emptyForm);
 
@@ -242,8 +242,8 @@ export default function NewsPage() {
         </div>
       )}
 
-      <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 overflow-hidden">
-        <table className="w-full">
+      <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 overflow-x-auto">
+        <table className="w-full min-w-[800px]">
           <thead>
             <tr className="border-b border-[var(--md-outline-variant)]">
               <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">

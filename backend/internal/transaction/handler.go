@@ -35,6 +35,25 @@ func (h *Handler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": txns, "total": total})
 }
 
+func (h *Handler) ListMine(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	userID := c.GetString("user_id")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	status := c.Query("status")
+
+	txns, total, err := h.svc.ListMine(c.Request.Context(), tenantID, userID, ListFilter{
+		Status: status,
+		Limit:  limit,
+		Offset: offset,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": txns, "total": total})
+}
+
 func (h *Handler) UpdateStatus(c *gin.Context) {
 	tenantID := c.GetString("tenant_id")
 	id := c.Param("id")
@@ -72,7 +91,7 @@ func (h *Handler) ExportCSV(c *gin.Context) {
 	c.Header("Content-Disposition", `attachment; filename="transactions.csv"`)
 
 	writer := csv.NewWriter(c.Writer)
-	writer.Write([]string{"ID", "User ID", "Reward ID", "Reward Name", "Status", "Tracking", "Expires At", "Created At"})
+	writer.Write([]string{"ID", "User ID", "Reward ID", "Reward Name", "Status", "Tracking", "Delivery Type", "Coupon Code", "Expires At", "Created At"})
 	for _, t := range txns {
 		rewardName := ""
 		if t.RewardName != nil {
@@ -82,7 +101,15 @@ func (h *Handler) ExportCSV(c *gin.Context) {
 		if t.Tracking != nil {
 			tracking = *t.Tracking
 		}
-		writer.Write([]string{t.ID, t.UserID, t.RewardID, rewardName, t.Status, tracking, t.ExpiresAt, t.CreatedAt})
+		deliveryType := ""
+		if t.DeliveryType != nil {
+			deliveryType = *t.DeliveryType
+		}
+		couponCode := ""
+		if t.CouponCode != nil {
+			couponCode = *t.CouponCode
+		}
+		writer.Write([]string{t.ID, t.UserID, t.RewardID, rewardName, t.Status, tracking, deliveryType, couponCode, t.ExpiresAt, t.CreatedAt})
 	}
 	writer.Flush()
 }

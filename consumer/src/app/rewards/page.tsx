@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import BottomNav from "@/components/BottomNav";
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { isLoggedIn } from "@/lib/auth";
 
 interface BalanceItem {
@@ -38,6 +38,18 @@ interface RewardDetail extends RewardItem {
   created_at: string;
 }
 
+interface RedeemResponse {
+  reservation_id: string;
+  reward_id: string;
+  status: string;
+  expires_at: string;
+  created_at: string;
+  confirmed_at?: string | null;
+  delivery_type: string;
+  coupon_code?: string | null;
+  address_id?: string | null;
+}
+
 function formatCountdown(end: string | null): string {
   if (!end) return "";
   const diff = new Date(end).getTime() - Date.now();
@@ -59,6 +71,7 @@ export default function RewardsPage() {
   const [redeemingId, setRedeemingId] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState("");
   const [error, setError] = useState("");
+  const [redeemResult, setRedeemResult] = useState<RedeemResponse | null>(null);
   const loggedIn = isLoggedIn();
 
   const totalPoints = balances.reduce((s, b) => s + b.balance, 0);
@@ -121,9 +134,21 @@ export default function RewardsPage() {
 
     setRedeemingId(reward.id);
     setError("");
+    setRedeemResult(null);
     try {
-      await api.post("/api/v1/redeem", { reward_id: reward.id });
-      setSuccessMsg(`แลก "${reward.name}" สำเร็จ!`);
+      const idempotencyKey =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `${reward.id}-${Date.now()}`;
+      const result = await api.post<RedeemResponse>("/api/v1/redeem", { reward_id: reward.id }, idempotencyKey);
+      setRedeemResult(result);
+      if (result.coupon_code) {
+        setSuccessMsg(`แลก "${reward.name}" สำเร็จ และรับโค้ดคูปองแล้ว`);
+      } else if (result.delivery_type === "shipping") {
+        setSuccessMsg(`แลก "${reward.name}" สำเร็จ ระบบบันทึกที่อยู่จัดส่งเริ่มต้นแล้ว`);
+      } else {
+        setSuccessMsg(`แลก "${reward.name}" สำเร็จ!`);
+      }
       setTimeout(() => setSuccessMsg(""), 3000);
       await loadBalances();
       if (detailId === reward.id) {
@@ -135,7 +160,13 @@ export default function RewardsPage() {
         )
       );
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "แลกไม่สำเร็จ");
+      if (err instanceof ApiError && err.data.error === "default_address_required") {
+        setError("กรุณาตั้งค่าที่อยู่จัดส่งเริ่มต้นในหน้าโปรไฟล์ก่อนแลกรางวัลนี้");
+      } else if (err instanceof ApiError && err.data.error === "no_coupon_available") {
+        setError("คูปองของรางวัลนี้หมดแล้ว");
+      } else {
+        setError(err instanceof Error ? err.message : "แลกไม่สำเร็จ");
+      }
     } finally {
       setRedeemingId(null);
     }
@@ -160,6 +191,27 @@ export default function RewardsPage() {
       {successMsg && (
         <div className="mx-5 mt-4 bg-[var(--success-light)] border border-[var(--success)] rounded-[var(--radius-md)] p-3 text-center">
           <p className="text-[13px] font-medium text-[var(--success)]">{successMsg}</p>
+        </div>
+      )}
+
+      {redeemResult?.coupon_code && (
+        <div className="mx-5 mt-4 bg-white border border-[#1976d2] rounded-[var(--radius-md)] p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[12px] text-[var(--on-surface-variant)]">Coupon Code</p>
+              <p className="mt-1 text-[20px] font-bold text-[#1976d2] font-mono break-all">{redeemResult.coupon_code}</p>
+              <p className="mt-1 text-[11px] text-[var(--on-surface-variant)]">บันทึกไว้ในประวัติการแลกแล้ว</p>
+            </div>
+            <button
+              onClick={() => navigator.clipboard.writeText(redeemResult.coupon_code || "")}
+              className="shrink-0 h-[36px] px-4 bg-[#1976d2] text-white rounded-[var(--radius-xl)] text-[12px] font-medium"
+            >
+              คัดลอก
+            </button>
+          </div>
+          <Link href="/history/redeems" className="inline-block mt-3 text-[12px] text-[#1976d2] font-medium">
+            ดูประวัติการแลก
+          </Link>
         </div>
       )}
 

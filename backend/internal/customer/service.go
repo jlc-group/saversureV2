@@ -50,7 +50,7 @@ func (s *Service) List(ctx context.Context, tenantID string, f ListFilter) ([]Cu
 		f.Limit = 50
 	}
 
-	where := "u.tenant_id = $1"
+	where := "u.tenant_id = $1 AND EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id = u.id AND ur.tenant_id = u.tenant_id AND ur.role = 'api_client')"
 	args := []any{tenantID}
 	argN := 2
 
@@ -110,7 +110,8 @@ func (s *Service) GetByID(ctx context.Context, tenantID, id string) (*Customer, 
 		        COALESCE((SELECT COUNT(*) FROM reward_reservations WHERE tenant_id = u.tenant_id AND user_id = u.id AND status = 'CONFIRMED'), 0),
 		        u.created_at::text
 		 FROM users u
-		 WHERE u.id = $1 AND u.tenant_id = $2`,
+		 WHERE u.id = $1 AND u.tenant_id = $2
+		   AND EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id = u.id AND ur.tenant_id = u.tenant_id AND ur.role = 'api_client')`,
 		id, tenantID,
 	).Scan(&c.ID, &c.TenantID, &c.Email, &c.Phone, &c.FirstName, &c.LastName,
 		&c.Status, &c.Province, &c.Occupation, &c.CustomerFlag,
@@ -246,7 +247,8 @@ func (s *Service) GetDetail(ctx context.Context, tenantID, customerID string) (*
 		        province, occupation, COALESCE(customer_flag, 'green'),
 		        COALESCE(phone_verified, false), status,
 		        created_at::text, last_login_at::text
-		 FROM users WHERE id = $1 AND tenant_id = $2`,
+		 FROM users WHERE id = $1 AND tenant_id = $2
+		   AND EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id = users.id AND ur.tenant_id = users.tenant_id AND ur.role = 'api_client')`,
 		customerID, tenantID,
 	).Scan(&profile.ID, &profile.Email, &profile.Phone, &profile.DisplayName, &profile.FirstName, &profile.LastName,
 		&profile.BirthDate, &profile.Gender, &profile.AvatarURL,

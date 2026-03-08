@@ -395,7 +395,7 @@ export default function LuckyDrawPage() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full min-w-[800px]">
                     <thead>
                       <tr className="border-b border-[var(--md-outline-variant)]">
                         <th className="text-left px-6 py-3.5 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Order</th>
@@ -454,14 +454,14 @@ export default function LuckyDrawPage() {
             )}
 
             {(campaign.status === "announced" || campaign.status === "ended") && (
-              <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 overflow-hidden">
+              <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 overflow-x-auto">
                 <h2 className="text-[16px] font-medium text-[var(--md-on-surface)] px-6 pt-6 pb-4 tracking-[0.1px]">Winners</h2>
                 {winners.length === 0 ? (
                   <div className="px-6 py-12 text-center text-[var(--md-on-surface-variant)]">
                     <p className="text-[14px]">No winners yet</p>
                   </div>
                 ) : (
-                  <table className="w-full">
+                  <table className="w-full min-w-[800px]">
                     <thead>
                       <tr className="border-b border-[var(--md-outline-variant)]">
                         <th className="text-left px-6 py-3.5 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Prize</th>

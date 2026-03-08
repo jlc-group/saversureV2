@@ -10,9 +10,10 @@ import (
 
 type Claims struct {
 	jwt.RegisteredClaims
-	UserID   string `json:"user_id"`
-	TenantID string `json:"tenant_id"`
-	Role     string `json:"role"`
+	UserID    string  `json:"user_id"`
+	TenantID  string  `json:"tenant_id"`
+	Role      string  `json:"role"`
+	FactoryID *string `json:"factory_id,omitempty"`
 }
 
 // JWTAuth validates the Bearer token and sets user context.
@@ -49,6 +50,9 @@ func JWTAuth(secret string) gin.HandlerFunc {
 		c.Set("user_id", claims.UserID)
 		c.Set("tenant_id", claims.TenantID)
 		c.Set("role", claims.Role)
+		if claims.FactoryID != nil {
+			c.Set("factory_id", *claims.FactoryID)
+		}
 
 		c.Next()
 	}

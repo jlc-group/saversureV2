@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -11,6 +12,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 
 	"saversure/internal/audit"
 	"saversure/internal/auth"
@@ -26,6 +29,7 @@ import (
 	"saversure/internal/currency"
 	"saversure/internal/donation"
 	"saversure/internal/engine"
+	"saversure/internal/export"
 	"saversure/internal/factory"
 	"saversure/internal/gamification"
 	"saversure/internal/geo"
@@ -99,6 +103,11 @@ func main() {
 	// --- Services ---
 	tenantSvc := tenant.NewService(db)
 	authSvc := auth.NewService(db, cfg.JWT.Secret, cfg.JWT.AccessTTL, cfg.JWT.RefreshTTL)
+	lineSvc := auth.NewLINEService(db, authSvc, auth.LINEConfig{
+		ChannelID:     cfg.LINE.ChannelID,
+		ChannelSecret: cfg.LINE.ChannelSecret,
+		CallbackURL:   cfg.LINE.CallbackURL,
+	})
 	rollSvc := roll.NewService(db)
 	campaignSvc := campaign.NewService(db)
 	batchSvc := batch.NewService(db, signer, rollSvc)
@@ -108,7 +117,7 @@ func main() {
 	auditSvc := audit.NewService(db)
 	promoSvc := promotion.NewService(db)
 	codeSvc := code.NewService(db, signer, ledgerSvc, promoSvc)
-	redemptionSvc := redemption.NewService(db, inventorySvc, ledgerSvc)
+	redemptionSvc := redemption.NewService(db, inventorySvc, ledgerSvc, couponSvc)
 
 	missionEngine := engine.NewMissionEngine(db)
 	notifEngine := engine.NewNotificationEngine(db)
@@ -118,6 +127,7 @@ func main() {
 	// --- Handlers ---
 	tenantHandler := tenant.NewHandler(tenantSvc)
 	authHandler := auth.NewHandler(authSvc)
+	lineHandler := auth.NewLINEHandler(lineSvc)
 	campaignHandler := campaign.NewHandler(campaignSvc)
 	batchHandler := batch.NewHandler(batchSvc, db)
 	inventoryHandler := inventory.NewHandler(inventorySvc)
@@ -153,6 +163,7 @@ func main() {
 	geoHandler := geo.NewHandler(geoSvc)
 
 	var uploadHandler *upload.Handler
+	var exportHandler *export.Handler
 	if cfg.MinIO.AccessKey != "" {
 		uh, err := upload.NewHandler(upload.Config{
 			Endpoint:  cfg.MinIO.Endpoint,
@@ -167,6 +178,13 @@ func main() {
 		} else {
 			uploadHandler = uh
 			slog.Info("MinIO connected", "endpoint", cfg.MinIO.Endpoint)
+		}
+
+		mc, mcErr := minioClient(cfg)
+		if mcErr == nil {
+			apiBase := fmt.Sprintf("http://localhost:%d", cfg.App.Port)
+			exportSvc := export.NewService(db, mc, cfg.MinIO.Bucket, cfg.MinIO.PublicURL, signer)
+			exportHandler = export.NewHandler(exportSvc, apiBase)
 		}
 	} else {
 		slog.Warn("MinIO not configured (upload disabled)")
@@ -191,6 +209,11 @@ func main() {
 		})
 	})
 
+	// Public download (no auth required)
+	if exportHandler != nil {
+		r.GET("/api/v1/exports/download/:token", exportHandler.Download)
+	}
+
 	api := r.Group("/api/v1")
 
 	// --- Auth (public) ---
@@ -201,6 +224,8 @@ func main() {
 		authRoutes.POST("/login", authHandler.Login)
 		authRoutes.POST("/login-phone", authHandler.LoginByPhone)
 		authRoutes.POST("/refresh", authHandler.Refresh)
+		authRoutes.GET("/line", lineHandler.GetAuthURL)
+		authRoutes.POST("/line/callback", lineHandler.Callback)
 	}
 
 	// --- OTP (public, no auth) ---
@@ -218,6 +243,9 @@ func main() {
 	} else {
 		slog.Warn("OTP disabled: SMS credentials not configured")
 	}
+
+	// --- Public utilities (no auth) ---
+	api.GET("/public/resolve-ref1", codeHandler.ResolveRef1)
 
 	// --- Protected routes ---
 	protected := api.Group("")
@@ -293,6 +321,13 @@ func main() {
 		scanRoutes.POST("", codeHandler.Scan)
 	}
 
+	// Code Lookup (Admin — validate code and show info without scanning)
+	codeRoutes := tenanted.Group("/codes")
+	codeRoutes.Use(mw.RequireRole("super_admin", "brand_admin", "factory_user"))
+	{
+		codeRoutes.GET("/lookup", codeHandler.Lookup)
+	}
+
 	// Roll Management (Admin / Factory)
 	rollRoutes := tenanted.Group("/rolls")
 	rollRoutes.Use(mw.RequireRole("super_admin", "brand_admin", "factory_user"))
@@ -306,6 +341,16 @@ func main() {
 		rollRoutes.PATCH("/:id/status", rollHandler.UpdateStatus)
 		rollRoutes.POST("/bulk-map", rollHandler.BulkMap)
 		rollRoutes.POST("/bulk-status", rollHandler.BulkUpdateStatus)
+		if exportHandler != nil {
+			rollRoutes.GET("/:id/sample-codes", exportHandler.SampleCodes)
+		}
+		// Admin-only: assign rolls to factory
+		adminOnly := rollRoutes.Group("")
+		adminOnly.Use(mw.RequireRole("super_admin", "brand_admin"))
+		{
+			adminOnly.PATCH("/:id/assign", rollHandler.Assign)
+			adminOnly.POST("/bulk-assign", rollHandler.BulkAssign)
+		}
 	}
 
 	// QC Verify (Factory / QC staff)
@@ -405,11 +450,16 @@ func main() {
 	productRoutes := tenanted.Group("/products")
 	productRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
 	{
-		productRoutes.GET("", productHandler.List)
 		productRoutes.POST("", productHandler.Create)
 		productRoutes.POST("/import", productHandler.ImportCSV)
 		productRoutes.PATCH("/:id", productHandler.Update)
 		productRoutes.DELETE("/:id", productHandler.Delete)
+	}
+	// factory_user สามารถดู product list ได้ (เพื่อ map สินค้า)
+	productReadRoutes := tenanted.Group("/products")
+	productReadRoutes.Use(mw.RequireRole("super_admin", "brand_admin", "factory_user"))
+	{
+		productReadRoutes.GET("", productHandler.List)
 	}
 
 	// Promotions (Brand Admin)
@@ -576,8 +626,23 @@ func main() {
 		uploadRoutes := tenanted.Group("/upload")
 		uploadRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
 		{
-			uploadRoutes.POST("/image", uploadHandler.UploadImage)
 			uploadRoutes.POST("/file", uploadHandler.UploadFile)
+		}
+		// factory_user สามารถ upload รูปหลักฐานได้
+		uploadImageRoute := tenanted.Group("/upload")
+		uploadImageRoute.Use(mw.RequireRole("super_admin", "brand_admin", "factory_user"))
+		{
+			uploadImageRoute.POST("/image", uploadHandler.UploadImage)
+		}
+	}
+
+	// Export Management
+	if exportHandler != nil {
+		exportRoutes := tenanted.Group("/exports")
+		exportRoutes.Use(mw.RequireRole("super_admin", "brand_admin", "factory_user"))
+		{
+			exportRoutes.POST("", exportHandler.Create)
+			exportRoutes.GET("", exportHandler.List)
 		}
 	}
 
@@ -617,6 +682,7 @@ func main() {
 		myRoutes.GET("/lucky-draw/:id/tickets", luckyDrawHandler.GetUserTickets)
 		myRoutes.POST("/donations/:id/donate", donationHandler.Donate)
 		myRoutes.GET("/balances", currencyHandler.GetMultiBalance)
+		myRoutes.GET("/redeem-transactions", transactionHandler.ListMine)
 		myRoutes.GET("/missions", gamifyHandler.GetUserMissions)
 		myRoutes.GET("/badges", gamifyHandler.GetUserBadges)
 		myRoutes.GET("/tier", tierHandler.GetUserTier)
@@ -654,6 +720,13 @@ func main() {
 	}
 
 	slog.Info("server stopped")
+}
+
+func minioClient(cfg *config.Config) (*minio.Client, error) {
+	return minio.New(cfg.MinIO.Endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(cfg.MinIO.AccessKey, cfg.MinIO.SecretKey, ""),
+		Secure: cfg.MinIO.UseSSL,
+	})
 }
 
 func setupLogger(env string) {

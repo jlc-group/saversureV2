@@ -28,7 +28,7 @@ func Idempotency(rdb *redis.Client, ttl time.Duration) gin.HandlerFunc {
 			return
 		}
 
-		cacheKey := "idem:" + c.GetString("tenant_id") + ":" + key
+		cacheKey := "idem:" + c.GetString("tenant_id") + ":" + c.GetString("user_id") + ":" + key
 		ctx := context.Background()
 
 		cached, err := rdb.Get(ctx, cacheKey).Bytes()

@@ -11,14 +11,21 @@ interface StaffUser {
   last_name: string | null;
   role: string;
   status: string;
+  factory_id: string | null;
+  factory_name: string | null;
   created_at: string;
+}
+
+interface Factory {
+  id: string;
+  name: string;
+  factory_type?: string;
 }
 
 const roleOptions = [
   { value: "brand_admin", label: "Brand Admin" },
   { value: "brand_staff", label: "Brand Staff" },
   { value: "factory_user", label: "Factory User" },
-  { value: "viewer", label: "Viewer" },
 ];
 
 const roleStyle: Record<string, string> = {
@@ -35,6 +42,7 @@ export default function StaffPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
+  const [factories, setFactories] = useState<Factory[]>([]);
 
   const [form, setForm] = useState({
     email: "",
@@ -42,6 +50,7 @@ export default function StaffPage() {
     first_name: "",
     last_name: "",
     role: "brand_staff",
+    factory_id: "",
   });
 
   const fetchData = async () => {
@@ -57,16 +66,34 @@ export default function StaffPage() {
     }
   };
 
+  const fetchFactories = async () => {
+    try {
+      const data = await api.get<{ data: Factory[] }>("/api/v1/factories");
+      setFactories(data.data || []);
+    } catch { /* ignore */ }
+  };
+
   useEffect(() => {
     fetchData();
+    fetchFactories();
   }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post("/api/v1/staff", form);
+      const payload: Record<string, unknown> = {
+        email: form.email,
+        password: form.password,
+        first_name: form.first_name,
+        last_name: form.last_name,
+        role: form.role,
+      };
+      if (form.role === "factory_user" && form.factory_id) {
+        payload.factory_id = form.factory_id;
+      }
+      await api.post("/api/v1/staff", payload);
       setShowForm(false);
-      setForm({ email: "", password: "", first_name: "", last_name: "", role: "brand_staff" });
+      setForm({ email: "", password: "", first_name: "", last_name: "", role: "brand_staff", factory_id: "" });
       fetchData();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed";
@@ -81,6 +108,18 @@ export default function StaffPage() {
       fetchData();
     } catch {
       alert("Failed to update role");
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const handleUpdateFactory = async (id: string, factory_id: string) => {
+    setActionId(id);
+    try {
+      await api.patch(`/api/v1/staff/${id}`, { factory_id: factory_id || null });
+      fetchData();
+    } catch {
+      alert("Failed to update factory");
     } finally {
       setActionId(null);
     }
@@ -182,7 +221,7 @@ export default function StaffPage() {
             />
             <select
               value={form.role}
-              onChange={(e) => setForm({ ...form, role: e.target.value })}
+              onChange={(e) => setForm({ ...form, role: e.target.value, factory_id: "" })}
               className={fieldClass}
             >
               {roleOptions.map((r) => (
@@ -191,9 +230,23 @@ export default function StaffPage() {
                 </option>
               ))}
             </select>
+            {form.role === "factory_user" ? (
+              <select
+                value={form.factory_id}
+                onChange={(e) => setForm({ ...form, factory_id: e.target.value })}
+                className={fieldClass}
+              >
+                <option value="">— เลือกโรงงาน (ถ้ามี) —</option>
+                {factories.map((f) => (
+                  <option key={f.id} value={f.id}>{f.name}</option>
+                ))}
+              </select>
+            ) : (
+              <div />
+            )}
             <button
               type="submit"
-              className="h-[48px] bg-[var(--md-primary)] text-white rounded-[var(--md-radius-xl)] text-[14px] font-medium hover:bg-[var(--md-primary-dark)] transition-all"
+              className="col-span-2 h-[48px] bg-[var(--md-primary)] text-white rounded-[var(--md-radius-xl)] text-[14px] font-medium hover:bg-[var(--md-primary-dark)] transition-all"
             >
               Create Staff
             </button>
@@ -201,34 +254,23 @@ export default function StaffPage() {
         </div>
       )}
 
-      <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 overflow-hidden">
-        <table className="w-full">
+      <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 overflow-x-auto">
+        <table className="w-full min-w-[800px]">
           <thead>
             <tr className="border-b border-[var(--md-outline-variant)]">
-              <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">
-                Name
-              </th>
-              <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">
-                Email
-              </th>
-              <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">
-                Role
-              </th>
-              <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">
-                Status
-              </th>
-              <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">
-                Joined
-              </th>
-              <th className="text-right px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">
-                Actions
-              </th>
+              <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Name</th>
+              <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Email</th>
+              <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Role</th>
+              <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Factory</th>
+              <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Status</th>
+              <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Joined</th>
+              <th className="text-right px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="px-5 py-12 text-center text-[var(--md-on-surface-variant)]">
+                <td colSpan={7} className="px-5 py-12 text-center text-[var(--md-on-surface-variant)]">
                   <svg className="animate-spin w-5 h-5 mx-auto" viewBox="0 0 24 24" fill="none">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -237,7 +279,7 @@ export default function StaffPage() {
               </tr>
             ) : staff.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-5 py-12 text-center text-[var(--md-on-surface-variant)]">
+                <td colSpan={7} className="px-5 py-12 text-center text-[var(--md-on-surface-variant)]">
                   No staff members yet
                 </td>
               </tr>
@@ -273,6 +315,23 @@ export default function StaffPage() {
                             </option>
                           ))}
                         </select>
+                      )}
+                    </td>
+                    <td className="px-5 py-3">
+                      {s.role === "factory_user" ? (
+                        <select
+                          value={s.factory_id || ""}
+                          onChange={(e) => handleUpdateFactory(s.id, e.target.value)}
+                          disabled={actionId === s.id}
+                          className="h-[28px] px-2 text-[12px] border border-[var(--md-outline-variant)] rounded-[6px] bg-transparent outline-none focus:border-[var(--md-primary)] min-w-[140px]"
+                        >
+                          <option value="">— ไม่มี —</option>
+                          {factories.map((f) => (
+                            <option key={f.id} value={f.id}>{f.name}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="text-[12px] text-[var(--md-on-surface-variant)]">—</span>
                       )}
                     </td>
                     <td className="px-5 py-3">

@@ -130,7 +130,7 @@ func (s *Service) Register(ctx context.Context, input RegisterInput, ipAddr stri
 		return nil, fmt.Errorf("commit: %w", err)
 	}
 
-	return s.generateTokenPair(userID, input.TenantID, "api_client")
+	return s.generateTokenPair(userID, input.TenantID, "api_client", nil)
 }
 
 func (s *Service) RegisterConsumer(ctx context.Context, input ConsumerRegisterInput, ipAddr string) (*TokenPair, error) {
@@ -214,19 +214,20 @@ func (s *Service) RegisterConsumer(ctx context.Context, input ConsumerRegisterIn
 		return nil, fmt.Errorf("commit: %w", err)
 	}
 
-	return s.generateTokenPair(userID, input.TenantID, "api_client")
+	return s.generateTokenPair(userID, input.TenantID, "api_client", nil)
 }
 
 func (s *Service) LoginByPhone(ctx context.Context, phone, password string) (*TokenPair, error) {
 	var userID, passwordHash, tenantID, role string
+	var factoryID *string
 	err := s.db.QueryRow(ctx,
-		`SELECT u.id, u.password_hash, u.tenant_id, ur.role
+		`SELECT u.id, u.password_hash, u.tenant_id, ur.role, u.factory_id
 		 FROM users u
 		 JOIN user_roles ur ON ur.user_id = u.id
 		 WHERE u.phone = $1 AND u.status = 'active'
 		 LIMIT 1`,
 		phone,
-	).Scan(&userID, &passwordHash, &tenantID, &role)
+	).Scan(&userID, &passwordHash, &tenantID, &role, &factoryID)
 	if err != nil {
 		return nil, ErrInvalidCredentials
 	}
@@ -237,20 +238,21 @@ func (s *Service) LoginByPhone(ctx context.Context, phone, password string) (*To
 
 	s.db.Exec(ctx, `UPDATE users SET last_login_at = NOW() WHERE id = $1`, userID)
 
-	return s.generateTokenPair(userID, tenantID, role)
+	return s.generateTokenPair(userID, tenantID, role, factoryID)
 }
 
 func (s *Service) Login(ctx context.Context, input LoginInput) (*TokenPair, error) {
 	var userID, passwordHash, tenantID, role string
+	var factoryID *string
 
 	err := s.db.QueryRow(ctx,
-		`SELECT u.id, u.password_hash, u.tenant_id, ur.role
+		`SELECT u.id, u.password_hash, u.tenant_id, ur.role, u.factory_id
 		 FROM users u
 		 JOIN user_roles ur ON ur.user_id = u.id
 		 WHERE u.email = $1 AND u.status = 'active'
 		 LIMIT 1`,
 		input.Email,
-	).Scan(&userID, &passwordHash, &tenantID, &role)
+	).Scan(&userID, &passwordHash, &tenantID, &role, &factoryID)
 
 	if err != nil {
 		return nil, ErrInvalidCredentials
@@ -260,7 +262,7 @@ func (s *Service) Login(ctx context.Context, input LoginInput) (*TokenPair, erro
 		return nil, ErrInvalidCredentials
 	}
 
-	return s.generateTokenPair(userID, tenantID, role)
+	return s.generateTokenPair(userID, tenantID, role, factoryID)
 }
 
 func (s *Service) RefreshToken(ctx context.Context, refreshToken string) (*TokenPair, error) {
@@ -273,7 +275,7 @@ func (s *Service) RefreshToken(ctx context.Context, refreshToken string) (*Token
 		return nil, ErrInvalidCredentials
 	}
 
-	return s.generateTokenPair(claims.UserID, claims.TenantID, claims.Role)
+	return s.generateTokenPair(claims.UserID, claims.TenantID, claims.Role, claims.FactoryID)
 }
 
 // PDPAConsent represents a consent record
@@ -338,7 +340,7 @@ func (s *Service) WithdrawPDPAConsent(ctx context.Context, userID, ipAddr string
 	return tx.Commit(ctx)
 }
 
-func (s *Service) generateTokenPair(userID, tenantID, role string) (*TokenPair, error) {
+func (s *Service) generateTokenPair(userID, tenantID, role string, factoryID *string) (*TokenPair, error) {
 	now := time.Now()
 
 	accessClaims := middleware.Claims{
@@ -347,9 +349,10 @@ func (s *Service) generateTokenPair(userID, tenantID, role string) (*TokenPair, 
 			ExpiresAt: jwt.NewNumericDate(now.Add(s.accessTTL)),
 			IssuedAt:  jwt.NewNumericDate(now),
 		},
-		UserID:   userID,
-		TenantID: tenantID,
-		Role:     role,
+		UserID:    userID,
+		TenantID:  tenantID,
+		Role:      role,
+		FactoryID: factoryID,
 	}
 
 	accessToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims).SignedString([]byte(s.jwtSecret))
@@ -363,9 +366,10 @@ func (s *Service) generateTokenPair(userID, tenantID, role string) (*TokenPair, 
 			ExpiresAt: jwt.NewNumericDate(now.Add(s.refreshTTL)),
 			IssuedAt:  jwt.NewNumericDate(now),
 		},
-		UserID:   userID,
-		TenantID: tenantID,
-		Role:     role,
+		UserID:    userID,
+		TenantID:  tenantID,
+		Role:      role,
+		FactoryID: factoryID,
 	}
 
 	refreshToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims).SignedString([]byte(s.jwtSecret))

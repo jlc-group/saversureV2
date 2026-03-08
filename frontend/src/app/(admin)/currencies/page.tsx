@@ -226,8 +226,8 @@ export default function CurrenciesPage() {
         </p>
       </div>
 
-      <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 overflow-hidden">
-        <table className="w-full">
+      <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 overflow-x-auto">
+        <table className="w-full min-w-[800px]">
           <thead>
             <tr className="border-b border-[var(--md-outline-variant)]">
               {["Icon", "Code", "Name", "Exchange Rate", "Active", "Actions"].map((h) => (

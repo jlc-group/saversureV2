@@ -4,7 +4,7 @@
 > เปรียบเทียบจาก V1 + ปรับปรุง + ฟีเจอร์ใหม่
 >
 > สร้างเมื่อ: 2026-03-04
-> อัปเดตล่าสุด: 2026-03-05
+> อัปเดตล่าสุด: 2026-03-06
 > อ้างอิง: V1 repos (jlc-group), saversure-charter-v2.docx, batch-qr-creator-01
 
 ---
@@ -98,6 +98,63 @@
 | Roll Lifecycle | ✅ | ✅ | Pipeline view, Map Product, QC approval + evidence, separation of duties |
 | V1 Product Import | ✅ | — | 150 สินค้า import + cleaned |
 
+### ข้อเสนอแนะหลังสำรวจ V2 + Legacy (2026-03-06)
+
+> สำรวจเทียบจาก `saversure-legacy` เพิ่มเติมแล้ว พบว่า V2 พร้อมมากในด้าน architecture และ security แต่ยังมีบาง flow ที่ควรปิดให้ “ใช้งานจริงครบวงจร” ก่อนงาน external dependency อย่าง LINE/LIFF แบบเต็มรูปแบบ
+
+#### Top 5 งานถัดไปที่ควรทำก่อน
+
+1. **ปิด Reward Redemption Flow ให้จบจริง**
+   - เชื่อม flow `reserve -> confirm` ให้ครบใน consumer/admin
+   - ทำ coupon delivery / coupon display หลังแลกให้ลูกค้าใช้งานได้จริง
+   - เหตุผล: กระทบ stock, transaction, และ UX โดยตรง
+
+2. **ทำ Camera Scan แบบ Web Fallback ก่อน LIFF**
+   - ให้ consumer scan ผ่าน browser ได้ก่อน แม้ยังไม่มี LINE credentials
+   - คง deep link / LIFF เป็น phase ถัดไป
+   - เหตุผล: เป็น user-facing action สำคัญที่สุดของระบบ
+
+3. **เพิ่ม Fulfillment Flow หลังแลก + PDF Delivery Notes**
+   - ย้ายจากแค่ redeem/reserve ไปสู่ flow เตรียมของ/จัดส่ง/สำเร็จ
+   - สร้างใบแพ็ก/ใบจ่าหน้า PDF สำหรับงานคลัง
+   - เหตุผล: legacy ใช้จริงและช่วยงาน operation มาก
+
+4. **ทำ Daily Ops Digest + Admin Alerts**
+   - สรุป pending redeem, QC fail, recalled rolls, suspicious scans, stock ใกล้หมด
+   - แสดงใน admin และเตรียมต่อ LINE/Email ภายหลัง
+   - เหตุผล: ช่วยทีมปฏิบัติการเห็นปัญหาเร็วขึ้น
+
+5. **ทำ Production Safety Baseline**
+   - Unit tests สำหรับ HMAC / codegen / ledger / redemption
+   - Integration tests สำหรับ API สำคัญ
+   - CI/CD + metrics + error tracking + uptime monitoring
+   - เหตุผล: ลดความเสี่ยง regression ก่อน rollout จริง
+
+#### สิ่งที่ได้จาก Legacy ที่ควรพอร์ตแนวคิดมาใช้
+
+- **PDF ใบแพ็ก/ใบจ่าหน้า + fulfillment status** — practical มากสำหรับหลังบ้าน
+- **Deep-link smart landing** — เลือก flow ให้เหมาะกับ device/context
+- **Admin direct outreach / ops alerts** — จาก scan/redeem ปัญหาสามารถ follow-up ได้เร็ว
+- **Coupon display หลังแลก** — โดยเฉพาะของรางวัลแบบ partner code / barcode / QR
+- **Practical anti-abuse tools** — remark, flag, suspicious pattern review, manual correction workflow
+
+#### ไอเดียใหม่ที่แนะนำเพิ่ม
+
+- **Suspicious Scan Playbook**
+  รวม remark, customer flag, support case, และ action ต่อเนื่องไว้ในหน้าเดียว
+- **Dynamic Coupon Token**
+  ออก QR/barcode แบบ single-use + expiry + audit log แทน static code
+- **Factory SLA Dashboard**
+  วัด turnaround time ตั้งแต่ assign -> map -> QC -> distribute แยกตามโรงงาน
+- **Export Health Monitor**
+  ดูประวัติ export, duplicate export, download activity, expired links, และไฟล์ที่โหลดบ่อยผิดปกติ
+
+#### หมายเหตุ backlog ที่ควรอัปเดตสถานะ
+
+- `Batch Status/Recall UI buttons` — ทำแล้วใน admin batches page
+- `Select factory/product during batch creation` — ทำแล้วใน admin batches page
+- `Roll Lifecycle` / `Export redesign` / `Factory portal` — ควรถือเป็น phase ที่เสร็จแล้ว และใช้เป็นฐานสำหรับ phase ถัดไป
+
 ---
 
 ## สิ่งที่ยังเหลือ (Requires External Dependencies)
@@ -137,19 +194,21 @@
 ## สิ่งที่ยังเหลือ (Nice-to-have / Future)
 
 ### Admin Enhancements
-- [ ] Batch Status/Recall UI buttons
-- [ ] Select factory/product during batch creation
 - [ ] Bulk status update for transactions
 - [ ] Export PDF delivery notes
 - [ ] Admin notification bell + dropdown
 - [ ] Brand admin scoped dashboard
+- [ ] Daily Ops digest / operational alert center
+- [ ] Suspicious scan review tools (remark, flag, action playbook)
 
 ### Consumer Enhancements
 - [ ] QR camera scanner (native/LIFF)
 - [ ] Deep link flow (scan QR → LIFF → auto-verify)
+- [ ] Web camera scanner fallback (non-LIFF)
 - [ ] Coupon display (QR/barcode)
 - [ ] Flash reward countdown timer
 - [ ] Auto-schedule flash rewards
+- [ ] Smart scan landing based on device/context
 
 ### Backend Enhancements
 - [ ] Leaderboard refresh job (cron)
@@ -159,6 +218,10 @@
 - [ ] Streaming CSV for large batch exports
 - [ ] Rate limiting per tenant
 - [ ] Tier rules configurable per tenant
+- [ ] Reward redemption confirm flow end-to-end
+- [ ] Fulfillment workflow after redeem (prepare / shipping / completed)
+- [ ] Dynamic coupon token with single-use / expiry / audit log
+- [ ] Factory SLA metrics + export health metrics
 
 ### Phase 6 — Non-Functional (Ongoing)
 

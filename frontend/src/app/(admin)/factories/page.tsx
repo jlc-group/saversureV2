@@ -7,6 +7,10 @@ interface Factory {
   id: string;
   name: string;
   code: string | null;
+  factory_type: string;
+  export_format: number;
+  codes_per_roll: number;
+  rolls_per_file: number;
   contact_name: string | null;
   contact_phone: string | null;
   contact_email: string | null;
@@ -14,6 +18,25 @@ interface Factory {
   status: string;
   created_at: string;
 }
+
+const factoryTypeLabels: Record<string, string> = {
+  general: "ทั่วไป",
+  sticker_printer: "โรงพิมพ์สติ๊กเกอร์",
+  applicator: "โรงงานแปะสติ๊กเกอร์",
+};
+
+const factoryTypeBadge: Record<string, string> = {
+  general: "bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)]",
+  sticker_printer: "bg-blue-100 text-blue-700",
+  applicator: "bg-purple-100 text-purple-700",
+};
+
+const exportFormatLabels: Record<number, string> = {
+  1: "Format 1 — Flat CSV",
+  2: "Format 2 — Multi 4 Columns",
+  3: "Format 3 — Multi N Columns (ถาวร)",
+  4: "Format 4 — Single Column (No Header)",
+};
 
 export default function FactoriesPage() {
   const [factories, setFactories] = useState<Factory[]>([]);
@@ -26,6 +49,10 @@ export default function FactoriesPage() {
   const emptyForm = {
     name: "",
     code: "",
+    factory_type: "general",
+    export_format: 1,
+    codes_per_roll: 10000,
+    rolls_per_file: 4,
     contact_name: "",
     contact_phone: "",
     contact_email: "",
@@ -72,6 +99,10 @@ export default function FactoriesPage() {
     setForm({
       name: f.name,
       code: f.code || "",
+      factory_type: f.factory_type || "general",
+      export_format: f.export_format || 1,
+      codes_per_roll: f.codes_per_roll || 10000,
+      rolls_per_file: f.rolls_per_file || 4,
       contact_name: f.contact_name || "",
       contact_phone: f.contact_phone || "",
       contact_email: f.contact_email || "",
@@ -152,49 +183,114 @@ export default function FactoriesPage() {
             {editId ? "Edit Factory" : "New Factory"}
           </h2>
           <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
-            <input
-              type="text"
-              placeholder="Factory Name"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className={fieldClass}
-              required
-            />
-            <input
-              type="text"
-              placeholder="Factory Code (optional)"
-              value={form.code}
-              onChange={(e) => setForm({ ...form, code: e.target.value })}
-              className={fieldClass}
-            />
-            <input
-              type="text"
-              placeholder="Contact Name"
-              value={form.contact_name}
-              onChange={(e) => setForm({ ...form, contact_name: e.target.value })}
-              className={fieldClass}
-            />
-            <input
-              type="text"
+            <div>
+              <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1 tracking-[0.3px]">ชื่อโรงงาน *</label>
+              <input
+                type="text"
+                placeholder="Factory Name"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className={fieldClass}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1 tracking-[0.3px]">รหัสโรงงาน</label>
+              <input
+                type="text"
+                placeholder="Factory Code (optional)"
+                value={form.code}
+                onChange={(e) => setForm({ ...form, code: e.target.value })}
+                className={fieldClass}
+              />
+            </div>
+            <div>
+              <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1 tracking-[0.3px]">ประเภทโรงงาน</label>
+              <select
+                value={form.factory_type}
+                onChange={(e) => setForm({ ...form, factory_type: e.target.value })}
+                className={fieldClass}
+              >
+                <option value="general">ทั่วไป (General)</option>
+                <option value="sticker_printer">โรงพิมพ์สติ๊กเกอร์ (Sticker Printer)</option>
+                <option value="applicator">โรงงานแปะสติ๊กเกอร์ (Applicator)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1 tracking-[0.3px]">รูปแบบ Export</label>
+              <select
+                value={form.export_format}
+                onChange={(e) => setForm({ ...form, export_format: Number(e.target.value) })}
+                className={fieldClass}
+              >
+                <option value={1}>Format 1 — Flat CSV (แถวเดียว)</option>
+                <option value={2}>Format 2 — Multi 4 Columns (fix 4 ม้วน)</option>
+                <option value={3}>Format 3 — Multi N Columns (กำหนดม้วนเอง)</option>
+                <option value={4}>Format 4 — Single Column (ไม่มี header)</option>
+              </select>
+              <p className="text-[11px] text-[var(--md-on-surface-variant)] mt-1">
+                {form.export_format === 1 && "แต่ละ roll เป็น 1 CSV แยกกัน มี header — URL, Serial, Ref1, Ref2, Lot, Roll"}
+                {form.export_format === 2 && "จัด 4 ม้วนเรียงกันเป็น column ในไฟล์เดียว (fix 4 ม้วน/ไฟล์)"}
+                {form.export_format === 3 && "จัด N ม้วนเรียงกันเป็น column — กำหนด 'จำนวนม้วนต่อไฟล์' ด้านล่าง"}
+                {form.export_format === 4 && "แต่ละ roll เป็น 1 CSV แยกกัน ไม่มี header — URL, Serial, Ref1, Ref2, Roll"}
+              </p>
+            </div>
+            {form.export_format === 3 && (
+              <div>
+                <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1 tracking-[0.3px]">จำนวนม้วนต่อไฟล์</label>
+                <input
+                  type="number"
+                  placeholder="4"
+                  value={form.rolls_per_file}
+                  onChange={(e) => setForm({ ...form, rolls_per_file: Number(e.target.value) || 4 })}
+                  className={fieldClass}
+                  min={1}
+                />
+                <p className="text-[11px] text-[var(--md-on-surface-variant)] mt-1">
+                  แต่ละไฟล์ CSV จะรวม {form.rolls_per_file} ม้วนเป็น column เรียงกัน
+                </p>
+              </div>
+            )}
+            <div>
+              <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1 tracking-[0.3px]">ชื่อผู้ติดต่อ</label>
+              <input
+                type="text"
+                placeholder="Contact Name"
+                value={form.contact_name}
+                onChange={(e) => setForm({ ...form, contact_name: e.target.value })}
+                className={fieldClass}
+              />
+            </div>
+            <div>
+              <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1 tracking-[0.3px]">เบอร์โทร</label>
+              <input
+                type="text"
               placeholder="Contact Phone"
               value={form.contact_phone}
               onChange={(e) => setForm({ ...form, contact_phone: e.target.value })}
               className={fieldClass}
             />
-            <input
-              type="email"
-              placeholder="Contact Email"
-              value={form.contact_email}
-              onChange={(e) => setForm({ ...form, contact_email: e.target.value })}
-              className={fieldClass}
-            />
-            <input
-              type="text"
-              placeholder="Address"
-              value={form.address}
-              onChange={(e) => setForm({ ...form, address: e.target.value })}
-              className={fieldClass}
-            />
+            </div>
+            <div>
+              <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1 tracking-[0.3px]">อีเมล</label>
+              <input
+                type="email"
+                placeholder="Contact Email"
+                value={form.contact_email}
+                onChange={(e) => setForm({ ...form, contact_email: e.target.value })}
+                className={fieldClass}
+              />
+            </div>
+            <div>
+              <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1 tracking-[0.3px]">ที่อยู่</label>
+              <input
+                type="text"
+                placeholder="Address"
+                value={form.address}
+                onChange={(e) => setForm({ ...form, address: e.target.value })}
+                className={fieldClass}
+              />
+            </div>
             <div className="col-span-2 flex justify-end">
               <button
                 type="submit"
@@ -207,8 +303,8 @@ export default function FactoriesPage() {
         </div>
       )}
 
-      <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 overflow-hidden">
-        <table className="w-full">
+      <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 overflow-x-auto">
+        <table className="w-full min-w-[800px]">
           <thead>
             <tr className="border-b border-[var(--md-outline-variant)]">
               <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">
@@ -216,6 +312,12 @@ export default function FactoriesPage() {
               </th>
               <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">
                 Code
+              </th>
+              <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">
+                Type
+              </th>
+              <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">
+                Export Format
               </th>
               <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">
                 Contact
@@ -234,7 +336,7 @@ export default function FactoriesPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="px-5 py-12 text-center text-[var(--md-on-surface-variant)]">
+                <td colSpan={8} className="px-5 py-12 text-center text-[var(--md-on-surface-variant)]">
                   <svg className="animate-spin w-5 h-5 mx-auto" viewBox="0 0 24 24" fill="none">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -243,7 +345,7 @@ export default function FactoriesPage() {
               </tr>
             ) : factories.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-5 py-12 text-center text-[var(--md-on-surface-variant)]">
+                <td colSpan={8} className="px-5 py-12 text-center text-[var(--md-on-surface-variant)]">
                   No factories yet
                 </td>
               </tr>
@@ -265,6 +367,21 @@ export default function FactoriesPage() {
                   </td>
                   <td className="px-5 py-3 font-mono text-[12px] font-medium text-[var(--md-on-surface)]">
                     {f.code || "—"}
+                  </td>
+                  <td className="px-5 py-3">
+                    <span className={`px-2.5 py-0.5 rounded-[6px] text-[11px] font-medium ${factoryTypeBadge[f.factory_type] || factoryTypeBadge.general}`}>
+                      {factoryTypeLabels[f.factory_type] || f.factory_type}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3">
+                    <div>
+                      <p className="text-[12px] font-medium text-[var(--md-on-surface)]">
+                        {exportFormatLabels[f.export_format] || `Format ${f.export_format}`}
+                      </p>
+                      <p className="text-[11px] text-[var(--md-on-surface-variant)]">
+                        {f.codes_per_roll?.toLocaleString()} codes/roll · {f.rolls_per_file} rolls/file
+                      </p>
+                    </div>
                   </td>
                   <td className="px-5 py-3">
                     <div>

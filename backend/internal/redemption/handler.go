@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"saversure/internal/coupon"
 	"saversure/internal/inventory"
 )
 
@@ -26,7 +27,7 @@ func (h *Handler) Redeem(c *gin.Context) {
 
 	idempotencyKey := c.GetHeader("Idempotency-Key")
 
-	reservation, err := h.svc.Reserve(
+	result, err := h.svc.RedeemNow(
 		c.Request.Context(),
 		c.GetString("tenant_id"),
 		c.GetString("user_id"),
@@ -41,11 +42,25 @@ func (h *Handler) Redeem(c *gin.Context) {
 			})
 			return
 		}
+		if errors.Is(err, coupon.ErrNoCouponAvailable) {
+			c.JSON(http.StatusConflict, gin.H{
+				"error":   "no_coupon_available",
+				"message": "Coupon code is not available for this reward",
+			})
+			return
+		}
+		if errors.Is(err, ErrDefaultAddressRequired) {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "default_address_required",
+				"message": "Please set a default shipping address before redeeming this reward",
+			})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "redemption_failed", "message": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, reservation)
+	c.JSON(http.StatusCreated, result)
 }
 
 func (h *Handler) Confirm(c *gin.Context) {

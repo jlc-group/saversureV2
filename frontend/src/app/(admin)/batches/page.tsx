@@ -62,9 +62,7 @@ export default function BatchesPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ campaign_id: "", prefix: "", quantity: 10000, codes_per_roll: 10000, product_id: "", factory_id: "" });
   const [submitting, setSubmitting] = useState(false);
-  const [exportingId, setExportingId] = useState<string | null>(null);
   const [actionId, setActionId] = useState<string | null>(null);
-  const [exportConfigByBatch, setExportConfigByBatch] = useState<Record<string, { lotSize: number; roll: number }>>({});
 
   const fetchBatches = async () => {
     try {
@@ -115,30 +113,6 @@ export default function BatchesPage() {
     } catch { alert("Failed to create batch"); } finally { setSubmitting(false); }
   };
 
-  const getExportConfig = (batch: Batch) => exportConfigByBatch[batch.id] || { lotSize: 10000, roll: 1 };
-
-  const updateExportConfig = (batchID: string, next: Partial<{ lotSize: number; roll: number }>) => {
-    setExportConfigByBatch((prev) => ({
-      ...prev,
-      [batchID]: { ...(prev[batchID] || { lotSize: 10000, roll: 1 }), ...next },
-    }));
-  };
-
-  const handleExport = async (batch: Batch, mode: "full" | "roll") => {
-    setExportingId(batch.id);
-    try {
-      const cfg = getExportConfig(batch);
-      const lotSize = Math.max(1, cfg.lotSize || 10000);
-      const maxRoll = Math.max(1, Math.ceil(batch.code_count / lotSize));
-      const roll = Math.min(Math.max(1, cfg.roll || 1), maxRoll);
-      const query = mode === "roll" ? `?format=csv&lot_size=${lotSize}&roll=${roll}` : "?format=csv";
-      const fileName = mode === "roll"
-        ? `batch_${batch.prefix}_roll_${roll}_of_${maxRoll}.csv`
-        : `batch_${batch.prefix}_${batch.serial_start}-${batch.serial_end}.csv`;
-      await api.download(`/api/v1/batches/${batch.id}/export${query}`, fileName);
-    } catch { alert("Failed to export batch"); } finally { setExportingId(null); }
-  };
-
   const handleUpdateStatus = async (batch: Batch) => {
     const nextStatus = statusTransitions[batch.status];
     if (!nextStatus) return;
@@ -168,7 +142,7 @@ export default function BatchesPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-[28px] font-normal text-[var(--md-on-surface)] tracking-[-0.5px]">Batches</h1>
-          <p className="text-[14px] text-[var(--md-on-surface-variant)] mt-1">Generate and export QR code batches</p>
+          <p className="text-[14px] text-[var(--md-on-surface-variant)] mt-1">สร้าง Batch QR Code — ดู rolls และ export ที่หน้า Rolls</p>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
@@ -242,8 +216,8 @@ export default function BatchesPage() {
       )}
 
       {/* Table */}
-      <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 overflow-hidden">
-        <table className="w-full">
+      <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 overflow-x-auto">
+        <table className="w-full min-w-[800px]">
           <thead>
             <tr className="border-b border-[var(--md-outline-variant)]">
               <th className="text-left px-6 py-3.5 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Prefix</th>
@@ -262,11 +236,9 @@ export default function BatchesPage() {
               <tr><td colSpan={7} className="px-6 py-12 text-center"><div className="text-[var(--md-on-surface-variant)]"><svg viewBox="0 0 24 24" fill="currentColor" className="w-12 h-12 mx-auto mb-3 opacity-30"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z" /></svg><p className="text-[14px]">No batches yet</p></div></td></tr>
             ) : (
               batches.map((b) => {
-                const cfg = getExportConfig(b);
-                const lotSize = Math.max(1, cfg.lotSize || 10000);
-                const maxRoll = Math.max(1, Math.ceil(b.code_count / lotSize));
                 const s = statusStyle[b.status] || statusStyle.generated;
                 const nextStatus = statusTransitions[b.status];
+                const rollCount = Math.ceil(b.code_count / 10000);
                 return (
                   <tr key={b.id} className="border-b border-[var(--md-outline-variant)] last:border-b-0 hover:bg-[var(--md-surface-dim)] transition-colors duration-150">
                     <td className="px-6 py-4">
@@ -275,7 +247,10 @@ export default function BatchesPage() {
                     </td>
                     <td className="px-6 py-4 text-[12px] text-[var(--md-on-surface-variant)]">{b.product_name || "—"}</td>
                     <td className="px-6 py-4 text-[12px] text-[var(--md-on-surface-variant)]">{b.factory_name || "—"}</td>
-                    <td className="px-6 py-4 text-[14px] font-medium text-[var(--md-on-surface)]">{b.code_count.toLocaleString()}</td>
+                    <td className="px-6 py-4">
+                      <p className="text-[14px] font-medium text-[var(--md-on-surface)]">{b.code_count.toLocaleString()}</p>
+                      <p className="text-[11px] text-[var(--md-on-surface-variant)]">{rollCount} rolls</p>
+                    </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-[var(--md-radius-sm)] text-[12px] font-medium ${s.bg} ${s.text}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />{b.status}
@@ -283,47 +258,32 @@ export default function BatchesPage() {
                     </td>
                     <td className="px-6 py-4 text-[13px] text-[var(--md-on-surface-variant)]">{new Date(b.created_at).toLocaleDateString()}</td>
                     <td className="px-6 py-4">
-                      <div className="flex flex-col gap-2.5 items-end">
-                        {/* Status actions */}
-                        <div className="flex gap-1.5">
-                          {nextStatus && b.status !== "recalled" && (
-                            <button
-                              onClick={() => handleUpdateStatus(b)}
-                              disabled={actionId === b.id}
-                              className="h-[28px] px-3 text-[11px] font-medium text-[var(--md-primary)] bg-[var(--md-primary-light)] rounded-[var(--md-radius-sm)] hover:opacity-80 disabled:opacity-50 transition-all duration-200"
-                            >
-                              {actionId === b.id ? "..." : `→ ${nextStatus}`}
-                            </button>
-                          )}
-                          {b.status !== "recalled" && (
-                            <button
-                              onClick={() => handleRecall(b)}
-                              disabled={actionId === b.id}
-                              className="h-[28px] px-3 text-[11px] font-medium text-[var(--md-error)] bg-[var(--md-error-light)] rounded-[var(--md-radius-sm)] hover:opacity-80 disabled:opacity-50 transition-all duration-200"
-                            >
-                              Recall
-                            </button>
-                          )}
-                        </div>
-                        {/* Export controls */}
-                        <div className="flex items-center gap-1.5 text-[11px] text-[var(--md-on-surface-variant)]">
-                          <span>lot</span>
-                          <input type="number" min={1} value={cfg.lotSize} onChange={(e) => updateExportConfig(b.id, { lotSize: parseInt(e.target.value, 10) || 10000 })} className="w-20 h-[26px] px-2 border border-[var(--md-outline-variant)] rounded-[var(--md-radius-sm)] text-[11px] text-[var(--md-on-surface)] bg-transparent outline-none focus:border-[var(--md-primary)]" />
-                          <span>roll</span>
-                          <input type="number" min={1} max={maxRoll} value={cfg.roll} onChange={(e) => updateExportConfig(b.id, { roll: parseInt(e.target.value, 10) || 1 })} className="w-14 h-[26px] px-2 border border-[var(--md-outline-variant)] rounded-[var(--md-radius-sm)] text-[11px] text-[var(--md-on-surface)] bg-transparent outline-none focus:border-[var(--md-primary)]" />
-                          <span className="opacity-60">/{maxRoll}</span>
-                        </div>
-                        <div className="flex gap-1.5">
-                          <Link href={`/rolls?batch_id=${b.id}`} className="h-[28px] px-3 text-[11px] font-medium text-[var(--md-primary)] bg-[var(--md-primary-light)] rounded-[var(--md-radius-sm)] hover:opacity-80 transition-all duration-200 inline-flex items-center">
-                            Rolls
-                          </Link>
-                          <button onClick={() => handleExport(b, "roll")} disabled={exportingId === b.id} className="h-[28px] px-3 text-[11px] font-medium bg-[var(--md-primary)] text-white rounded-[var(--md-radius-sm)] hover:bg-[var(--md-primary-dark)] disabled:opacity-50 transition-all duration-200">
-                            {exportingId === b.id ? "..." : "Export Roll"}
+                      <div className="flex gap-1.5 justify-end">
+                        <Link
+                          href={`/rolls?batch_id=${b.id}`}
+                          className="h-[28px] px-4 text-[11px] font-medium text-indigo-600 bg-indigo-50 dark:bg-indigo-950 rounded-[var(--md-radius-sm)] hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-all duration-200 inline-flex items-center gap-1.5"
+                        >
+                          <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z" /></svg>
+                          Rolls & Export
+                        </Link>
+                        {nextStatus && b.status !== "recalled" && (
+                          <button
+                            onClick={() => handleUpdateStatus(b)}
+                            disabled={actionId === b.id}
+                            className="h-[28px] px-3 text-[11px] font-medium text-[var(--md-primary)] bg-[var(--md-primary-light)] rounded-[var(--md-radius-sm)] hover:opacity-80 disabled:opacity-50 transition-all duration-200"
+                          >
+                            {actionId === b.id ? "..." : `→ ${nextStatus}`}
                           </button>
-                          <button onClick={() => handleExport(b, "full")} disabled={exportingId === b.id} className="h-[28px] px-3 text-[11px] font-medium text-[var(--md-on-surface-variant)] bg-[var(--md-surface-container)] rounded-[var(--md-radius-sm)] hover:bg-[var(--md-surface-container-high)] disabled:opacity-50 transition-all duration-200">
-                            Full
+                        )}
+                        {b.status !== "recalled" && (
+                          <button
+                            onClick={() => handleRecall(b)}
+                            disabled={actionId === b.id}
+                            className="h-[28px] px-3 text-[11px] font-medium text-[var(--md-error)] bg-[var(--md-error-light)] rounded-[var(--md-radius-sm)] hover:opacity-80 disabled:opacity-50 transition-all duration-200"
+                          >
+                            Recall
                           </button>
-                        </div>
+                        )}
                       </div>
                     </td>
                   </tr>

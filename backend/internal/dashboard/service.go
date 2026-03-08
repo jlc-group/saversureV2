@@ -98,9 +98,11 @@ func (s *Service) GetSummary(ctx context.Context, tenantID string) (*Summary, er
 		`SELECT COALESCE(SUM(ABS(amount)), 0) FROM point_ledger WHERE tenant_id = $1 AND type = 'debit'`, tenantID,
 	).Scan(&sum.PointsRedeemed)
 
-	// Total users
+	// Total users (consumers only)
 	_ = s.db.QueryRow(ctx,
-		`SELECT COUNT(*) FROM users WHERE tenant_id = $1`, tenantID,
+		`SELECT COUNT(*) FROM users u WHERE u.tenant_id = $1
+		   AND EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id = u.id AND ur.tenant_id = u.tenant_id AND ur.role = 'api_client')`,
+		tenantID,
 	).Scan(&sum.UsersTotal)
 
 	return sum, nil

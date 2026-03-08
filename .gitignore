@@ -11,7 +11,19 @@ frontend/out/
 backend/dist/
 backend/bin/
 backend/api.exe
+backend/*.exe
 frontend/dist/
+
+# Temp SQL scripts
+backend/*.sql
+!backend/migrations/
+
+# Commit messages
+_commit_msg.txt
+
+# factory-portal build
+factory-portal/node_modules/
+factory-portal/.next/
 
 # Environment
 .env

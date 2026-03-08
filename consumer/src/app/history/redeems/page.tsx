@@ -10,6 +10,8 @@ interface RedeemEntry {
   reward_name: string | null;
   status: string;
   tracking: string | null;
+  delivery_type: string | null;
+  coupon_code: string | null;
   created_at: string;
 }
 
@@ -33,7 +35,7 @@ export default function RedeemHistoryPage() {
       return;
     }
     api
-      .get<{ data: RedeemEntry[] }>("/api/v1/redeem-transactions")
+      .get<{ data: RedeemEntry[] }>("/api/v1/my/redeem-transactions")
       .then((d) => setEntries(d.data || []))
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -73,12 +75,31 @@ export default function RedeemHistoryPage() {
                   <p className="text-[11px] text-[var(--on-surface-variant)]">
                     {new Date(e.created_at).toLocaleDateString()}
                   </p>
-                  {e.tracking && (
-                    <p className="text-[11px] text-[var(--on-surface-variant)]">
-                      Tracking: <span className="font-mono">{e.tracking}</span>
-                    </p>
-                  )}
+                  <div className="text-right">
+                    {e.tracking && (
+                      <p className="text-[11px] text-[var(--on-surface-variant)]">
+                        Tracking: <span className="font-mono">{e.tracking}</span>
+                      </p>
+                    )}
+                    {e.delivery_type && (
+                      <p className="text-[10px] text-[var(--on-surface-variant)] capitalize">{e.delivery_type}</p>
+                    )}
+                  </div>
                 </div>
+                {e.coupon_code && (
+                  <div className="mt-3 p-3 rounded-[var(--radius-sm)] bg-[var(--info-light)] flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] text-[var(--info)]">Coupon Code</p>
+                      <p className="text-[13px] font-bold font-mono text-[var(--info)] break-all">{e.coupon_code}</p>
+                    </div>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(e.coupon_code || "")}
+                      className="shrink-0 h-[32px] px-3 rounded-[var(--radius-xl)] bg-[var(--info)] text-white text-[11px] font-medium"
+                    >
+                      คัดลอก
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })

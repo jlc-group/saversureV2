@@ -7,22 +7,26 @@ import { isLoggedIn, getUser } from "@/lib/auth";
 import { api } from "@/lib/api";
 
 interface PointBalance {
-  balance: number;
+  current: number;
+  total_earned: number;
+  total_spent: number;
 }
 
 export default function HomePage() {
   const [loggedIn, setLoggedIn] = useState(false);
-  const [points, setPoints] = useState(0);
+  const [points, setPoints] = useState<number>(0);
+  const [user, setUser] = useState<{ user_id: string } | null>(null);
 
   useEffect(() => {
     const li = isLoggedIn();
     setLoggedIn(li);
+    setUser(getUser());
     if (li) {
-      api.get<PointBalance>("/api/v1/points/balance").then((d) => setPoints(d.balance)).catch(() => {});
+      api.get<PointBalance>("/api/v1/points/balance")
+        .then((d) => setPoints(d.current ?? 0))
+        .catch(() => {});
     }
   }, []);
-
-  const user = getUser();
 
   return (
     <div className="pb-20">
@@ -45,7 +49,7 @@ export default function HomePage() {
         {/* Points card */}
         <div className="bg-white/15 backdrop-blur rounded-[var(--radius-lg)] p-5">
           <p className="text-[12px] opacity-80 mb-1">Total Points</p>
-          <p className="text-[36px] font-bold leading-none">{points.toLocaleString()}</p>
+          <p className="text-[36px] font-bold leading-none">{(points ?? 0).toLocaleString()}</p>
           <p className="text-[12px] opacity-70 mt-2">pts</p>
         </div>
       </div>

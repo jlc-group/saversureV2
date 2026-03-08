@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -44,6 +45,7 @@ type ScanInput struct {
 
 type ScanResult struct {
 	Status              string `json:"status"`
+	Ref1                string `json:"ref1,omitempty"`
 	Points              int    `json:"points_earned,omitempty"`
 	BonusPoints         int    `json:"bonus_points,omitempty"`
 	TotalPoints         int    `json:"total_points,omitempty"`
@@ -68,7 +70,8 @@ func (s *Service) Scan(ctx context.Context, tenantID, userID string, input ScanI
 			if pfxErr != nil {
 				return nil, fmt.Errorf("load prefixes: %w", pfxErr)
 			}
-			prefix, serial, valid = s.signer.ValidateCompactCode(input.Code, knownPrefixes, 0)
+			hmacLen := s.loadHMACLength(ctx, tenantID)
+			prefix, serial, valid = s.signer.ValidateCompactCode(input.Code, knownPrefixes, hmacLen)
 		}
 		if !valid {
 			return nil, ErrInvalidCode
@@ -167,11 +170,19 @@ func (s *Service) Scan(ctx context.Context, tenantID, userID string, input ScanI
 		).Scan(&productID)
 	}
 
-	// Check if code already used (on-scan creation: INSERT ON CONFLICT)
-	ref1Val := input.Ref1
-	if ref1Val == "" {
-		ref1Val = input.Code
-	}
+	// Load tenant/campaign settings to compute ref1 from serial
+	var rawTenantSettings, rawCampaignSettings string
+	_ = tx.QueryRow(ctx,
+		`SELECT COALESCE(t.settings, '{}'::jsonb)::text, COALESCE(c.settings, '{}'::jsonb)::text
+		 FROM tenants t, campaigns c
+		 WHERE t.id = $1 AND c.id = $2`,
+		tenantID, campaignID,
+	).Scan(&rawTenantSettings, &rawCampaignSettings)
+	var tenantSettingsMap, campaignSettingsMap map[string]any
+	_ = json.Unmarshal([]byte(rawTenantSettings), &tenantSettingsMap)
+	_ = json.Unmarshal([]byte(rawCampaignSettings), &campaignSettingsMap)
+	exportCfg := codegen.ConfigFromTenantSettings(tenantSettingsMap)
+	exportCfg = exportCfg.MergeWith(codegen.ConfigFromCampaignSettings(campaignSettingsMap))
 
 	// Compute ref2 running number from batch's ref2 range
 	var ref2Start *int64
@@ -180,6 +191,19 @@ func (s *Service) Scan(ctx context.Context, tenantID, userID string, input ScanI
 		`SELECT ref2_start, serial_start FROM batches WHERE id = $1 AND tenant_id = $2`,
 		batchID, tenantID,
 	).Scan(&ref2Start, &batchSerialStart)
+
+	// Compute ref1 from serial + config
+	ref1Min := exportCfg.Ref1MinValue
+	if ref1Min == 0 {
+		ref1Min = batchSerialStart
+	}
+	runningNumber := serial - batchSerialStart + ref1Min
+	computedRef1 := codegen.GenerateRef1(runningNumber, exportCfg)
+
+	ref1Val := input.Ref1
+	if ref1Val == "" {
+		ref1Val = computedRef1
+	}
 
 	var ref2Val string
 	if ref2Start != nil {
@@ -275,6 +299,7 @@ func (s *Service) Scan(ctx context.Context, tenantID, userID string, input ScanI
 
 	return &ScanResult{
 		Status:              "success",
+		Ref1:                computedRef1,
 		Points:              pointsPerScan,
 		BonusPoints:         bonusPoints,
 		TotalPoints:         totalPoints,
@@ -328,9 +353,183 @@ func (s *Service) resolveRef1ToBatch(ctx context.Context, tenantID string, runni
 	return "", 0, ErrBatchNotFound
 }
 
+// ResolveRef1Result is a lightweight response for resolving compact code to ref1
+type ResolveRef1Result struct {
+	Ref1 string `json:"ref1"`
+}
+
+// ResolveRef1 resolves a compact code to its ref1 value without requiring auth
+func (s *Service) ResolveRef1(ctx context.Context, tenantID, codeStr string) (*ResolveRef1Result, error) {
+	var prefix string
+	var serial int64
+
+	if strings.Contains(codeStr, "-") {
+		var valid bool
+		prefix, serial, valid = s.signer.ValidateCode(codeStr)
+		if !valid {
+			return nil, ErrInvalidCode
+		}
+	} else {
+		knownPrefixes, err := s.loadKnownPrefixes(ctx, tenantID)
+		if err != nil {
+			return nil, fmt.Errorf("load prefixes: %w", err)
+		}
+		hmacLen := s.loadHMACLength(ctx, tenantID)
+		var valid bool
+		prefix, serial, valid = s.signer.ValidateCompactCode(codeStr, knownPrefixes, hmacLen)
+		if !valid {
+			return nil, ErrInvalidCode
+		}
+	}
+
+	var batchSerialStart int64
+	var rawTenantSettings, rawCampaignSettings string
+	err := s.db.QueryRow(ctx,
+		`SELECT b.serial_start,
+			COALESCE(t.settings, '{}'::jsonb)::text,
+			COALESCE(c.settings, '{}'::jsonb)::text
+		 FROM batches b
+		 JOIN campaigns c ON c.id = b.campaign_id
+		 JOIN tenants t ON t.id = b.tenant_id
+		 WHERE b.tenant_id = $1 AND b.prefix = $2
+		   AND $3 BETWEEN b.serial_start AND b.serial_end
+		 LIMIT 1`,
+		tenantID, prefix, serial,
+	).Scan(&batchSerialStart, &rawTenantSettings, &rawCampaignSettings)
+	if err != nil {
+		return nil, ErrBatchNotFound
+	}
+
+	var tenantSettingsMap, campaignSettingsMap map[string]any
+	_ = json.Unmarshal([]byte(rawTenantSettings), &tenantSettingsMap)
+	_ = json.Unmarshal([]byte(rawCampaignSettings), &campaignSettingsMap)
+	cfg := codegen.ConfigFromTenantSettings(tenantSettingsMap)
+	cfg = cfg.MergeWith(codegen.ConfigFromCampaignSettings(campaignSettingsMap))
+
+	ref1Min := cfg.Ref1MinValue
+	if ref1Min == 0 {
+		ref1Min = batchSerialStart
+	}
+	runningNumber := serial - batchSerialStart + ref1Min
+	ref1 := codegen.GenerateRef1(runningNumber, cfg)
+
+	return &ResolveRef1Result{Ref1: ref1}, nil
+}
+
+// LookupResult contains code info for admin preview (no point awarding)
+type LookupResult struct {
+	Valid         bool    `json:"valid"`
+	Prefix        string  `json:"prefix"`
+	Serial        int64   `json:"serial"`
+	BatchID       string  `json:"batch_id,omitempty"`
+	CampaignName  string  `json:"campaign_name,omitempty"`
+	BatchStatus   string  `json:"batch_status,omitempty"`
+	RollNumber    *int    `json:"roll_number,omitempty"`
+	RollStatus    *string `json:"roll_status,omitempty"`
+	ProductName   *string `json:"product_name,omitempty"`
+	ProductSKU    *string `json:"product_sku,omitempty"`
+	PointsPerScan *int    `json:"points_per_scan,omitempty"`
+	FactoryName   *string `json:"factory_name,omitempty"`
+	MappedBy      *string `json:"mapped_by,omitempty"`
+	MappedAt      *string `json:"mapped_at,omitempty"`
+	QCBy          *string `json:"qc_by,omitempty"`
+	QCAt          *string `json:"qc_at,omitempty"`
+	QCNote        *string `json:"qc_note,omitempty"`
+	CodeStatus    *string `json:"code_status,omitempty"`
+	ScannedBy     *string `json:"scanned_by,omitempty"`
+}
+
+func (s *Service) Lookup(ctx context.Context, tenantID, codeStr string) (*LookupResult, error) {
+	var prefix string
+	var serial int64
+
+	if strings.Contains(codeStr, "-") {
+		var valid bool
+		prefix, serial, valid = s.signer.ValidateCode(codeStr)
+		if !valid {
+			return &LookupResult{Valid: false}, nil
+		}
+	} else {
+		knownPrefixes, err := s.loadKnownPrefixes(ctx, tenantID)
+		if err != nil {
+			return nil, fmt.Errorf("load prefixes: %w", err)
+		}
+		var valid bool
+		prefix, serial, valid = s.signer.ValidateCompactCode(codeStr, knownPrefixes, 0)
+		if !valid {
+			return &LookupResult{Valid: false}, nil
+		}
+	}
+
+	result := &LookupResult{Valid: true, Prefix: prefix, Serial: serial}
+
+	var campaignName, batchStatus string
+	err := s.db.QueryRow(ctx,
+		`SELECT b.id, c.name, b.status
+		 FROM batches b JOIN campaigns c ON c.id = b.campaign_id
+		 WHERE b.tenant_id = $1 AND b.prefix = $2
+		   AND $3 BETWEEN b.serial_start AND b.serial_end
+		 LIMIT 1`,
+		tenantID, prefix, serial,
+	).Scan(&result.BatchID, &campaignName, &batchStatus)
+	if err != nil {
+		return result, nil
+	}
+	result.CampaignName = campaignName
+	result.BatchStatus = batchStatus
+
+	var rollNumber int
+	var rollStatus string
+	var productName, productSKU, factoryName, mappedBy, mappedAt, qcBy, qcAt, qcNote *string
+	var pointsPerScan *int
+	err = s.db.QueryRow(ctx,
+		`SELECT r.roll_number, r.status, p.name, p.sku, p.points_per_scan,
+		        f.name, mu.display_name, r.mapped_at::text,
+		        qu.display_name, r.qc_at::text, r.qc_note
+		 FROM rolls r
+		 LEFT JOIN products p ON p.id = r.product_id
+		 LEFT JOIN factories f ON f.id = r.factory_id
+		 LEFT JOIN users mu ON mu.id = r.mapped_by
+		 LEFT JOIN users qu ON qu.id = r.qc_by
+		 WHERE r.batch_id = $1 AND r.tenant_id = $2
+		   AND $3 BETWEEN r.serial_start AND r.serial_end
+		 LIMIT 1`,
+		result.BatchID, tenantID, serial,
+	).Scan(&rollNumber, &rollStatus, &productName, &productSKU, &pointsPerScan,
+		&factoryName, &mappedBy, &mappedAt, &qcBy, &qcAt, &qcNote)
+	if err == nil {
+		result.RollNumber = &rollNumber
+		result.RollStatus = &rollStatus
+		result.ProductName = productName
+		result.ProductSKU = productSKU
+		result.PointsPerScan = pointsPerScan
+		result.FactoryName = factoryName
+		result.MappedBy = mappedBy
+		result.MappedAt = mappedAt
+		result.QCBy = qcBy
+		result.QCAt = qcAt
+		result.QCNote = qcNote
+	}
+
+	var codeStatus, scannedByName *string
+	_ = s.db.QueryRow(ctx,
+		`SELECT c.status, u.display_name
+		 FROM codes c
+		 LEFT JOIN users u ON u.id = c.scanned_by
+		 WHERE c.tenant_id = $1 AND c.batch_id = $2 AND c.serial_number = $3`,
+		tenantID, result.BatchID, serial,
+	).Scan(&codeStatus, &scannedByName)
+	if codeStatus != nil {
+		result.CodeStatus = codeStatus
+		result.ScannedBy = scannedByName
+	}
+
+	return result, nil
+}
+
 func (s *Service) loadKnownPrefixes(ctx context.Context, tenantID string) ([]string, error) {
 	rows, err := s.db.Query(ctx,
-		`SELECT DISTINCT prefix FROM batches WHERE tenant_id = $1 ORDER BY length(prefix) DESC`,
+		`SELECT prefix FROM batches WHERE tenant_id = $1 GROUP BY prefix ORDER BY length(prefix) DESC`,
 		tenantID,
 	)
 	if err != nil {
@@ -347,4 +546,41 @@ func (s *Service) loadKnownPrefixes(ctx context.Context, tenantID string) ([]str
 		prefixes = append(prefixes, p)
 	}
 	return prefixes, rows.Err()
+}
+
+func (s *Service) loadHMACLength(ctx context.Context, tenantID string) int {
+	var raw string
+	err := s.db.QueryRow(ctx,
+		`SELECT COALESCE(settings->'code_export'->>'hmac_length', '0') FROM tenants WHERE id = $1`,
+		tenantID,
+	).Scan(&raw)
+	if err != nil {
+		return 0
+	}
+	n, _ := strconv.Atoi(raw)
+	return n
+}
+
+// ResolveTenantFromCode finds the tenant_id for a given code by trying all tenants' prefixes
+func (s *Service) ResolveTenantFromCode(ctx context.Context, codeStr string) (string, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT DISTINCT t.id, b.prefix
+		 FROM tenants t
+		 JOIN batches b ON b.tenant_id = t.id
+		 ORDER BY length(b.prefix) DESC`)
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var tenantID, prefix string
+		if err := rows.Scan(&tenantID, &prefix); err != nil {
+			continue
+		}
+		if strings.HasPrefix(codeStr, prefix) {
+			return tenantID, nil
+		}
+	}
+	return "", ErrBatchNotFound
 }

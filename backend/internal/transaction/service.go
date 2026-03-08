@@ -23,6 +23,8 @@ type Transaction struct {
 	RewardName *string `json:"reward_name"`
 	Status     string  `json:"status"`
 	Tracking   *string `json:"tracking"`
+	DeliveryType *string `json:"delivery_type"`
+	CouponCode *string `json:"coupon_code"`
 	ExpiresAt  string  `json:"expires_at"`
 	CreatedAt  string  `json:"created_at"`
 }
@@ -34,6 +36,14 @@ type ListFilter struct {
 }
 
 func (s *Service) List(ctx context.Context, tenantID string, f ListFilter) ([]Transaction, int64, error) {
+	return s.list(ctx, tenantID, "", f)
+}
+
+func (s *Service) ListMine(ctx context.Context, tenantID, userID string, f ListFilter) ([]Transaction, int64, error) {
+	return s.list(ctx, tenantID, userID, f)
+}
+
+func (s *Service) list(ctx context.Context, tenantID, userID string, f ListFilter) ([]Transaction, int64, error) {
 	if f.Limit <= 0 {
 		f.Limit = 50
 	}
@@ -41,6 +51,12 @@ func (s *Service) List(ctx context.Context, tenantID string, f ListFilter) ([]Tr
 	where := "rr.tenant_id = $1"
 	args := []any{tenantID}
 	argN := 2
+
+	if userID != "" {
+		where += fmt.Sprintf(" AND rr.user_id = $%d", argN)
+		args = append(args, userID)
+		argN++
+	}
 
 	if f.Status != "" {
 		where += fmt.Sprintf(" AND rr.status = $%d", argN)
@@ -56,7 +72,15 @@ func (s *Service) List(ctx context.Context, tenantID string, f ListFilter) ([]Tr
 
 	query := fmt.Sprintf(
 		`SELECT rr.id, rr.tenant_id, rr.user_id, rr.reward_id, r.name,
-		        rr.status, rr.tracking_number, rr.expires_at::text, rr.created_at::text
+		        rr.status, rr.tracking_number,
+		        CASE
+		          WHEN COALESCE(r.delivery_type, 'none') <> 'none' THEN r.delivery_type
+		          WHEN r.type = 'coupon' THEN 'coupon'
+		          WHEN r.type = 'digital' THEN 'digital'
+		          ELSE COALESCE(r.delivery_type, 'none')
+		        END,
+		        rr.coupon_code,
+		        rr.expires_at::text, rr.created_at::text
 		 FROM reward_reservations rr
 		 LEFT JOIN rewards r ON r.id = rr.reward_id
 		 WHERE %s
@@ -76,7 +100,7 @@ func (s *Service) List(ctx context.Context, tenantID string, f ListFilter) ([]Tr
 	for rows.Next() {
 		var t Transaction
 		if err := rows.Scan(&t.ID, &t.TenantID, &t.UserID, &t.RewardID, &t.RewardName,
-			&t.Status, &t.Tracking, &t.ExpiresAt, &t.CreatedAt); err != nil {
+			&t.Status, &t.Tracking, &t.DeliveryType, &t.CouponCode, &t.ExpiresAt, &t.CreatedAt); err != nil {
 			return nil, 0, fmt.Errorf("scan txn: %w", err)
 		}
 		txns = append(txns, t)

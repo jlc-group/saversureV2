@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { api } from "@/lib/api";
 import { FileUpload } from "@/components/ui/file-upload";
 
@@ -34,6 +34,8 @@ export default function ProductsPage() {
 
   const emptyForm = { name: "", sku: "", description: "", image_url: "", points_per_scan: 1 };
   const [form, setForm] = useState(emptyForm);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -161,60 +163,128 @@ export default function ProductsPage() {
       {showForm && (
         <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-xl)] md-elevation-2 p-6 mb-6">
           <h2 className="text-[18px] font-medium text-[var(--md-on-surface)] mb-4">
-            {editId ? "Edit Product" : "New Product"}
+            {editId ? "แก้ไขสินค้า" : "เพิ่มสินค้าใหม่"}
           </h2>
-          <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
-            <input
-              type="text"
-              placeholder="Product Name"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className={fieldClass}
-              required
-            />
-            <input
-              type="text"
-              placeholder="SKU (optional)"
-              value={form.sku}
-              onChange={(e) => setForm({ ...form, sku: e.target.value })}
-              className={fieldClass}
-            />
-            <input
-              type="text"
-              placeholder="Description"
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              className={`${fieldClass} col-span-2`}
-            />
-            <input
-              type="text"
-              placeholder="Image URL (optional)"
-              value={form.image_url}
-              onChange={(e) => setForm({ ...form, image_url: e.target.value })}
-              className={fieldClass}
-            />
-            <input
-              type="number"
-              placeholder="Points per scan"
-              value={form.points_per_scan}
-              min={1}
-              onChange={(e) => setForm({ ...form, points_per_scan: parseInt(e.target.value) || 1 })}
-              className={fieldClass}
-            />
-            <div className="col-span-2 flex justify-end">
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
+              <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5">ชื่อสินค้า *</label>
+              <input
+                type="text"
+                placeholder="เช่น จุฬาเฮิร์บ เรด ออเร้นจ์ กลูต้า บูสเตอร์ เซรั่ม"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className={fieldClass}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5">รหัสสินค้า (SKU)</label>
+              <input
+                type="text"
+                placeholder="เช่น BOX-L7-6Gx6"
+                value={form.sku}
+                onChange={(e) => setForm({ ...form, sku: e.target.value })}
+                className={fieldClass}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5">รายละเอียดสินค้า</label>
+              <input
+                type="text"
+                placeholder="ชื่อภาษาอังกฤษ, ราคา, ขนาด ฯลฯ"
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                className={fieldClass}
+              />
+            </div>
+
+            <div>
+              <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5">รูปสินค้า</label>
+              <div className="flex items-start gap-3">
+                {form.image_url ? (
+                  <div className="relative w-[80px] h-[80px] rounded-[var(--md-radius-md)] overflow-hidden border border-[var(--md-outline-variant)] flex-shrink-0">
+                    <img src={form.image_url} alt="preview" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, image_url: "" })}
+                      className="absolute top-0.5 right-0.5 w-5 h-5 bg-black/60 text-white rounded-full flex items-center justify-center text-[11px] hover:bg-black/80"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <div className="w-[80px] h-[80px] rounded-[var(--md-radius-md)] border-2 border-dashed border-[var(--md-outline-variant)] flex items-center justify-center flex-shrink-0">
+                    <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 text-[var(--md-on-surface-variant)] opacity-40">
+                      <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />
+                    </svg>
+                  </div>
+                )}
+                <div className="flex flex-col gap-1.5">
+                  <button
+                    type="button"
+                    disabled={uploadingImage}
+                    onClick={() => imageInputRef.current?.click()}
+                    className="h-[36px] px-4 border border-[var(--md-outline)] rounded-[var(--md-radius-sm)] text-[13px] font-medium text-[var(--md-on-surface)] hover:bg-[var(--md-surface-dim)] transition-all disabled:opacity-50"
+                  >
+                    {uploadingImage ? "กำลังอัปโหลด..." : "อัปโหลดรูป"}
+                  </button>
+                  <span className="text-[11px] text-[var(--md-on-surface-variant)]">JPEG, PNG, WebP ไม่เกิน 10MB</span>
+                </div>
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 10 * 1024 * 1024) {
+                      alert("ไฟล์ต้องไม่เกิน 10MB");
+                      return;
+                    }
+                    setUploadingImage(true);
+                    try {
+                      const fd = new FormData();
+                      fd.append("file", file);
+                      const result = await api.uploadForm<{ url: string }>("/api/v1/upload/image", fd);
+                      setForm((prev) => ({ ...prev, image_url: result.url }));
+                    } catch {
+                      alert("อัปโหลดรูปล้มเหลว");
+                    } finally {
+                      setUploadingImage(false);
+                      e.target.value = "";
+                    }
+                  }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5">แต้มต่อการสแกน</label>
+              <input
+                type="number"
+                placeholder="1"
+                value={form.points_per_scan}
+                min={1}
+                onChange={(e) => setForm({ ...form, points_per_scan: parseInt(e.target.value) || 1 })}
+                className={fieldClass}
+              />
+            </div>
+
+            <div className="md:col-span-2 flex justify-end">
               <button
                 type="submit"
                 className="h-[48px] px-8 bg-[var(--md-primary)] text-white rounded-[var(--md-radius-xl)] text-[14px] font-medium hover:bg-[var(--md-primary-dark)] transition-all"
               >
-                {editId ? "Save Changes" : "Create Product"}
+                {editId ? "บันทึกการแก้ไข" : "สร้างสินค้า"}
               </button>
             </div>
           </form>
         </div>
       )}
 
-      <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 overflow-hidden">
-        <table className="w-full">
+      <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 overflow-x-auto">
+        <table className="w-full min-w-[800px]">
           <thead>
             <tr className="border-b border-[var(--md-outline-variant)]">
               <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">
