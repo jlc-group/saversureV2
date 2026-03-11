@@ -17,17 +17,28 @@ func NewHandler(db *pgxpool.Pool) *Handler {
 	return &Handler{svc: NewService(db)}
 }
 
-func (h *Handler) List(c *gin.Context) {
-	tenantID := c.GetString("tenant_id")
+func parseFilter(c *gin.Context) ListFilter {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
-	status := c.Query("status")
+	return ListFilter{
+		Status:       c.Query("status"),
+		Search:       c.Query("search"),
+		DateFrom:     c.Query("date_from"),
+		DateTo:       c.Query("date_to"),
+		DeliveryType: c.Query("delivery_type"),
+		RewardID:     c.Query("reward_id"),
+		SortBy:       c.Query("sort_by"),
+		SortDir:      c.Query("sort_dir"),
+		Limit:        limit,
+		Offset:       offset,
+	}
+}
 
-	txns, total, err := h.svc.List(c.Request.Context(), tenantID, ListFilter{
-		Status: status,
-		Limit:  limit,
-		Offset: offset,
-	})
+func (h *Handler) List(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	f := parseFilter(c)
+
+	txns, total, err := h.svc.List(c.Request.Context(), tenantID, f)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -35,18 +46,24 @@ func (h *Handler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": txns, "total": total})
 }
 
+func (h *Handler) Summary(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	f := parseFilter(c)
+
+	counts, err := h.svc.Summary(c.Request.Context(), tenantID, f)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": counts})
+}
+
 func (h *Handler) ListMine(c *gin.Context) {
 	tenantID := c.GetString("tenant_id")
 	userID := c.GetString("user_id")
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
-	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
-	status := c.Query("status")
+	f := parseFilter(c)
 
-	txns, total, err := h.svc.ListMine(c.Request.Context(), tenantID, userID, ListFilter{
-		Status: status,
-		Limit:  limit,
-		Offset: offset,
-	})
+	txns, total, err := h.svc.ListMine(c.Request.Context(), tenantID, userID, f)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -75,41 +92,46 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, txn)
 }
 
+func ptrStr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
 func (h *Handler) ExportCSV(c *gin.Context) {
 	tenantID := c.GetString("tenant_id")
-	status := c.Query("status")
+	f := parseFilter(c)
+	f.Limit = 10000
+	f.Offset = 0
 
-	// Fetch all transactions (no pagination for export)
-	txns, _, err := h.svc.List(c.Request.Context(), tenantID, ListFilter{Status: status, Limit: 10000, Offset: 0})
+	txns, _, err := h.svc.List(c.Request.Context(), tenantID, f)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Write CSV
 	c.Header("Content-Type", "text/csv")
 	c.Header("Content-Disposition", `attachment; filename="transactions.csv"`)
 
 	writer := csv.NewWriter(c.Writer)
-	writer.Write([]string{"ID", "User ID", "Reward ID", "Reward Name", "Status", "Tracking", "Delivery Type", "Coupon Code", "Expires At", "Created At"})
+	writer.Write([]string{
+		"ID", "User ID", "User Name", "User Phone", "Reward ID", "Reward Name",
+		"Status", "Tracking", "Delivery Type", "Coupon Code",
+		"Recipient Name", "Recipient Phone",
+		"Address Line 1", "Address Line 2", "District", "Sub District", "Province", "Postal Code",
+		"Expires At", "Created At",
+	})
 	for _, t := range txns {
-		rewardName := ""
-		if t.RewardName != nil {
-			rewardName = *t.RewardName
-		}
-		tracking := ""
-		if t.Tracking != nil {
-			tracking = *t.Tracking
-		}
-		deliveryType := ""
-		if t.DeliveryType != nil {
-			deliveryType = *t.DeliveryType
-		}
-		couponCode := ""
-		if t.CouponCode != nil {
-			couponCode = *t.CouponCode
-		}
-		writer.Write([]string{t.ID, t.UserID, t.RewardID, rewardName, t.Status, tracking, deliveryType, couponCode, t.ExpiresAt, t.CreatedAt})
+		writer.Write([]string{
+			t.ID, t.UserID, ptrStr(t.UserName), ptrStr(t.UserPhone),
+			t.RewardID, ptrStr(t.RewardName),
+			t.Status, ptrStr(t.Tracking), ptrStr(t.DeliveryType), ptrStr(t.CouponCode),
+			ptrStr(t.RecipientName), ptrStr(t.RecipientPhone),
+			ptrStr(t.AddressLine1), ptrStr(t.AddressLine2),
+			ptrStr(t.District), ptrStr(t.SubDistrict), ptrStr(t.Province), ptrStr(t.PostalCode),
+			t.ExpiresAt, t.CreatedAt,
+		})
 	}
 	writer.Flush()
 }

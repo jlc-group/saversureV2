@@ -12,35 +12,55 @@ import {
 } from "@/lib/currency";
 import { useTenant } from "./TenantProvider";
 import { Separator } from "@/components/ui/separator";
+import { getNavIcon } from "@/lib/nav-icons";
 
-const menuItems = [
-  { label: "หน้าหลัก", href: "/", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5"><path d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75" /></svg> },
-  { label: "สแกนสะสมแต้ม", href: "/scan", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5"><path d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zm0 9.75c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zm9.75-9.75c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" /></svg> },
-  { label: "ประวัติสะสมแต้ม", href: "/history", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5"><path d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> },
-  { label: "กระเป๋าเงิน", href: "/wallet", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5"><path d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 110-6h.75A2.25 2.25 0 0118 6v.75M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008z" /></svg> },
-  { label: "แลกรางวัล", href: "/rewards", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5"><path d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg> },
-  { label: "ข่าวสาร", href: "/news", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5"><path d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 01-2.25 2.25M16.5 7.5V18a2.25 2.25 0 002.25 2.25M16.5 7.5V4.875c0-.621-.504-1.125-1.125-1.125H4.125C3.504 3.75 3 4.254 3 4.875V18a2.25 2.25 0 002.25 2.25h13.5M6 7.5h3v3H6v-3z" /></svg> },
+interface DrawerMenuItem {
+  icon: string;
+  label: string;
+  link: string;
+  visible: boolean;
+}
+
+const FALLBACK_ITEMS: DrawerMenuItem[] = [
+  { icon: "home", label: "หน้าหลัก", link: "/", visible: true },
+  { icon: "scan", label: "สแกน QR Code", link: "/scan", visible: true },
+  { icon: "gift", label: "แลกของรางวัล", link: "/rewards", visible: true },
+  { icon: "star", label: "กระเป๋าเงิน", link: "/wallet", visible: true },
+  { icon: "history", label: "ประวัติสแกน", link: "/history", visible: true },
+  { icon: "trophy", label: "ประวัติแลกรางวัล", link: "/history/redeems", visible: true },
+  { icon: "news", label: "ข่าวสาร", link: "/news", visible: true },
+  { icon: "user", label: "โปรไฟล์ของฉัน", link: "/profile", visible: true },
 ];
 
 export default function Drawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
   const [loggedIn, setLoggedIn] = useState(false);
   const [balances, setBalances] = useState<MultiBalance[]>([]);
+  const [menuItems, setMenuItems] = useState<DrawerMenuItem[]>(FALLBACK_ITEMS);
   const { brandName, branding } = useTenant();
   const primaryBalance = getPrimaryBalance(balances);
   const secondaryBalances = getSecondaryBalances(balances);
 
   useEffect(() => {
-    setLoggedIn(isLoggedIn());
+    api
+      .get<{ items: DrawerMenuItem[] }>("/api/v1/public/nav-menu/drawer")
+      .then((d) => {
+        if (d.items && d.items.length > 0) {
+          setMenuItems(d.items.filter((i) => i.visible));
+        }
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
-    if (open && loggedIn) {
+    const li = isLoggedIn();
+    setLoggedIn(li);
+    if (open && li) {
       api.get<{ data: MultiBalance[] }>("/api/v1/my/balances")
         .then((d) => setBalances(d.data ?? []))
         .catch(() => {});
     }
-  }, [open, loggedIn]);
+  }, [open]);
 
   const navigate = (href: string) => {
     router.push(href);
@@ -139,18 +159,21 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
 
         <Separator />
 
-        {/* Menu */}
+        {/* Menu — dynamically fetched */}
         <div className="p-2">
-          {menuItems.map((item) => (
-            <button
-              key={item.href}
-              className="flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-left transition hover:bg-secondary active:bg-secondary"
-              onClick={() => navigate(item.href)}
-            >
-              <span className="text-[var(--jh-green)]">{item.icon}</span>
-              <span className="text-sm font-medium text-foreground">{item.label}</span>
-            </button>
-          ))}
+          {menuItems.map((item) => {
+            const renderIcon = getNavIcon(item.icon);
+            return (
+              <button
+                key={item.link}
+                className="flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-left transition hover:bg-secondary active:bg-secondary"
+                onClick={() => navigate(item.link)}
+              >
+                <span className="text-[var(--jh-green)]">{renderIcon(false)}</span>
+                <span className="text-sm font-medium text-foreground">{item.label}</span>
+              </button>
+            );
+          })}
         </div>
 
         {loggedIn && (

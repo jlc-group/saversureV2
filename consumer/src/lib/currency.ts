@@ -25,7 +25,7 @@ export function getCurrencyIcon(code?: string, icon?: string | null) {
 
 export function getPrimaryBalance(balances: MultiBalance[]) {
   if (!balances.length) return null;
-  return balances.find((item) => item.currency === "point") || balances[0];
+  return balances.find((item) => item.currency.toLowerCase() === "point") || balances[0];
 }
 
 export function getSecondaryBalances(balances: MultiBalance[]) {

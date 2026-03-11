@@ -28,7 +28,8 @@ type LINEConfig struct {
 }
 
 type GoogleConfig struct {
-	ClientID string
+	ClientID     string
+	GeminiAPIKey string
 }
 
 type SMSConfig struct {
@@ -161,7 +162,8 @@ func Load() (*Config, error) {
 			CallbackURL:   getEnv("LINE_CALLBACK_URL", "http://localhost:30403/auth/line/callback"),
 		},
 		Google: GoogleConfig{
-			ClientID: getEnv("GOOGLE_CLIENT_ID", ""),
+			ClientID:     getEnv("GOOGLE_CLIENT_ID", ""),
+			GeminiAPIKey: getEnv("GEMINI_API_KEY", ""),
 		},
 	}
 

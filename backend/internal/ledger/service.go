@@ -2,7 +2,9 @@ package ledger
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -12,6 +14,8 @@ import (
 type Service struct {
 	db *pgxpool.Pool
 }
+
+var ErrInsufficientBalance = errors.New("insufficient balance")
 
 func NewService(db *pgxpool.Pool) *Service {
 	return &Service{db: db}
@@ -53,6 +57,7 @@ func (s *Service) CreditWithExpiry(ctx context.Context, tx pgx.Tx, tenantID, use
 	if currency == "" {
 		currency = "point"
 	}
+	currency = strings.ToLower(currency)
 
 	var campaignPtr, expiryActionPtr, promoIDPtr *string
 	if campaignID != "" {
@@ -90,6 +95,7 @@ func (s *Service) Debit(ctx context.Context, tx pgx.Tx, tenantID, userID string,
 	if currency == "" {
 		currency = "point"
 	}
+	currency = strings.ToLower(currency)
 	var currentBalance int
 	err := tx.QueryRow(ctx,
 		`SELECT COALESCE((SELECT balance_after FROM point_ledger
@@ -102,7 +108,7 @@ func (s *Service) Debit(ctx context.Context, tx pgx.Tx, tenantID, userID string,
 	}
 
 	if currentBalance < amount {
-		return fmt.Errorf("insufficient balance: have %d, need %d", currentBalance, amount)
+		return fmt.Errorf("%w: have %d, need %d", ErrInsufficientBalance, currentBalance, amount)
 	}
 
 	_, err = tx.Exec(ctx,

@@ -21,6 +21,7 @@ type Detail struct {
 	Name               string  `json:"name"`
 	Description        string  `json:"description"`
 	PointCost          int     `json:"point_cost"`
+	CostCurrency       string  `json:"cost_currency"`
 	ImageURL           *string `json:"image_url,omitempty"`
 	DeliveryType       string  `json:"delivery_type"`
 	Type               string  `json:"type"`
@@ -44,6 +45,7 @@ type PublicItem struct {
 	Name         string  `json:"name"`
 	Description  string  `json:"description"`
 	PointCost    int     `json:"point_cost"`
+	CostCurrency string  `json:"cost_currency"`
 	ImageURL     *string `json:"image_url,omitempty"`
 	DeliveryType string  `json:"delivery_type"`
 	AvailableQty int     `json:"available_qty"`
@@ -57,7 +59,7 @@ type PublicItem struct {
 func (s *Service) GetDetail(ctx context.Context, tenantID, rewardID string) (*Detail, error) {
 	var d Detail
 	err := s.db.QueryRow(ctx,
-		`SELECT r.id, r.name, r.description, r.point_cost, r.image_url,
+		`SELECT r.id, r.name, COALESCE(r.description, ''), r.point_cost, COALESCE(r.cost_currency, 'point'), r.image_url,
 		        COALESCE(r.delivery_type, 'none'), r.type, r.campaign_id,
 		        ri.total_qty, ri.reserved_qty, ri.sold_qty,
 		        (ri.total_qty - ri.reserved_qty - ri.sold_qty) as available_qty,
@@ -69,7 +71,7 @@ func (s *Service) GetDetail(ctx context.Context, tenantID, rewardID string) (*De
 		 LEFT JOIN reward_tiers rt ON rt.id = r.tier_id
 		 WHERE r.id = $1 AND r.tenant_id = $2`,
 		rewardID, tenantID,
-	).Scan(&d.ID, &d.Name, &d.Description, &d.PointCost, &d.ImageURL,
+	).Scan(&d.ID, &d.Name, &d.Description, &d.PointCost, &d.CostCurrency, &d.ImageURL,
 		&d.DeliveryType, &d.Type, &d.CampaignID,
 		&d.TotalQty, &d.ReservedQty, &d.SoldQty, &d.AvailableQty,
 		&d.TierID, &d.TierName,
@@ -98,7 +100,7 @@ func (s *Service) ListPublic(ctx context.Context, tenantID string, tierID *strin
 		limit = 100
 	}
 
-	where := "r.tenant_id = $1 AND (ri.total_qty - ri.reserved_qty - ri.sold_qty) > 0"
+	where := "r.tenant_id = $1 AND COALESCE(r.status, 'active') = 'active' AND (r.expires_at IS NULL OR r.expires_at > NOW()) AND (ri.total_qty - ri.reserved_qty - ri.sold_qty) > 0"
 	args := []any{tenantID}
 	argN := 2
 
@@ -115,7 +117,7 @@ func (s *Service) ListPublic(ctx context.Context, tenantID string, tierID *strin
 	).Scan(&total)
 
 	query := fmt.Sprintf(
-		`SELECT r.id, r.name, r.description, r.point_cost, r.image_url,
+		`SELECT r.id, r.name, COALESCE(r.description, ''), r.point_cost, COALESCE(r.cost_currency, 'point'), r.image_url,
 		        COALESCE(r.delivery_type, 'none'),
 		        (ri.total_qty - ri.reserved_qty - ri.sold_qty) as available_qty,
 		        COALESCE(r.is_flash, false), r.flash_start::text, r.flash_end::text,
@@ -139,7 +141,7 @@ func (s *Service) ListPublic(ctx context.Context, tenantID string, tierID *strin
 	var items []PublicItem
 	for rows.Next() {
 		var p PublicItem
-		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.PointCost, &p.ImageURL,
+		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.PointCost, &p.CostCurrency, &p.ImageURL,
 			&p.DeliveryType, &p.AvailableQty,
 			&p.IsFlash, &p.FlashStart, &p.FlashEnd,
 			&p.TierID, &p.TierName); err != nil {

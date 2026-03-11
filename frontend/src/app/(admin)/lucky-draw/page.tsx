@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { ImageUpload } from "@/components/ui/image-upload";
 
 interface LDCampaign {
   id: string;
@@ -284,9 +285,12 @@ export default function LuckyDrawPage() {
                   <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5 tracking-[0.4px] uppercase">Max Tickets Per User</label>
                   <input type="number" value={campaignForm.max_tickets_per_user} onChange={(e) => setCampaignForm({ ...campaignForm, max_tickets_per_user: parseInt(e.target.value) || 1 })} min={1} className={fieldClass} />
                 </div>
-                <div>
-                  <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5 tracking-[0.4px] uppercase">Image URL</label>
-                  <input type="text" value={campaignForm.image_url} onChange={(e) => setCampaignForm({ ...campaignForm, image_url: e.target.value })} className={fieldClass} placeholder="Optional" />
+                <div className="md:col-span-2">
+                  <ImageUpload
+                    value={campaignForm.image_url}
+                    onChange={(url) => setCampaignForm({ ...campaignForm, image_url: url })}
+                    label="รูปภาพ Lucky Draw"
+                  />
                 </div>
                 <div>
                   <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5 tracking-[0.4px] uppercase">Registration Start</label>
@@ -528,9 +532,12 @@ export default function LuckyDrawPage() {
                 <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5 tracking-[0.4px] uppercase">Max Tickets Per User</label>
                 <input type="number" value={campaignForm.max_tickets_per_user} onChange={(e) => setCampaignForm({ ...campaignForm, max_tickets_per_user: parseInt(e.target.value) || 1 })} min={1} className={fieldClass} />
               </div>
-              <div>
-                <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5 tracking-[0.4px] uppercase">Image URL</label>
-                <input type="text" value={campaignForm.image_url} onChange={(e) => setCampaignForm({ ...campaignForm, image_url: e.target.value })} className={fieldClass} placeholder="Optional" />
+              <div className="md:col-span-2">
+                <ImageUpload
+                  value={campaignForm.image_url}
+                  onChange={(url) => setCampaignForm({ ...campaignForm, image_url: url })}
+                  label="รูปภาพ Lucky Draw"
+                />
               </div>
               <div>
                 <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5 tracking-[0.4px] uppercase">Registration Start</label>

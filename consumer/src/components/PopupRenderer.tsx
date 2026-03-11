@@ -110,9 +110,10 @@ export default function PopupRenderer() {
         <div className="p-5">
           <h3 className="text-lg font-bold text-gray-900">{popup.title}</h3>
           {popup.content && (
-            <p className="mt-2 text-sm text-gray-600 leading-relaxed">
-              {popup.content}
-            </p>
+            <div
+              className="mt-2 text-sm text-gray-600 leading-relaxed [&_h3]:text-base [&_h3]:font-bold [&_h3]:text-gray-900 [&_b]:font-bold [&_p]:mt-1"
+              dangerouslySetInnerHTML={{ __html: popup.content }}
+            />
           )}
           <div className="mt-4 flex gap-2">
             {popup.link_url && (

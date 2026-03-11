@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { ImageUpload } from "@/components/ui/image-upload";
 
 interface Mission {
   id: string;
@@ -610,16 +611,12 @@ export default function GamificationPage() {
                     />
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5 tracking-[0.4px] uppercase">
-                      Icon URL
-                    </label>
-                    <input
-                      type="text"
+                    <ImageUpload
                       value={badgeForm.icon_url}
-                      onChange={(e) =>
-                        setBadgeForm({ ...badgeForm, icon_url: e.target.value })
+                      onChange={(url) =>
+                        setBadgeForm({ ...badgeForm, icon_url: url })
                       }
-                      className={fieldClass}
+                      label="ไอคอน Badge"
                     />
                   </div>
                 </div>

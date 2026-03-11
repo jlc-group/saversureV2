@@ -192,12 +192,13 @@ func main() {
 	var mediaProxy *upload.ProxyHandler
 	if cfg.MinIO.AccessKey != "" {
 		uh, err := upload.NewHandler(upload.Config{
-			Endpoint:  cfg.MinIO.Endpoint,
-			AccessKey: cfg.MinIO.AccessKey,
-			SecretKey: cfg.MinIO.SecretKey,
-			Bucket:    cfg.MinIO.Bucket,
-			UseSSL:    cfg.MinIO.UseSSL,
-			PublicURL: cfg.MinIO.PublicURL,
+			Endpoint:     cfg.MinIO.Endpoint,
+			AccessKey:    cfg.MinIO.AccessKey,
+			SecretKey:    cfg.MinIO.SecretKey,
+			Bucket:       cfg.MinIO.Bucket,
+			UseSSL:       cfg.MinIO.UseSSL,
+			PublicURL:    cfg.MinIO.PublicURL,
+			GeminiAPIKey: cfg.Google.GeminiAPIKey,
 		})
 		if err != nil {
 			slog.Warn("MinIO not available (upload disabled)", "error", err)
@@ -361,6 +362,8 @@ func main() {
 	{
 		rewardRoutes.POST("", inventoryHandler.CreateReward)
 		rewardRoutes.GET("", inventoryHandler.List)
+		rewardRoutes.GET("/:id", inventoryHandler.GetByID)
+		rewardRoutes.PATCH("/:id", inventoryHandler.UpdateReward)
 		rewardRoutes.PATCH("/:id/inventory", inventoryHandler.UpdateInventory)
 	}
 
@@ -472,6 +475,7 @@ func main() {
 	txnRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
 	{
 		txnRoutes.GET("", transactionHandler.List)
+		txnRoutes.GET("/summary", transactionHandler.Summary)
 		txnRoutes.GET("/export", transactionHandler.ExportCSV)
 		txnRoutes.PATCH("/:id", transactionHandler.UpdateStatus)
 	}
@@ -782,6 +786,7 @@ func main() {
 		uploadImageRoute.Use(mw.RequireRole("super_admin", "brand_admin", "factory_user"))
 		{
 			uploadImageRoute.POST("/image", uploadHandler.UploadImage)
+			uploadImageRoute.POST("/ai-generate", uploadHandler.AIGenerateImage)
 		}
 	}
 
@@ -813,6 +818,7 @@ func main() {
 		publicRoutes.GET("/page-config/:slug", pageConfigHandler.GetPublic)
 		publicRoutes.GET("/popups", popupHandler.ListActive)
 		publicRoutes.GET("/nav-menu/:type", navMenuHandler.GetPublic)
+		publicRoutes.GET("/currencies", currencyHandler.ListPublic)
 	}
 
 	// Consumer Profile (self)

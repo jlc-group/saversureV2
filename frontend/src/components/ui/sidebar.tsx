@@ -190,8 +190,88 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: "แคมเปญเสริม",
+    label: "สนับสนุน",
     items: [
+      {
+        href: "/support",
+        label: "Support",
+        roles: ["super_admin", "brand_admin", "brand_staff"],
+        icon: (
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
+            <path d="M21 12.22C21 6.73 16.74 3 12 3c-4.69 0-9 3.65-9 9.28-.6.34-1 .98-1 1.72v2c0 1.1.9 2 2 2h1v-6.1c0-3.87 3.13-7 7-7s7 3.13 7 7V19h-8v2h8c1.1 0 2-.9 2-2v-1.22c.59-.31 1-.92 1-1.64v-2.3c0-.7-.41-1.31-1-1.62z" />
+          </svg>
+        ),
+      },
+    ],
+  },
+  {
+    label: "อินทิเกรชัน",
+    items: [
+      {
+        href: "/api-keys",
+        label: "API Keys",
+        roles: ["super_admin", "brand_admin"],
+        icon: (
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
+            <path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z" />
+          </svg>
+        ),
+      },
+      {
+        href: "/webhooks",
+        label: "Webhooks",
+        roles: ["super_admin", "brand_admin"],
+        icon: (
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+          </svg>
+        ),
+      },
+    ],
+  },
+  {
+    label: "หน้าลูกค้า (Consumer)",
+    items: [
+      {
+        href: "/branding",
+        label: "Branding",
+        roles: ["super_admin", "brand_admin"],
+        icon: (
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
+            <path d="M12 22C6.49 22 2 17.51 2 12S6.49 2 12 2s10 4.04 10 9c0 3.31-2.69 6-6 6h-1.77c-.28 0-.5.22-.5.5 0 .12.05.23.13.33.41.47.64 1.06.64 1.67A2.5 2.5 0 0 1 12 22zm0-18c-4.41 0-8 3.59-8 8s3.59 8 8 8c.28 0 .5-.22.5-.5a.54.54 0 0 0-.14-.35c-.41-.46-.63-1.05-.63-1.65a2.5 2.5 0 0 1 2.5-2.5H16c2.21 0 4-1.79 4-4 0-3.86-3.59-7-8-7z" />
+          </svg>
+        ),
+      },
+      {
+        href: "/page-builder",
+        label: "Page Builder",
+        roles: ["super_admin", "brand_admin"],
+        icon: (
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
+            <path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z" />
+          </svg>
+        ),
+      },
+      {
+        href: "/popup-manager",
+        label: "Popup Manager",
+        roles: ["super_admin", "brand_admin"],
+        icon: (
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
+            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 12h2v5H7v-5zm4-3h2v8h-2V9zm4-2h2v10h-2V7z" />
+          </svg>
+        ),
+      },
+      {
+        href: "/menu-editor",
+        label: "Menu Editor",
+        roles: ["super_admin", "brand_admin"],
+        icon: (
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
+            <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
+          </svg>
+        ),
+      },
       {
         href: "/news",
         label: "News & Banners",
@@ -235,88 +315,8 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: "สนับสนุน",
-    items: [
-      {
-        href: "/support",
-        label: "Support",
-        roles: ["super_admin", "brand_admin", "brand_staff"],
-        icon: (
-          <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
-            <path d="M21 12.22C21 6.73 16.74 3 12 3c-4.69 0-9 3.65-9 9.28-.6.34-1 .98-1 1.72v2c0 1.1.9 2 2 2h1v-6.1c0-3.87 3.13-7 7-7s7 3.13 7 7V19h-8v2h8c1.1 0 2-.9 2-2v-1.22c.59-.31 1-.92 1-1.64v-2.3c0-.7-.41-1.31-1-1.62z" />
-          </svg>
-        ),
-      },
-    ],
-  },
-  {
-    label: "อินทิเกรชัน",
-    items: [
-      {
-        href: "/api-keys",
-        label: "API Keys",
-        roles: ["super_admin", "brand_admin"],
-        icon: (
-          <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
-            <path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z" />
-          </svg>
-        ),
-      },
-      {
-        href: "/webhooks",
-        label: "Webhooks",
-        roles: ["super_admin", "brand_admin"],
-        icon: (
-          <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-          </svg>
-        ),
-      },
-    ],
-  },
-  {
     label: "ตั้งค่า",
     items: [
-      {
-        href: "/branding",
-        label: "Branding",
-        roles: ["super_admin", "brand_admin"],
-        icon: (
-          <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
-            <path d="M12 22C6.49 22 2 17.51 2 12S6.49 2 12 2s10 4.04 10 9c0 3.31-2.69 6-6 6h-1.77c-.28 0-.5.22-.5.5 0 .12.05.23.13.33.41.47.64 1.06.64 1.67A2.5 2.5 0 0 1 12 22zm0-18c-4.41 0-8 3.59-8 8s3.59 8 8 8c.28 0 .5-.22.5-.5a.54.54 0 0 0-.14-.35c-.41-.46-.63-1.05-.63-1.65a2.5 2.5 0 0 1 2.5-2.5H16c2.21 0 4-1.79 4-4 0-3.86-3.59-7-8-7z" />
-          </svg>
-        ),
-      },
-      {
-        href: "/page-builder",
-        label: "Page Builder",
-        roles: ["super_admin", "brand_admin"],
-        icon: (
-          <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
-            <path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z" />
-          </svg>
-        ),
-      },
-      {
-        href: "/popup-manager",
-        label: "Popup Manager",
-        roles: ["super_admin", "brand_admin"],
-        icon: (
-          <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
-            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 12h2v5H7v-5zm4-3h2v8h-2V9zm4-2h2v10h-2V7z" />
-          </svg>
-        ),
-      },
-      {
-        href: "/menu-editor",
-        label: "Menu Editor",
-        roles: ["super_admin", "brand_admin"],
-        icon: (
-          <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
-            <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
-          </svg>
-        ),
-      },
       {
         href: "/settings/staff",
         label: "Staff",

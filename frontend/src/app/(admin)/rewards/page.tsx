@@ -1,13 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import Image from "next/image";
 import { api } from "@/lib/api";
 
 interface Reward {
   id: string;
   name: string;
+  description: string;
   type: string;
   point_cost: number;
+  cost_currency: string;
+  image_url: string | null;
+  delivery_type: string;
+  status: string;
+  expires_at: string | null;
   total_qty: number;
   reserved_qty: number;
   sold_qty: number;
@@ -15,103 +22,324 @@ interface Reward {
   created_at: string;
 }
 
+interface CurrencyMaster {
+  id: string;
+  code: string;
+  name: string;
+  icon: string;
+  is_default: boolean;
+  active: boolean;
+}
+
+const typeOptions = [
+  { value: "physical", label: "สินค้าจริง" },
+  { value: "coupon", label: "คูปอง" },
+  { value: "digital", label: "ดิจิทัล" },
+  { value: "ticket", label: "ตั๋ว" },
+];
+
+const deliveryOptions = [
+  { value: "none", label: "ไม่ระบุ" },
+  { value: "shipping", label: "📦 จัดส่ง" },
+  { value: "coupon", label: "🎫 คูปอง" },
+  { value: "pickup", label: "📍 รับหน้าร้าน" },
+  { value: "digital", label: "📱 ดิจิทัล" },
+  { value: "ticket", label: "🎟️ ตั๋ว/บัตร" },
+];
+
+const statusBadge: Record<string, { label: string; cls: string }> = {
+  active: { label: "Active", cls: "bg-green-100 text-green-700" },
+  inactive: { label: "Inactive", cls: "bg-gray-200 text-gray-600" },
+  draft: { label: "Draft", cls: "bg-amber-100 text-amber-700" },
+};
+
+const currencyFallbackEmoji: Record<string, string> = { point: "🪙", diamond: "💎", ticket: "🎟️" };
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:30400";
+const mediaUrl = (url: string | null) => {
+  if (!url) return null;
+  if (url.startsWith("http")) return url;
+  return `${API_BASE}/media/${url}`;
+};
+
+const fieldClass = "w-full h-[44px] px-3 border border-[var(--md-outline)] rounded-[var(--md-radius-sm)] text-[14px] text-[var(--md-on-surface)] bg-transparent outline-none focus:border-[var(--md-primary)] focus:border-2 transition-all";
+const labelClass = "block text-[11px] font-semibold text-[var(--md-on-surface-variant)] mb-1 tracking-[0.5px] uppercase";
+
+type FormData = {
+  campaign_id: string;
+  name: string;
+  description: string;
+  type: string;
+  point_cost: number;
+  cost_currency: string;
+  delivery_type: string;
+  status: string;
+  expires_at: string;
+  total_qty: number;
+  image_url: string;
+};
+
+const emptyForm: FormData = {
+  campaign_id: "", name: "", description: "", type: "physical",
+  point_cost: 100, cost_currency: "point", delivery_type: "none",
+  status: "active", expires_at: "", total_qty: 100, image_url: "",
+};
+
 export default function RewardsPage() {
   const [rewards, setRewards] = useState<Reward[]>([]);
+  const [currencies, setCurrencies] = useState<CurrencyMaster[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ campaign_id: "", name: "", description: "", type: "physical", point_cost: 100, total_qty: 100 });
+  const [editId, setEditId] = useState<string | null>(null);
+  const [form, setForm] = useState<FormData>({ ...emptyForm });
   const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [inventoryModal, setInventoryModal] = useState<{ id: string; name: string; delta: number } | null>(null);
   const [updatingInv, setUpdatingInv] = useState(false);
+  const [filter, setFilter] = useState<"all" | "active" | "inactive" | "draft">("all");
 
-  const fetchRewards = async () => {
+  const getCurrencyIcon = (code: string) => {
+    const c = currencies.find((x) => x.code.toLowerCase() === code.toLowerCase());
+    return c?.icon || currencyFallbackEmoji[code.toLowerCase()] || "⭐";
+  };
+
+  const getCurrencyName = (code: string) => {
+    const c = currencies.find((x) => x.code.toLowerCase() === code.toLowerCase());
+    return c?.name || code;
+  };
+
+  const fetchRewards = useCallback(async () => {
     try {
       const data = await api.get<{ data: Reward[] }>("/api/v1/rewards");
       setRewards(data.data || []);
     } catch { /* ignore */ } finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => {
+    fetchRewards();
+    api.get<{ data: CurrencyMaster[] }>("/api/v1/currencies")
+      .then((d) => setCurrencies(d.data || []))
+      .catch(() => {});
+  }, [fetchRewards]);
+
+  const openCreate = () => {
+    setEditId(null);
+    setForm({ ...emptyForm });
+    setShowForm(true);
   };
 
-  useEffect(() => { fetchRewards(); }, []);
+  const openEdit = (r: Reward) => {
+    setEditId(r.id);
+    setForm({
+      campaign_id: "",
+      name: r.name,
+      description: r.description,
+      type: r.type,
+      point_cost: r.point_cost,
+      cost_currency: r.cost_currency,
+      delivery_type: r.delivery_type,
+      status: r.status,
+      expires_at: r.expires_at ? r.expires_at.slice(0, 16) : "",
+      total_qty: r.total_qty,
+      image_url: r.image_url || "",
+    });
+    setShowForm(true);
+  };
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await api.post("/api/v1/rewards", form);
+      if (editId) {
+        await api.patch(`/api/v1/rewards/${editId}`, {
+          name: form.name || undefined,
+          description: form.description || undefined,
+          type: form.type || undefined,
+          point_cost: form.point_cost || undefined,
+          cost_currency: form.cost_currency || undefined,
+          delivery_type: form.delivery_type || undefined,
+          status: form.status || undefined,
+          expires_at: form.expires_at || "__clear__",
+          image_url: form.image_url || undefined,
+        });
+      } else {
+        await api.post("/api/v1/rewards", {
+          ...form,
+          expires_at: form.expires_at || null,
+          image_url: form.image_url || null,
+        });
+      }
       setShowForm(false);
-      setForm({ campaign_id: "", name: "", description: "", type: "physical", point_cost: 100, total_qty: 100 });
+      setEditId(null);
+      setForm({ ...emptyForm });
       fetchRewards();
-    } catch { alert("Failed to create reward"); } finally { setSubmitting(false); }
+    } catch { alert("Failed to save reward"); } finally { setSubmitting(false); }
   };
 
   const handleUpdateInventory = async () => {
     if (!inventoryModal) return;
     setUpdatingInv(true);
     try {
-      await api.patch(`/api/v1/rewards/${inventoryModal.id}/inventory`, { delta: inventoryModal.delta });
+      await api.patch(`/api/v1/rewards/${inventoryModal.id}/inventory`, { total_qty: inventoryModal.delta });
       setInventoryModal(null);
       fetchRewards();
     } catch { alert("Failed to update inventory"); } finally { setUpdatingInv(false); }
   };
 
-  const fieldClass = "w-full h-[48px] px-4 border border-[var(--md-outline)] rounded-[var(--md-radius-sm)] text-[14px] text-[var(--md-on-surface)] bg-transparent outline-none focus:border-[var(--md-primary)] focus:border-2 transition-all duration-200";
+  const toggleStatus = async (r: Reward) => {
+    const newStatus = r.status === "active" ? "inactive" : "active";
+    try {
+      await api.patch(`/api/v1/rewards/${r.id}`, { status: newStatus });
+      fetchRewards();
+    } catch { alert("Failed to update status"); }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const result = await api.upload("/api/v1/upload/image", file);
+      setForm({ ...form, image_url: result.url });
+    } catch { alert("Upload failed"); } finally { setUploading(false); }
+  };
+
+  const filtered = filter === "all" ? rewards : rewards.filter((r) => r.status === filter);
 
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-[28px] font-normal text-[var(--md-on-surface)] tracking-[-0.5px]">Rewards & Inventory</h1>
-          <p className="text-[14px] text-[var(--md-on-surface-variant)] mt-1">Manage reward items and track inventory</p>
+          <p className="text-[14px] text-[var(--md-on-surface-variant)] mt-1">
+            จัดการของรางวัล ราคา สกุลเงิน สถานะ และ stock
+          </p>
         </div>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="inline-flex items-center gap-2 h-[40px] px-6 bg-[var(--md-primary)] text-white rounded-[var(--md-radius-xl)] text-[14px] font-medium tracking-[0.1px] hover:bg-[var(--md-primary-dark)] active:scale-[0.98] transition-all duration-200"
-        >
-          {showForm ? (
-            <><svg viewBox="0 0 24 24" fill="currentColor" className="w-[18px] h-[18px]"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" /></svg>Cancel</>
-          ) : (
-            <><svg viewBox="0 0 24 24" fill="currentColor" className="w-[18px] h-[18px]"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" /></svg>Add Reward</>
-          )}
+        <button onClick={openCreate} className="inline-flex items-center gap-2 h-[40px] px-6 bg-[var(--md-primary)] text-white rounded-[var(--md-radius-xl)] text-[14px] font-medium hover:bg-[var(--md-primary-dark)] active:scale-[0.98] transition-all">
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-[18px] h-[18px]"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" /></svg>
+          Add Reward
         </button>
       </div>
 
-      {/* Create form */}
+      {/* Filters */}
+      <div className="flex gap-2 mb-4">
+        {(["all", "active", "inactive", "draft"] as const).map((f) => (
+          <button key={f} onClick={() => setFilter(f)} className={`px-4 py-1.5 rounded-full text-[13px] font-medium transition-all ${filter === f ? "bg-[var(--md-primary)] text-white" : "bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)] hover:bg-[var(--md-surface-container-high)]"}`}>
+            {f === "all" ? `ทั้งหมด (${rewards.length})` : `${statusBadge[f]?.label || f} (${rewards.filter((r) => r.status === f).length})`}
+          </button>
+        ))}
+      </div>
+
+      {/* Create / Edit Form Modal */}
       {showForm && (
-        <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 p-6 mb-6">
-          <h2 className="text-[16px] font-medium text-[var(--md-on-surface)] mb-5 tracking-[0.1px]">Add Reward</h2>
-          <form onSubmit={handleCreate} className="space-y-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 overflow-y-auto py-8" onClick={() => { setShowForm(false); setEditId(null); }}>
+          <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-xl)] md-elevation-3 p-6 w-full max-w-[640px] mx-4" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-[18px] font-medium text-[var(--md-on-surface)] mb-5">{editId ? "แก้ไขรางวัล" : "เพิ่มรางวัลใหม่"}</h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Image */}
               <div>
-                <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5 tracking-[0.4px] uppercase">Campaign ID</label>
-                <input type="text" value={form.campaign_id} onChange={(e) => setForm({ ...form, campaign_id: e.target.value })} required className={fieldClass} />
+                <label className={labelClass}>รูปสินค้า</label>
+                <div className="flex items-center gap-4">
+                  <div className="w-20 h-20 rounded-[var(--md-radius-md)] border border-dashed border-[var(--md-outline)] overflow-hidden bg-[var(--md-surface-container)] flex items-center justify-center">
+                    {form.image_url ? (
+                      <Image src={mediaUrl(form.image_url) || ""} alt="" width={80} height={80} className="w-full h-full object-cover" />
+                    ) : (
+                      <svg viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8 text-[var(--md-on-surface-variant)] opacity-30"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" /></svg>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" id="reward-img" />
+                    <label htmlFor="reward-img" className={`inline-flex items-center gap-2 h-[36px] px-4 bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)] rounded-[var(--md-radius-sm)] text-[13px] font-medium cursor-pointer hover:bg-[var(--md-surface-container-high)] transition-all ${uploading ? "opacity-50 pointer-events-none" : ""}`}>
+                      {uploading ? "Uploading..." : "📷 เลือกรูป"}
+                    </label>
+                    {form.image_url && (
+                      <button type="button" onClick={() => setForm({ ...form, image_url: "" })} className="ml-2 text-[12px] text-red-500 hover:underline">ลบรูป</button>
+                    )}
+                    <p className="text-[11px] text-[var(--md-on-surface-variant)] mt-1">หรือวาง URL รูปภาพ:</p>
+                    <input type="text" value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} placeholder="https://..." className={`${fieldClass} h-[36px] mt-1 text-[12px]`} />
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5 tracking-[0.4px] uppercase">Name</label>
-                <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required className={fieldClass} />
+
+              <div className="grid grid-cols-2 gap-3">
+                {!editId && (
+                  <div className="col-span-2">
+                    <label className={labelClass}>Campaign ID</label>
+                    <input type="text" value={form.campaign_id} onChange={(e) => setForm({ ...form, campaign_id: e.target.value })} required className={fieldClass} />
+                  </div>
+                )}
+                <div className="col-span-2">
+                  <label className={labelClass}>ชื่อรางวัล</label>
+                  <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required={!editId} className={fieldClass} />
+                </div>
+                <div className="col-span-2">
+                  <label className={labelClass}>รายละเอียด</label>
+                  <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} className={`${fieldClass} h-auto py-2`} />
+                </div>
+                <div>
+                  <label className={labelClass}>ราคา (จำนวนแต้ม)</label>
+                  <input type="number" value={form.point_cost} onChange={(e) => setForm({ ...form, point_cost: parseInt(e.target.value) || 1 })} min={1} required className={fieldClass} />
+                </div>
+                <div>
+                  <label className={labelClass}>สกุลเงิน</label>
+                  <select value={form.cost_currency} onChange={(e) => setForm({ ...form, cost_currency: e.target.value })} className={fieldClass}>
+                      {currencies.length > 0
+                      ? currencies.filter((c) => c.active).map((c) => (
+                          <option key={c.code} value={c.code.toLowerCase()}>
+                            {c.icon} {c.name} ({c.code})
+                          </option>
+                        ))
+                      : <option value="point">🪙 Point</option>
+                    }
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass}>ประเภทสินค้า</label>
+                  <select value={form.type} onChange={(e) => {
+                    const t = e.target.value;
+                    const autoDelivery: Record<string, string> = { physical: "shipping", coupon: "coupon", digital: "digital", ticket: "ticket" };
+                    setForm({ ...form, type: t, delivery_type: autoDelivery[t] || form.delivery_type });
+                  }} className={fieldClass}>
+                    {typeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass}>วิธีจัดส่ง</label>
+                  <select value={form.delivery_type} onChange={(e) => setForm({ ...form, delivery_type: e.target.value })} className={fieldClass}>
+                    {deliveryOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass}>สถานะ</label>
+                  <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className={fieldClass}>
+                    <option value="active">✅ Active</option>
+                    <option value="inactive">⏸️ Inactive</option>
+                    <option value="draft">📝 Draft</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass}>วันหมดอายุ</label>
+                  <input type="datetime-local" value={form.expires_at} onChange={(e) => setForm({ ...form, expires_at: e.target.value })} className={fieldClass} />
+                </div>
+                {!editId && (
+                  <div>
+                    <label className={labelClass}>จำนวน Stock เริ่มต้น</label>
+                    <input type="number" value={form.total_qty} onChange={(e) => setForm({ ...form, total_qty: parseInt(e.target.value) || 1 })} min={1} required className={fieldClass} />
+                  </div>
+                )}
               </div>
-              <div>
-                <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5 tracking-[0.4px] uppercase">Type</label>
-                <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className={fieldClass}>
-                  <option value="physical">Physical Item</option>
-                  <option value="digital">Digital</option>
-                  <option value="coupon">Coupon</option>
-                  <option value="ticket">Ticket</option>
-                </select>
+
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => { setShowForm(false); setEditId(null); }} className="flex-1 h-[40px] text-[14px] font-medium text-[var(--md-on-surface-variant)] bg-[var(--md-surface-container)] rounded-[var(--md-radius-xl)] hover:bg-[var(--md-surface-container-high)] transition-all">
+                  ยกเลิก
+                </button>
+                <button type="submit" disabled={submitting} className="flex-1 h-[40px] text-[14px] font-medium text-white bg-[var(--md-primary)] rounded-[var(--md-radius-xl)] hover:bg-[var(--md-primary-dark)] disabled:opacity-60 transition-all">
+                  {submitting ? "Saving..." : editId ? "บันทึกการแก้ไข" : "สร้างรางวัล"}
+                </button>
               </div>
-              <div>
-                <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5 tracking-[0.4px] uppercase">Point Cost</label>
-                <input type="number" value={form.point_cost} onChange={(e) => setForm({ ...form, point_cost: parseInt(e.target.value) || 1 })} min={1} required className={fieldClass} />
-              </div>
-              <div>
-                <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5 tracking-[0.4px] uppercase">Total Quantity</label>
-                <input type="number" value={form.total_qty} onChange={(e) => setForm({ ...form, total_qty: parseInt(e.target.value) || 1 })} min={1} required className={fieldClass} />
-              </div>
-            </div>
-            <button type="submit" disabled={submitting} className="h-[40px] px-6 bg-[var(--md-primary)] text-white rounded-[var(--md-radius-xl)] text-[14px] font-medium tracking-[0.1px] hover:bg-[var(--md-primary-dark)] disabled:opacity-60 active:scale-[0.98] transition-all duration-200">
-              {submitting ? "Creating..." : "Create Reward"}
-            </button>
-          </form>
+            </form>
+          </div>
         </div>
       )}
 
@@ -119,33 +347,25 @@ export default function RewardsPage() {
       {inventoryModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setInventoryModal(null)}>
           <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-xl)] md-elevation-3 p-6 w-full max-w-[400px] mx-4" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-[18px] font-medium text-[var(--md-on-surface)] mb-1">Update Inventory</h3>
+            <h3 className="text-[18px] font-medium text-[var(--md-on-surface)] mb-1">อัพเดท Stock</h3>
             <p className="text-[13px] text-[var(--md-on-surface-variant)] mb-5">{inventoryModal.name}</p>
             <div>
-              <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5 tracking-[0.4px] uppercase">
-                Quantity Change (+ เพิ่ม, - ลด)
-              </label>
-              <input
-                type="number"
-                value={inventoryModal.delta}
-                onChange={(e) => setInventoryModal({ ...inventoryModal, delta: parseInt(e.target.value) || 0 })}
-                className="w-full h-[56px] px-5 border border-[var(--md-outline)] rounded-[var(--md-radius-md)] text-[20px] font-mono text-[var(--md-on-surface)] bg-transparent outline-none text-center focus:border-[var(--md-primary)] focus:border-2 transition-all duration-200"
-                autoFocus
-              />
+              <label className={labelClass}>จำนวน Total ใหม่</label>
+              <input type="number" value={inventoryModal.delta} onChange={(e) => setInventoryModal({ ...inventoryModal, delta: parseInt(e.target.value) || 0 })} className="w-full h-[56px] px-5 border border-[var(--md-outline)] rounded-[var(--md-radius-md)] text-[20px] font-mono text-[var(--md-on-surface)] bg-transparent outline-none text-center focus:border-[var(--md-primary)] focus:border-2 transition-all" autoFocus />
               <div className="flex gap-2 mt-3 justify-center">
-                {[10, 50, 100, 500].map((n) => (
-                  <button key={n} type="button" onClick={() => setInventoryModal({ ...inventoryModal, delta: n })} className="h-[32px] px-3 text-[12px] font-medium text-[var(--md-success)] bg-[var(--md-success-light)] rounded-[var(--md-radius-sm)] hover:opacity-80 transition-all">
-                    +{n}
+                {[50, 100, 200, 500, 1000].map((n) => (
+                  <button key={n} type="button" onClick={() => setInventoryModal({ ...inventoryModal, delta: n })} className="h-[32px] px-3 text-[12px] font-medium text-[var(--md-primary)] bg-[var(--md-primary-light)] rounded-[var(--md-radius-sm)] hover:opacity-80 transition-all">
+                    {n}
                   </button>
                 ))}
               </div>
             </div>
             <div className="flex gap-3 mt-6">
-              <button onClick={() => setInventoryModal(null)} className="flex-1 h-[40px] text-[14px] font-medium text-[var(--md-on-surface-variant)] bg-[var(--md-surface-container)] rounded-[var(--md-radius-xl)] hover:bg-[var(--md-surface-container-high)] transition-all duration-200">
-                Cancel
+              <button onClick={() => setInventoryModal(null)} className="flex-1 h-[40px] text-[14px] font-medium text-[var(--md-on-surface-variant)] bg-[var(--md-surface-container)] rounded-[var(--md-radius-xl)] hover:bg-[var(--md-surface-container-high)] transition-all">
+                ยกเลิก
               </button>
-              <button onClick={handleUpdateInventory} disabled={updatingInv || inventoryModal.delta === 0} className="flex-1 h-[40px] text-[14px] font-medium text-white bg-[var(--md-primary)] rounded-[var(--md-radius-xl)] hover:bg-[var(--md-primary-dark)] disabled:opacity-60 transition-all duration-200">
-                {updatingInv ? "Updating..." : "Update"}
+              <button onClick={handleUpdateInventory} disabled={updatingInv || !inventoryModal.delta} className="flex-1 h-[40px] text-[14px] font-medium text-white bg-[var(--md-primary)] rounded-[var(--md-radius-xl)] hover:bg-[var(--md-primary-dark)] disabled:opacity-60 transition-all">
+                {updatingInv ? "Updating..." : "อัพเดท"}
               </button>
             </div>
           </div>
@@ -154,48 +374,100 @@ export default function RewardsPage() {
 
       {/* Table */}
       <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 overflow-x-auto">
-        <table className="w-full min-w-[800px]">
+        <table className="w-full min-w-[1000px]">
           <thead>
             <tr className="border-b border-[var(--md-outline-variant)]">
-              <th className="text-left px-6 py-3.5 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Reward</th>
-              <th className="text-left px-6 py-3.5 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Type</th>
-              <th className="text-right px-6 py-3.5 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Cost</th>
-              <th className="text-right px-6 py-3.5 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Total</th>
-              <th className="text-right px-6 py-3.5 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Available</th>
-              <th className="text-right px-6 py-3.5 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Actions</th>
+              <th className="text-left px-4 py-3 text-[11px] font-semibold text-[var(--md-on-surface-variant)] tracking-[0.5px] uppercase w-14" />
+              <th className="text-left px-4 py-3 text-[11px] font-semibold text-[var(--md-on-surface-variant)] tracking-[0.5px] uppercase">รางวัล</th>
+              <th className="text-left px-4 py-3 text-[11px] font-semibold text-[var(--md-on-surface-variant)] tracking-[0.5px] uppercase">ประเภท</th>
+              <th className="text-right px-4 py-3 text-[11px] font-semibold text-[var(--md-on-surface-variant)] tracking-[0.5px] uppercase">ราคา</th>
+              <th className="text-center px-4 py-3 text-[11px] font-semibold text-[var(--md-on-surface-variant)] tracking-[0.5px] uppercase">สถานะ</th>
+              <th className="text-center px-4 py-3 text-[11px] font-semibold text-[var(--md-on-surface-variant)] tracking-[0.5px] uppercase">หมดอายุ</th>
+              <th className="text-right px-4 py-3 text-[11px] font-semibold text-[var(--md-on-surface-variant)] tracking-[0.5px] uppercase">Stock</th>
+              <th className="text-right px-4 py-3 text-[11px] font-semibold text-[var(--md-on-surface-variant)] tracking-[0.5px] uppercase">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="px-6 py-12 text-center"><div className="inline-flex items-center gap-3 text-[var(--md-on-surface-variant)]"><svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Loading...</div></td></tr>
-            ) : rewards.length === 0 ? (
-              <tr><td colSpan={6} className="px-6 py-12 text-center"><div className="text-[var(--md-on-surface-variant)]"><svg viewBox="0 0 24 24" fill="currentColor" className="w-12 h-12 mx-auto mb-3 opacity-30"><path d="M20 6h-2.18c.11-.31.18-.65.18-1 0-1.66-1.34-3-3-3-1.05 0-1.96.54-2.5 1.35l-.5.67-.5-.68A2.99 2.99 0 009 2C7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-2 .89-2 2v11c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2z" /></svg><p className="text-[14px]">No rewards yet</p></div></td></tr>
+              <tr><td colSpan={8} className="px-6 py-12 text-center"><div className="inline-flex items-center gap-3 text-[var(--md-on-surface-variant)]"><svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Loading...</div></td></tr>
+            ) : filtered.length === 0 ? (
+              <tr><td colSpan={8} className="px-6 py-12 text-center text-[var(--md-on-surface-variant)]">No rewards found</td></tr>
             ) : (
-              rewards.map((r) => {
+              filtered.map((r) => {
                 const pct = r.total_qty > 0 ? Math.round((r.available_qty / r.total_qty) * 100) : 0;
+                const badge = statusBadge[r.status] || statusBadge.active;
+                const emoji = getCurrencyIcon(r.cost_currency);
+                const isExpired = r.expires_at && new Date(r.expires_at) < new Date();
+                const imgSrc = mediaUrl(r.image_url);
+
                 return (
-                  <tr key={r.id} className="border-b border-[var(--md-outline-variant)] last:border-b-0 hover:bg-[var(--md-surface-dim)] transition-colors duration-150">
-                    <td className="px-6 py-4 text-[14px] font-medium text-[var(--md-on-surface)]">{r.name}</td>
-                    <td className="px-6 py-4">
-                      <span className="px-3 py-1 rounded-[var(--md-radius-sm)] text-[12px] font-medium bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)] capitalize">{r.type}</span>
+                  <tr key={r.id} className="border-b border-[var(--md-outline-variant)] last:border-b-0 hover:bg-[var(--md-surface-dim)] transition-colors">
+                    {/* Thumbnail */}
+                    <td className="px-4 py-3">
+                      <div className="w-10 h-10 rounded-[var(--md-radius-sm)] overflow-hidden bg-[var(--md-surface-container)] flex items-center justify-center">
+                        {imgSrc ? (
+                          <Image src={imgSrc} alt="" width={40} height={40} className="w-full h-full object-cover" />
+                        ) : (
+                          <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-[var(--md-on-surface-variant)] opacity-30"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" /></svg>
+                        )}
+                      </div>
                     </td>
-                    <td className="px-6 py-4 text-right text-[14px] text-[var(--md-on-surface-variant)]">{r.point_cost.toLocaleString()} pts</td>
-                    <td className="px-6 py-4 text-right text-[14px] font-medium text-[var(--md-on-surface)]">{r.total_qty.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-right">
+                    {/* Name + delivery */}
+                    <td className="px-4 py-3">
+                      <p className="text-[14px] font-medium text-[var(--md-on-surface)] leading-tight">{r.name}</p>
+                      {r.delivery_type !== "none" && (
+                        <p className="text-[11px] text-[var(--md-on-surface-variant)] mt-0.5">
+                          {deliveryOptions.find((o) => o.value === r.delivery_type)?.label || r.delivery_type}
+                        </p>
+                      )}
+                    </td>
+                    {/* Type */}
+                    <td className="px-4 py-3">
+                      <span className="px-2.5 py-0.5 rounded-[var(--md-radius-sm)] text-[11px] font-medium bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)] capitalize">{r.type}</span>
+                    </td>
+                    {/* Cost */}
+                    <td className="px-4 py-3 text-right">
+                      <span className="text-[14px] font-bold text-[var(--md-on-surface)]">
+                        {emoji} {r.point_cost.toLocaleString()}
+                      </span>
+                      <p className="text-[10px] text-[var(--md-on-surface-variant)]">{r.cost_currency}</p>
+                    </td>
+                    {/* Status */}
+                    <td className="px-4 py-3 text-center">
+                      <button onClick={() => toggleStatus(r)} className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all hover:opacity-80 ${badge.cls}`}>
+                        {badge.label}
+                      </button>
+                    </td>
+                    {/* Expiry */}
+                    <td className="px-4 py-3 text-center">
+                      {r.expires_at ? (
+                        <span className={`text-[12px] ${isExpired ? "text-red-500 font-bold" : "text-[var(--md-on-surface-variant)]"}`}>
+                          {isExpired ? "❌ หมดอายุ" : new Date(r.expires_at).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" })}
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-[var(--md-on-surface-variant)]">ไม่กำหนด</span>
+                      )}
+                    </td>
+                    {/* Stock */}
+                    <td className="px-4 py-3 text-right">
                       <div className="flex flex-col items-end gap-1">
                         <span className="text-[14px] font-bold text-[var(--md-primary)]">{r.available_qty.toLocaleString()}</span>
                         <div className="w-16 h-1.5 bg-[var(--md-surface-container)] rounded-full overflow-hidden">
                           <div className="h-full bg-[var(--md-primary)] rounded-full transition-all" style={{ width: `${pct}%` }} />
                         </div>
+                        <span className="text-[10px] text-[var(--md-on-surface-variant)]">{r.available_qty}/{r.total_qty}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => setInventoryModal({ id: r.id, name: r.name, delta: 0 })}
-                        className="h-[30px] px-3 text-[12px] font-medium text-[var(--md-primary)] bg-[var(--md-primary-light)] rounded-[var(--md-radius-sm)] hover:opacity-80 transition-all duration-200"
-                      >
-                        Update Stock
-                      </button>
+                    {/* Actions */}
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex gap-1.5 justify-end">
+                        <button onClick={() => openEdit(r)} className="h-[28px] px-2.5 text-[11px] font-medium text-[var(--md-primary)] bg-[var(--md-primary-light)] rounded-[var(--md-radius-sm)] hover:opacity-80 transition-all">
+                          ✏️ แก้ไข
+                        </button>
+                        <button onClick={() => setInventoryModal({ id: r.id, name: r.name, delta: r.total_qty })} className="h-[28px] px-2.5 text-[11px] font-medium text-[var(--md-on-surface-variant)] bg-[var(--md-surface-container)] rounded-[var(--md-radius-sm)] hover:opacity-80 transition-all">
+                          📦 Stock
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

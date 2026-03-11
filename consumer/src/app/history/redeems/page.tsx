@@ -22,6 +22,15 @@ interface RedeemEntry {
   tracking: string | null;
   delivery_type: string | null;
   coupon_code: string | null;
+  recipient_name: string | null;
+  recipient_phone: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  district: string | null;
+  sub_district: string | null;
+  province: string | null;
+  postal_code: string | null;
+  confirmed_at: string | null;
   created_at: string;
 }
 
@@ -71,6 +80,12 @@ function CouponDisplay({ code }: { code: string }) {
 export default function RedeemHistoryPage() {
   const [entries, setEntries] = useState<RedeemEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const getAddressText = (entry: RedeemEntry) =>
+    [entry.address_line1, entry.address_line2, entry.sub_district, entry.district, entry.province, entry.postal_code]
+      .filter(Boolean)
+      .join(" ");
 
   useEffect(() => {
     if (!isLoggedIn()) { setLoading(false); return; }
@@ -161,6 +176,36 @@ export default function RedeemHistoryPage() {
                           </p>
                         )}
                       </div>
+                      <div className="mt-3 flex items-center justify-between gap-2">
+                        <p className="text-xs text-muted-foreground">
+                          {e.delivery_type === "shipping" ? "จัดส่งถึงบ้าน" : e.delivery_type === "coupon" ? "คูปอง" : e.delivery_type === "digital" ? "ดิจิทัล" : e.delivery_type === "ticket" ? "ตั๋ว" : "ทั่วไป"}
+                        </p>
+                        <button
+                          onClick={() => setExpandedId(expandedId === e.id ? null : e.id)}
+                          className="rounded-full border border-border px-3 py-1 text-[11px] font-semibold text-[var(--jh-green)]"
+                        >
+                          {expandedId === e.id ? "ซ่อนรายละเอียด" : "ดูรายละเอียด"}
+                        </button>
+                      </div>
+                      {expandedId === e.id && (
+                        <div className="mt-3 rounded-xl bg-secondary p-3 text-sm">
+                          <div className="space-y-2 text-[13px]">
+                            <p><span className="text-muted-foreground">สถานะล่าสุด:</span> {s.label}</p>
+                            {e.confirmed_at && (
+                              <p><span className="text-muted-foreground">ยืนยันเมื่อ:</span> {new Date(e.confirmed_at).toLocaleString("th-TH")}</p>
+                            )}
+                            {e.recipient_name && (
+                              <p><span className="text-muted-foreground">ชื่อผู้รับ:</span> {e.recipient_name}</p>
+                            )}
+                            {e.recipient_phone && (
+                              <p><span className="text-muted-foreground">เบอร์ผู้รับ:</span> {e.recipient_phone}</p>
+                            )}
+                            {getAddressText(e) && (
+                              <p><span className="text-muted-foreground">ที่อยู่จัดส่ง:</span> {getAddressText(e)}</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
                       {e.coupon_code && <CouponDisplay code={e.coupon_code} />}
                     </CardContent>
                   </Card>

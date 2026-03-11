@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { ImageUpload } from "@/components/ui/image-upload";
 
 interface Donation {
   id: string;
@@ -197,13 +198,13 @@ export default function DonationsPage() {
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               className={`${textareaClass} col-span-2`}
             />
-            <input
-              type="text"
-              placeholder="Image URL"
-              value={form.image_url}
-              onChange={(e) => setForm({ ...form, image_url: e.target.value })}
-              className={`${fieldClass} col-span-2`}
-            />
+            <div className="col-span-2">
+              <ImageUpload
+                value={form.image_url}
+                onChange={(url) => setForm({ ...form, image_url: url })}
+                label="รูปภาพโครงการบริจาค"
+              />
+            </div>
             <input
               type="datetime-local"
               value={form.start_date}

@@ -8,6 +8,7 @@ import (
 
 	"saversure/internal/coupon"
 	"saversure/internal/inventory"
+	"saversure/internal/ledger"
 )
 
 type Handler struct {
@@ -53,6 +54,20 @@ func (h *Handler) Redeem(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error":   "default_address_required",
 				"message": "Please set a default shipping address before redeeming this reward",
+			})
+			return
+		}
+		if errors.Is(err, ErrAddressNotFound) {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "address_not_found",
+				"message": "Selected shipping address was not found",
+			})
+			return
+		}
+		if errors.Is(err, ledger.ErrInsufficientBalance) {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "insufficient_balance",
+				"message": err.Error(),
 			})
 			return
 		}

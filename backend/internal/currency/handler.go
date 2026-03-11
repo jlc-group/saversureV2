@@ -26,6 +26,17 @@ func (h *Handler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": items})
 }
 
+func (h *Handler) ListPublic(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+
+	items, err := h.svc.ListActive(c.Request.Context(), tenantID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": items})
+}
+
 func (h *Handler) Create(c *gin.Context) {
 	tenantID := c.GetString("tenant_id")
 	var input CreateInput

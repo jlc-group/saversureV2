@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
@@ -151,6 +152,25 @@ function DefaultHomeContent() {
 }
 
 export default function HomePage() {
+  const [checked, setChecked] = useState(false);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoggedIn()) {
+      router.replace("/login");
+    } else {
+      setChecked(true);
+    }
+  }, [router]);
+
+  if (!checked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--jh-green)] border-t-transparent" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen pb-24 bg-background">
       <Navbar />

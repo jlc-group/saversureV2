@@ -20,63 +20,107 @@ func NewService(db *pgxpool.Pool) *Service {
 }
 
 type Reward struct {
-	ID          string `json:"id"`
-	TenantID    string `json:"tenant_id"`
-	CampaignID  string `json:"campaign_id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Type        string `json:"type"`
-	PointCost   int    `json:"point_cost"`
-	TotalQty    int    `json:"total_qty"`
-	ReservedQty int    `json:"reserved_qty"`
-	SoldQty     int    `json:"sold_qty"`
-	AvailableQty int   `json:"available_qty"`
-	CreatedAt   string `json:"created_at"`
+	ID           string  `json:"id"`
+	TenantID     string  `json:"tenant_id"`
+	CampaignID   string  `json:"campaign_id"`
+	Name         string  `json:"name"`
+	Description  string  `json:"description"`
+	Type         string  `json:"type"`
+	PointCost    int     `json:"point_cost"`
+	CostCurrency string  `json:"cost_currency"`
+	ImageURL     *string `json:"image_url"`
+	DeliveryType string  `json:"delivery_type"`
+	Status       string  `json:"status"`
+	ExpiresAt    *string `json:"expires_at"`
+	TotalQty     int     `json:"total_qty"`
+	ReservedQty  int     `json:"reserved_qty"`
+	SoldQty      int     `json:"sold_qty"`
+	AvailableQty int     `json:"available_qty"`
+	CreatedAt    string  `json:"created_at"`
 }
 
 type CreateRewardInput struct {
-	CampaignID  string `json:"campaign_id" binding:"required"`
-	Name        string `json:"name" binding:"required"`
-	Description string `json:"description"`
-	Type        string `json:"type" binding:"required"`
-	PointCost   int    `json:"point_cost" binding:"required,min=1"`
-	TotalQty    int    `json:"total_qty" binding:"required,min=1"`
+	CampaignID   string  `json:"campaign_id" binding:"required"`
+	Name         string  `json:"name" binding:"required"`
+	Description  string  `json:"description"`
+	Type         string  `json:"type" binding:"required"`
+	PointCost    int     `json:"point_cost" binding:"required,min=1"`
+	CostCurrency string  `json:"cost_currency"`
+	ImageURL     *string `json:"image_url"`
+	DeliveryType string  `json:"delivery_type"`
+	Status       string  `json:"status"`
+	ExpiresAt    *string `json:"expires_at"`
+	TotalQty     int     `json:"total_qty" binding:"required,min=1"`
+}
+
+type UpdateRewardInput struct {
+	Name         *string `json:"name"`
+	Description  *string `json:"description"`
+	Type         *string `json:"type"`
+	PointCost    *int    `json:"point_cost"`
+	CostCurrency *string `json:"cost_currency"`
+	ImageURL     *string `json:"image_url"`
+	DeliveryType *string `json:"delivery_type"`
+	Status       *string `json:"status"`
+	ExpiresAt    *string `json:"expires_at"`
 }
 
 type UpdateInventoryInput struct {
 	TotalQty *int `json:"total_qty"`
 }
 
-func (s *Service) CreateReward(ctx context.Context, tenantID string, input CreateRewardInput) (*Reward, error) {
+const rewardSelectCols = `r.id, r.tenant_id, r.campaign_id, r.name, COALESCE(r.description, ''), r.type, r.point_cost,
+	COALESCE(r.cost_currency, 'point'), r.image_url, COALESCE(r.delivery_type, 'none'),
+	COALESCE(r.status, 'active'), r.expires_at::text,
+	ri.total_qty, ri.reserved_qty, ri.sold_qty, (ri.total_qty - ri.reserved_qty - ri.sold_qty) as available_qty,
+	r.created_at::text`
+
+func scanReward(scanner interface{ Scan(dest ...any) error }) (*Reward, error) {
 	var r Reward
-	err := s.db.QueryRow(ctx,
-		`WITH ins AS (
-			INSERT INTO rewards (tenant_id, campaign_id, name, description, type, point_cost)
-			VALUES ($1, $2, $3, $4, $5, $6)
-			RETURNING id, tenant_id, campaign_id, name, description, type, point_cost, created_at
-		), inv AS (
-			INSERT INTO reward_inventory (reward_id, total_qty, reserved_qty, sold_qty)
-			SELECT id, $7, 0, 0 FROM ins
-			RETURNING reward_id, total_qty, reserved_qty, sold_qty
-		)
-		SELECT ins.id, ins.tenant_id, ins.campaign_id, ins.name, ins.description, ins.type, ins.point_cost,
-			inv.total_qty, inv.reserved_qty, inv.sold_qty, (inv.total_qty - inv.reserved_qty - inv.sold_qty) as available_qty,
-			ins.created_at
-		FROM ins JOIN inv ON inv.reward_id = ins.id`,
-		tenantID, input.CampaignID, input.Name, input.Description, input.Type, input.PointCost, input.TotalQty,
-	).Scan(&r.ID, &r.TenantID, &r.CampaignID, &r.Name, &r.Description, &r.Type, &r.PointCost,
-		&r.TotalQty, &r.ReservedQty, &r.SoldQty, &r.AvailableQty, &r.CreatedAt)
+	err := scanner.Scan(&r.ID, &r.TenantID, &r.CampaignID, &r.Name, &r.Description, &r.Type, &r.PointCost,
+		&r.CostCurrency, &r.ImageURL, &r.DeliveryType,
+		&r.Status, &r.ExpiresAt,
+		&r.TotalQty, &r.ReservedQty, &r.SoldQty, &r.AvailableQty,
+		&r.CreatedAt)
 	if err != nil {
-		return nil, fmt.Errorf("create reward: %w", err)
+		return nil, err
 	}
 	return &r, nil
 }
 
+func (s *Service) CreateReward(ctx context.Context, tenantID string, input CreateRewardInput) (*Reward, error) {
+	if input.CostCurrency == "" {
+		input.CostCurrency = "point"
+	}
+	if input.DeliveryType == "" {
+		input.DeliveryType = "none"
+	}
+	if input.Status == "" {
+		input.Status = "active"
+	}
+
+	row := s.db.QueryRow(ctx,
+		`WITH ins AS (
+			INSERT INTO rewards (tenant_id, campaign_id, name, description, type, point_cost, cost_currency, image_url, delivery_type, status, expires_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::timestamptz)
+			RETURNING *
+		), inv AS (
+			INSERT INTO reward_inventory (reward_id, total_qty, reserved_qty, sold_qty)
+			SELECT id, $12, 0, 0 FROM ins
+			RETURNING reward_id, total_qty, reserved_qty, sold_qty
+		)
+		SELECT `+rewardSelectCols+`
+		FROM ins r JOIN inv ri ON ri.reward_id = r.id`,
+		tenantID, input.CampaignID, input.Name, input.Description, input.Type, input.PointCost,
+		input.CostCurrency, input.ImageURL, input.DeliveryType, input.Status, input.ExpiresAt,
+		input.TotalQty,
+	)
+	return scanReward(row)
+}
+
 func (s *Service) List(ctx context.Context, tenantID string) ([]Reward, error) {
 	rows, err := s.db.Query(ctx,
-		`SELECT r.id, r.tenant_id, r.campaign_id, r.name, r.description, r.type, r.point_cost,
-			ri.total_qty, ri.reserved_qty, ri.sold_qty, (ri.total_qty - ri.reserved_qty - ri.sold_qty) as available_qty,
-			r.created_at
+		`SELECT `+rewardSelectCols+`
 		 FROM rewards r
 		 JOIN reward_inventory ri ON ri.reward_id = r.id
 		 WHERE r.tenant_id = $1
@@ -88,33 +132,70 @@ func (s *Service) List(ctx context.Context, tenantID string) ([]Reward, error) {
 
 	var rewards []Reward
 	for rows.Next() {
-		var r Reward
-		if err := rows.Scan(&r.ID, &r.TenantID, &r.CampaignID, &r.Name, &r.Description, &r.Type, &r.PointCost,
-			&r.TotalQty, &r.ReservedQty, &r.SoldQty, &r.AvailableQty, &r.CreatedAt); err != nil {
+		r, err := scanReward(rows)
+		if err != nil {
 			return nil, fmt.Errorf("scan reward: %w", err)
 		}
-		rewards = append(rewards, r)
+		rewards = append(rewards, *r)
 	}
 	return rewards, nil
 }
 
+func (s *Service) UpdateReward(ctx context.Context, tenantID, rewardID string, input UpdateRewardInput) (*Reward, error) {
+	row := s.db.QueryRow(ctx,
+		`UPDATE rewards SET
+			name = COALESCE($3, name),
+			description = COALESCE($4, description),
+			type = COALESCE($5, type),
+			point_cost = COALESCE($6, point_cost),
+			cost_currency = COALESCE($7, cost_currency),
+			image_url = COALESCE($8, image_url),
+			delivery_type = COALESCE($9, delivery_type),
+			status = COALESCE($10, status),
+			expires_at = CASE WHEN $11::text = '__clear__' THEN NULL WHEN $11::text IS NOT NULL THEN $11::timestamptz ELSE expires_at END,
+			updated_at = NOW()
+		 WHERE id = $2 AND tenant_id = $1
+		 RETURNING id`,
+		tenantID, rewardID,
+		input.Name, input.Description, input.Type, input.PointCost,
+		input.CostCurrency, input.ImageURL, input.DeliveryType, input.Status, input.ExpiresAt,
+	)
+
+	var id string
+	if err := row.Scan(&id); err != nil {
+		return nil, fmt.Errorf("update reward: %w", err)
+	}
+
+	r, err := s.GetByID(ctx, tenantID, rewardID)
+	if err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
+func (s *Service) GetByID(ctx context.Context, tenantID, rewardID string) (*Reward, error) {
+	row := s.db.QueryRow(ctx,
+		`SELECT `+rewardSelectCols+`
+		 FROM rewards r
+		 JOIN reward_inventory ri ON ri.reward_id = r.id
+		 WHERE r.id = $1 AND r.tenant_id = $2`,
+		rewardID, tenantID)
+	return scanReward(row)
+}
+
 func (s *Service) UpdateInventory(ctx context.Context, tenantID, rewardID string, input UpdateInventoryInput) (*Reward, error) {
-	var r Reward
-	err := s.db.QueryRow(ctx,
+	_, err := s.db.Exec(ctx,
 		`UPDATE reward_inventory ri SET
 			total_qty = COALESCE($3, ri.total_qty),
 			version = ri.version + 1
 		 FROM rewards rw
-		 WHERE ri.reward_id = $2 AND rw.id = ri.reward_id AND rw.tenant_id = $1
-		 RETURNING rw.id, rw.tenant_id, rw.campaign_id, rw.name, rw.description, rw.type, rw.point_cost,
-			ri.total_qty, ri.reserved_qty, ri.sold_qty, (ri.total_qty - ri.reserved_qty - ri.sold_qty), rw.created_at`,
+		 WHERE ri.reward_id = $2 AND rw.id = ri.reward_id AND rw.tenant_id = $1`,
 		tenantID, rewardID, input.TotalQty,
-	).Scan(&r.ID, &r.TenantID, &r.CampaignID, &r.Name, &r.Description, &r.Type, &r.PointCost,
-		&r.TotalQty, &r.ReservedQty, &r.SoldQty, &r.AvailableQty, &r.CreatedAt)
+	)
 	if err != nil {
 		return nil, fmt.Errorf("update inventory: %w", err)
 	}
-	return &r, nil
+	return s.GetByID(ctx, tenantID, rewardID)
 }
 
 // AtomicReserve performs the 2-phase reservation step 1 (reserve) with row-level locking.

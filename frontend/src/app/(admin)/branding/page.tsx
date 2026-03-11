@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { ImageUpload } from "@/components/ui/image-upload";
 import { useTenantContext } from "@/lib/tenant-context";
 
 interface BrandingSettings {
@@ -123,27 +124,18 @@ export default function BrandingPage() {
                 />
               </div>
               <div>
-                <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5 tracking-[0.4px] uppercase">
-                  logo_url
-                </label>
-                <input
-                  type="url"
+                <ImageUpload
                   value={form.logo_url}
-                  onChange={(e) => setForm({ ...form, logo_url: e.target.value })}
-                  className={fieldClass}
-                  placeholder="https://..."
+                  onChange={(url) => setForm({ ...form, logo_url: url })}
+                  label="Logo"
                 />
               </div>
               <div>
-                <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5 tracking-[0.4px] uppercase">
-                  favicon_url
-                </label>
-                <input
-                  type="url"
+                <ImageUpload
                   value={form.favicon_url}
-                  onChange={(e) => setForm({ ...form, favicon_url: e.target.value })}
-                  className={fieldClass}
-                  placeholder="https://..."
+                  onChange={(url) => setForm({ ...form, favicon_url: url })}
+                  label="Favicon"
+                  accept="image/png,image/x-icon,image/svg+xml"
                 />
               </div>
             </div>

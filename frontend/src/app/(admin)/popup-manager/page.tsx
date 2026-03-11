@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import RichTextEditor from "@/components/RichTextEditor";
+import { ImageUpload } from "@/components/ui/image-upload";
 
 interface PopupItem {
   id: string;
@@ -201,21 +203,17 @@ export default function PopupManagerPage() {
               <label className="text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5 block uppercase tracking-[0.4px]">
                 Content
               </label>
-              <textarea
+              <RichTextEditor
                 value={form.content}
-                onChange={(e) => setForm({ ...form, content: e.target.value })}
-                className={textareaClass}
+                onChange={(val) => setForm({ ...form, content: val })}
+                placeholder="เขียนเนื้อหา popup... (รองรับ Bold, สี, รูปภาพ, ลิงก์)"
               />
             </div>
             <div>
-              <label className="text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5 block uppercase tracking-[0.4px]">
-                Image URL
-              </label>
-              <input
-                type="text"
+              <ImageUpload
                 value={form.image_url}
-                onChange={(e) => setForm({ ...form, image_url: e.target.value })}
-                className={fieldClass}
+                onChange={(url) => setForm({ ...form, image_url: url })}
+                label="รูปภาพ Popup"
               />
             </div>
             <div>
@@ -360,9 +358,10 @@ export default function PopupManagerPage() {
                   <td className="px-4 py-3">
                     <p className="text-[13px] font-medium text-[var(--md-on-surface)]">{item.title}</p>
                     {item.content && (
-                      <p className="text-[11px] text-[var(--md-on-surface-variant)] mt-0.5 line-clamp-1">
-                        {item.content}
-                      </p>
+                      <p
+                        className="text-[11px] text-[var(--md-on-surface-variant)] mt-0.5 line-clamp-1"
+                        dangerouslySetInnerHTML={{ __html: item.content.replace(/<[^>]+>/g, " ").trim() }}
+                      />
                     )}
                   </td>
                   <td className="px-4 py-3 text-[12px] text-[var(--md-on-surface-variant)]">

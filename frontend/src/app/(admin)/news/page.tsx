@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { ImageUpload } from "@/components/ui/image-upload";
 
 interface NewsItem {
   id: string;
@@ -200,13 +201,13 @@ export default function NewsPage() {
               onChange={(e) => setForm({ ...form, content: e.target.value })}
               className={`${textareaClass} col-span-2`}
             />
-            <input
-              type="text"
-              placeholder="Image URL (optional)"
-              value={form.image_url}
-              onChange={(e) => setForm({ ...form, image_url: e.target.value })}
-              className={fieldClass}
-            />
+            <div className="col-span-2">
+              <ImageUpload
+                value={form.image_url}
+                onChange={(url) => setForm({ ...form, image_url: url })}
+                label="รูปภาพข่าว"
+              />
+            </div>
             <input
               type="text"
               placeholder="Link URL (optional)"

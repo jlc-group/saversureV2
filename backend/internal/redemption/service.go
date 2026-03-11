@@ -20,6 +20,7 @@ var (
 	ErrReservationExpired  = errors.New("reservation has expired")
 	ErrAlreadyConfirmed    = errors.New("reservation already confirmed")
 	ErrDefaultAddressRequired = errors.New("default shipping address is required")
+	ErrAddressNotFound       = errors.New("shipping address not found")
 )
 
 type Service struct {
@@ -49,7 +50,8 @@ type Reservation struct {
 }
 
 type RedeemInput struct {
-	RewardID string `json:"reward_id" binding:"required"`
+	RewardID  string  `json:"reward_id" binding:"required"`
+	AddressID *string `json:"address_id,omitempty"`
 }
 
 type RedeemResult struct {
@@ -64,8 +66,21 @@ type RedeemResult struct {
 	AddressID     *string `json:"address_id,omitempty"`
 }
 
+type shippingAddress struct {
+	ID            string
+	RecipientName string
+	Phone         string
+	AddressLine1  string
+	AddressLine2  *string
+	District      *string
+	SubDistrict   *string
+	Province      *string
+	PostalCode    *string
+}
+
 type rewardMeta struct {
 	PointCost    int
+	CostCurrency string
 	Type         string
 	DeliveryType string
 }
@@ -74,11 +89,13 @@ func normalizeDeliveryType(meta rewardMeta) string {
 	if meta.DeliveryType != "" && meta.DeliveryType != "none" {
 		return meta.DeliveryType
 	}
-	if meta.Type == "coupon" {
+	switch meta.Type {
+	case "coupon":
 		return "coupon"
-	}
-	if meta.Type == "digital" {
+	case "digital":
 		return "digital"
+	case "ticket":
+		return "ticket"
 	}
 	return meta.DeliveryType
 }
@@ -86,11 +103,11 @@ func normalizeDeliveryType(meta rewardMeta) string {
 func (s *Service) loadRewardMeta(ctx context.Context, tx pgx.Tx, tenantID, rewardID string) (rewardMeta, error) {
 	var meta rewardMeta
 	err := tx.QueryRow(ctx,
-		`SELECT point_cost, type, COALESCE(delivery_type, 'none')
+		`SELECT point_cost, COALESCE(cost_currency, 'point'), type, COALESCE(delivery_type, 'none')
 		 FROM rewards
 		 WHERE id = $1 AND tenant_id = $2`,
 		rewardID, tenantID,
-	).Scan(&meta.PointCost, &meta.Type, &meta.DeliveryType)
+	).Scan(&meta.PointCost, &meta.CostCurrency, &meta.Type, &meta.DeliveryType)
 	if err != nil {
 		return rewardMeta{}, fmt.Errorf("reward not found: %w", err)
 	}
@@ -98,22 +115,60 @@ func (s *Service) loadRewardMeta(ctx context.Context, tx pgx.Tx, tenantID, rewar
 	return meta, nil
 }
 
-func (s *Service) getDefaultAddressID(ctx context.Context, tx pgx.Tx, tenantID, userID string) (*string, error) {
-	var addressID string
+func (s *Service) getAddressByID(ctx context.Context, tx pgx.Tx, tenantID, userID, addressID string) (*shippingAddress, error) {
+	var addr shippingAddress
 	err := tx.QueryRow(ctx,
-		`SELECT id FROM user_addresses
+		`SELECT id, recipient_name, phone, address_line1, address_line2, district, sub_district, province, postal_code
+		 FROM user_addresses
+		 WHERE id = $1 AND tenant_id = $2 AND user_id = $3`,
+		addressID, tenantID, userID,
+	).Scan(
+		&addr.ID,
+		&addr.RecipientName,
+		&addr.Phone,
+		&addr.AddressLine1,
+		&addr.AddressLine2,
+		&addr.District,
+		&addr.SubDistrict,
+		&addr.Province,
+		&addr.PostalCode,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("load shipping address: %w", err)
+	}
+	return &addr, nil
+}
+
+func (s *Service) getDefaultAddress(ctx context.Context, tx pgx.Tx, tenantID, userID string) (*shippingAddress, error) {
+	var addr shippingAddress
+	err := tx.QueryRow(ctx,
+		`SELECT id, recipient_name, phone, address_line1, address_line2, district, sub_district, province, postal_code
+		 FROM user_addresses
 		 WHERE tenant_id = $1 AND user_id = $2 AND is_default = TRUE
 		 ORDER BY created_at ASC
 		 LIMIT 1`,
 		tenantID, userID,
-	).Scan(&addressID)
+	).Scan(
+		&addr.ID,
+		&addr.RecipientName,
+		&addr.Phone,
+		&addr.AddressLine1,
+		&addr.AddressLine2,
+		&addr.District,
+		&addr.SubDistrict,
+		&addr.Province,
+		&addr.PostalCode,
+	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("load default address: %w", err)
 	}
-	return &addressID, nil
+	return &addr, nil
 }
 
 func (s *Service) getResultByIdempotency(ctx context.Context, tenantID, userID, idempotencyKey string) (*RedeemResult, error) {
@@ -151,15 +206,27 @@ func (s *Service) RedeemNow(ctx context.Context, tenantID, userID string, input 
 		return nil, err
 	}
 
+	var shippingAddr *shippingAddress
 	var addressID *string
 	if meta.DeliveryType == "shipping" {
-		addressID, err = s.getDefaultAddressID(ctx, tx, tenantID, userID)
-		if err != nil {
-			return nil, err
+		if input.AddressID != nil && *input.AddressID != "" {
+			shippingAddr, err = s.getAddressByID(ctx, tx, tenantID, userID, *input.AddressID)
+			if err != nil {
+				return nil, err
+			}
+			if shippingAddr == nil {
+				return nil, ErrAddressNotFound
+			}
+		} else {
+			shippingAddr, err = s.getDefaultAddress(ctx, tx, tenantID, userID)
+			if err != nil {
+				return nil, err
+			}
 		}
-		if addressID == nil {
+		if shippingAddr == nil {
 			return nil, ErrDefaultAddressRequired
 		}
+		addressID = &shippingAddr.ID
 	}
 
 	if err := s.inventorySvc.AtomicReserve(ctx, tx, input.RewardID); err != nil {
@@ -170,7 +237,7 @@ func (s *Service) RedeemNow(ctx context.Context, tenantID, userID string, input 
 	}
 
 	if err := s.ledgerSvc.Debit(ctx, tx, tenantID, userID, meta.PointCost, "redemption", input.RewardID,
-		"Redeemed reward", "point"); err != nil {
+		"Redeemed reward", meta.CostCurrency); err != nil {
 		return nil, fmt.Errorf("debit points: %w", err)
 	}
 
@@ -178,10 +245,22 @@ func (s *Service) RedeemNow(ctx context.Context, tenantID, userID string, input 
 	var reservationID, status, createdAt string
 	var confirmedAt *string
 	err = tx.QueryRow(ctx,
-		`INSERT INTO reward_reservations (user_id, reward_id, tenant_id, status, idempotency_key, expires_at, address_id)
-		 VALUES ($1, $2, $3, 'PENDING', $4, $5, $6)
+		`INSERT INTO reward_reservations (
+			user_id, reward_id, tenant_id, status, idempotency_key, expires_at, address_id, delivery_type,
+			recipient_name, recipient_phone, shipping_address_line1, shipping_address_line2,
+			shipping_district, shipping_sub_district, shipping_province, shipping_postal_code
+		)
+		 VALUES ($1, $2, $3, 'PENDING', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 		 RETURNING id, status, created_at::text`,
-		userID, input.RewardID, tenantID, idempotencyKey, expiresAt, addressID,
+		userID, input.RewardID, tenantID, idempotencyKey, expiresAt, addressID, meta.DeliveryType,
+		nullIfNoAddress(shippingAddr, func(a *shippingAddress) string { return a.RecipientName }),
+		nullIfNoAddress(shippingAddr, func(a *shippingAddress) string { return a.Phone }),
+		nullIfNoAddress(shippingAddr, func(a *shippingAddress) string { return a.AddressLine1 }),
+		nullIfNoAddressPtr(shippingAddr, func(a *shippingAddress) *string { return a.AddressLine2 }),
+		nullIfNoAddressPtr(shippingAddr, func(a *shippingAddress) *string { return a.District }),
+		nullIfNoAddressPtr(shippingAddr, func(a *shippingAddress) *string { return a.SubDistrict }),
+		nullIfNoAddressPtr(shippingAddr, func(a *shippingAddress) *string { return a.Province }),
+		nullIfNoAddressPtr(shippingAddr, func(a *shippingAddress) *string { return a.PostalCode }),
 	).Scan(&reservationID, &status, &createdAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -235,6 +314,21 @@ func (s *Service) RedeemNow(ctx context.Context, tenantID, userID string, input 
 	}, nil
 }
 
+func nullIfNoAddress(addr *shippingAddress, getter func(*shippingAddress) string) *string {
+	if addr == nil {
+		return nil
+	}
+	value := getter(addr)
+	return &value
+}
+
+func nullIfNoAddressPtr(addr *shippingAddress, getter func(*shippingAddress) *string) *string {
+	if addr == nil {
+		return nil
+	}
+	return getter(addr)
+}
+
 // Reserve performs Phase 1 of the 2-phase redemption.
 // Uses atomic DB transaction with row-level locking to prevent oversell.
 // RULE #1: Oversell must NEVER happen. If uncertain, REJECT safely.
@@ -245,17 +339,11 @@ func (s *Service) Reserve(ctx context.Context, tenantID, userID string, input Re
 	}
 	defer tx.Rollback(ctx)
 
-	// Check user has enough points
-	var pointCost int
-	err = tx.QueryRow(ctx,
-		`SELECT point_cost FROM rewards WHERE id = $1 AND tenant_id = $2`,
-		input.RewardID, tenantID,
-	).Scan(&pointCost)
+	meta, err := s.loadRewardMeta(ctx, tx, tenantID, input.RewardID)
 	if err != nil {
-		return nil, fmt.Errorf("reward not found: %w", err)
+		return nil, err
 	}
 
-	// Atomic reserve: SELECT FOR UPDATE + check availability + reserve
 	if err := s.inventorySvc.AtomicReserve(ctx, tx, input.RewardID); err != nil {
 		if errors.Is(err, inventory.ErrOutOfStock) {
 			return nil, err
@@ -263,9 +351,8 @@ func (s *Service) Reserve(ctx context.Context, tenantID, userID string, input Re
 		return nil, fmt.Errorf("reserve inventory: %w", err)
 	}
 
-	// Debit points from user
-	if err := s.ledgerSvc.Debit(ctx, tx, tenantID, userID, pointCost, "redemption", input.RewardID,
-		fmt.Sprintf("Redeemed reward (reserved)"), "point"); err != nil {
+	if err := s.ledgerSvc.Debit(ctx, tx, tenantID, userID, meta.PointCost, "redemption", input.RewardID,
+		"Redeemed reward (reserved)", meta.CostCurrency); err != nil {
 		return nil, fmt.Errorf("debit points: %w", err)
 	}
 

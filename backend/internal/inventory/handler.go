@@ -40,6 +40,31 @@ func (h *Handler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": rewards})
 }
 
+func (h *Handler) GetByID(c *gin.Context) {
+	reward, err := h.svc.GetByID(c.Request.Context(), c.GetString("tenant_id"), c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not_found"})
+		return
+	}
+	c.JSON(http.StatusOK, reward)
+}
+
+func (h *Handler) UpdateReward(c *gin.Context) {
+	var input UpdateRewardInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		return
+	}
+
+	reward, err := h.svc.UpdateReward(c.Request.Context(), c.GetString("tenant_id"), c.Param("id"), input)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, reward)
+}
+
 func (h *Handler) UpdateInventory(c *gin.Context) {
 	var input UpdateInventoryInput
 	if err := c.ShouldBindJSON(&input); err != nil {

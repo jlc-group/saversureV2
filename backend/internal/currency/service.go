@@ -3,6 +3,7 @@ package currency
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -95,7 +96,29 @@ func (s *Service) List(ctx context.Context, tenantID string) ([]Currency, error)
 	return items, nil
 }
 
+func (s *Service) ListActive(ctx context.Context, tenantID string) ([]Currency, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT `+selectCols+` FROM point_currencies WHERE tenant_id = $1 AND active = true ORDER BY sort_order, code`,
+		tenantID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list active currencies: %w", err)
+	}
+	defer rows.Close()
+
+	var items []Currency
+	for rows.Next() {
+		c, err := scanCurrency(rows.Scan)
+		if err != nil {
+			return nil, fmt.Errorf("scan currency: %w", err)
+		}
+		items = append(items, c)
+	}
+	return items, nil
+}
+
 func (s *Service) Create(ctx context.Context, input CreateInput) (*Currency, error) {
+	input.Code = strings.ToLower(strings.TrimSpace(input.Code))
 	if input.Icon == "" {
 		input.Icon = "⭐"
 	}
@@ -170,16 +193,16 @@ func (s *Service) Delete(ctx context.Context, tenantID, id string) error {
 func (s *Service) GetMultiBalance(ctx context.Context, tenantID, userID string) ([]MultiBalance, error) {
 	rows, err := s.db.Query(ctx,
 		`SELECT
-			pl.currency,
-			COALESCE(pc.name, pl.currency),
+			LOWER(pl.currency),
+			COALESCE(pc.name, LOWER(pl.currency)),
 			COALESCE(pc.icon, '⭐'),
 			COALESCE(SUM(CASE WHEN pl.entry_type = 'credit' THEN pl.amount ELSE 0 END), 0) AS earned,
 			COALESCE(SUM(CASE WHEN pl.entry_type = 'debit' THEN pl.amount ELSE 0 END), 0) AS spent,
 			COALESCE(SUM(CASE WHEN pl.entry_type = 'credit' THEN pl.amount ELSE -pl.amount END), 0) AS balance
 		 FROM point_ledger pl
-		 LEFT JOIN point_currencies pc ON pc.tenant_id = pl.tenant_id AND pc.code = pl.currency
+		 LEFT JOIN point_currencies pc ON pc.tenant_id = pl.tenant_id AND LOWER(pc.code) = LOWER(pl.currency)
 		 WHERE pl.tenant_id = $1 AND pl.user_id = $2
-		 GROUP BY pl.currency, pc.name, pc.icon, pc.sort_order
+		 GROUP BY LOWER(pl.currency), pc.name, pc.icon, pc.sort_order
 		 ORDER BY COALESCE(pc.sort_order, 999)`,
 		tenantID, userID,
 	)

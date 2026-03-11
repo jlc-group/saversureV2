@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { ImageUpload } from "@/components/ui/image-upload";
 import {
   DndContext,
   closestCenter,
@@ -38,7 +39,7 @@ interface PageConfig {
   version: number;
 }
 
-const PAGE_OPTIONS = [
+const BUILT_IN_PAGES = [
   { value: "home", label: "หน้าแรก (Home)" },
   { value: "scan", label: "หน้าสแกน (Scan)" },
   { value: "rewards", label: "หน้ารางวัล (Rewards)" },
@@ -46,6 +47,8 @@ const PAGE_OPTIONS = [
   { value: "profile", label: "หน้าโปรไฟล์ (Profile)" },
   { value: "news", label: "หน้าข่าวสาร (News)" },
 ];
+
+const BUILT_IN_SLUGS = new Set(BUILT_IN_PAGES.map((p) => p.value));
 
 /* ------------------------------------------------------------------ */
 /*  Section Type Registry (mirrors consumer sections)                  */
@@ -429,6 +432,17 @@ function SectionEditor({
                         </option>
                       ))}
                     </select>
+                  ) : subField.type === "image" ? (
+                    <ImageUpload
+                      value={(item[subField.key] as string) ?? ""}
+                      onChange={(url) => {
+                        const updated = [...items];
+                        updated[idx] = { ...updated[idx], [subField.key]: url };
+                        updateProp(field.key, updated);
+                      }}
+                      label=""
+                      compact
+                    />
                   ) : (
                     <input
                       type={subField.type === "number" ? "number" : "text"}
@@ -490,6 +504,13 @@ function SectionEditor({
             value={(value as number) ?? 0}
             onChange={(e) => updateProp(field.key, Number(e.target.value))}
             className={fieldClass}
+          />
+        ) : field.type === "image" ? (
+          <ImageUpload
+            value={(value as string) ?? ""}
+            onChange={(url) => updateProp(field.key, url)}
+            label=""
+            compact
           />
         ) : (
           <input
@@ -594,10 +615,26 @@ export default function PageBuilderPage() {
   const [loadingVersions, setLoadingVersions] = useState(false);
   const [showDuplicate, setShowDuplicate] = useState(false);
   const [dupTarget, setDupTarget] = useState("");
+  const [customPages, setCustomPages] = useState<{ value: string; label: string }[]>([]);
+  const [showNewPage, setShowNewPage] = useState(false);
+  const [newSlug, setNewSlug] = useState("");
+  const [newLabel, setNewLabel] = useState("");
+
+  const allPages = [...BUILT_IN_PAGES, ...customPages];
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
+
+  const fetchCustomPages = useCallback(async () => {
+    try {
+      const data = await api.get<{ data: PageConfig[] }>("/api/v1/page-configs");
+      const customs = (data.data || [])
+        .filter((pc) => !BUILT_IN_SLUGS.has(pc.page_slug))
+        .map((pc) => ({ value: pc.page_slug, label: `📄 ${pc.page_slug}` }));
+      setCustomPages(customs);
+    } catch { /* ignore */ }
+  }, []);
 
   const fetchConfig = useCallback(async (slug: string) => {
     setLoading(true);
@@ -618,8 +655,47 @@ export default function PageBuilderPage() {
   }, []);
 
   useEffect(() => {
+    fetchCustomPages();
+  }, [fetchCustomPages]);
+
+  useEffect(() => {
     fetchConfig(pageSlug);
   }, [pageSlug, fetchConfig]);
+
+  const handleCreatePage = async () => {
+    const slug = newSlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-");
+    if (!slug) return;
+    if (BUILT_IN_SLUGS.has(slug) || customPages.some((p) => p.value === slug)) {
+      alert("ชื่อหน้านี้มีอยู่แล้ว");
+      return;
+    }
+    try {
+      await api.put("/api/v1/page-configs", {
+        page_slug: slug,
+        sections: [],
+        status: "draft",
+      });
+      setCustomPages((prev) => [...prev, { value: slug, label: `📄 ${newLabel || slug}` }]);
+      setNewSlug("");
+      setNewLabel("");
+      setShowNewPage(false);
+      setPageSlug(slug);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "สร้างหน้าไม่สำเร็จ");
+    }
+  };
+
+  const handleDeletePage = async (slug: string) => {
+    if (BUILT_IN_SLUGS.has(slug)) return;
+    if (!confirm(`ลบหน้า "${slug}" ถาวร?`)) return;
+    try {
+      await api.delete(`/api/v1/page-configs/${slug}`);
+      setCustomPages((prev) => prev.filter((p) => p.value !== slug));
+      if (pageSlug === slug) setPageSlug("home");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "ลบไม่สำเร็จ");
+    }
+  };
 
   const fetchVersions = async (slug: string) => {
     setLoadingVersions(true);
@@ -788,21 +864,95 @@ export default function PageBuilderPage() {
       </div>
 
       {/* Page Selector */}
-      <div className="flex gap-2 mb-6 flex-wrap">
-        {PAGE_OPTIONS.map((p) => (
-          <button
-            key={p.value}
-            onClick={() => setPageSlug(p.value)}
-            className={`h-[36px] px-4 rounded-[var(--md-radius-sm)] text-[13px] font-medium transition-all ${
-              pageSlug === p.value
-                ? "bg-[var(--md-primary)] text-white"
-                : "bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)] hover:bg-[var(--md-surface-container-high)]"
-            }`}
-          >
-            {p.label}
-          </button>
+      <div className="flex gap-2 mb-6 flex-wrap items-center">
+        {allPages.map((p) => (
+          <div key={p.value} className="relative group">
+            <button
+              onClick={() => setPageSlug(p.value)}
+              className={`h-[36px] px-4 rounded-[var(--md-radius-sm)] text-[13px] font-medium transition-all ${
+                pageSlug === p.value
+                  ? "bg-[var(--md-primary)] text-white"
+                  : "bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)] hover:bg-[var(--md-surface-container-high)]"
+              }`}
+            >
+              {p.label}
+            </button>
+            {!BUILT_IN_SLUGS.has(p.value) && (
+              <button
+                onClick={(e) => { e.stopPropagation(); handleDeletePage(p.value); }}
+                className="absolute -top-1.5 -right-1.5 hidden group-hover:flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[var(--md-error)] text-white text-[10px] leading-none"
+                title="ลบหน้านี้"
+              >
+                ✕
+              </button>
+            )}
+          </div>
         ))}
+
+        <button
+          onClick={() => setShowNewPage(true)}
+          className="h-[36px] px-3 rounded-[var(--md-radius-sm)] text-[13px] font-medium border-2 border-dashed border-[var(--md-outline)] text-[var(--md-on-surface-variant)] hover:border-[var(--md-primary)] hover:text-[var(--md-primary)] transition-all"
+        >
+          + สร้างหน้าใหม่
+        </button>
       </div>
+
+      {/* New Page Modal */}
+      {showNewPage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-xl)] md-elevation-3 w-full max-w-[420px] p-6">
+            <h3 className="text-[18px] font-medium text-[var(--md-on-surface)] mb-4">
+              สร้างหน้าใหม่
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase tracking-[0.4px] mb-1 block">
+                  Slug (ภาษาอังกฤษ, ใช้ใน URL)
+                </label>
+                <input
+                  type="text"
+                  value={newSlug}
+                  onChange={(e) => setNewSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))}
+                  placeholder="เช่น promotions, about-us, faq"
+                  className="w-full h-[40px] px-3 border border-[var(--md-outline)] rounded-[var(--md-radius-sm)] text-[13px] bg-transparent outline-none focus:border-[var(--md-primary)] focus:border-2"
+                />
+                {newSlug && (
+                  <p className="text-[11px] text-[var(--md-on-surface-variant)] mt-1">
+                    URL: <span className="font-mono text-[var(--md-primary)]">/p/{newSlug.replace(/[^a-z0-9-]/g, "-")}</span>
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase tracking-[0.4px] mb-1 block">
+                  ชื่อแสดงผล (ไม่บังคับ)
+                </label>
+                <input
+                  type="text"
+                  value={newLabel}
+                  onChange={(e) => setNewLabel(e.target.value)}
+                  placeholder="เช่น โปรโมชั่น, เกี่ยวกับเรา"
+                  className="w-full h-[40px] px-3 border border-[var(--md-outline)] rounded-[var(--md-radius-sm)] text-[13px] bg-transparent outline-none focus:border-[var(--md-primary)] focus:border-2"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-5">
+              <button
+                onClick={() => { setShowNewPage(false); setNewSlug(""); setNewLabel(""); }}
+                className="h-[36px] px-4 text-[13px] font-medium text-[var(--md-on-surface-variant)] hover:bg-[var(--md-surface-container)] rounded-[var(--md-radius-sm)]"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={handleCreatePage}
+                disabled={!newSlug.trim()}
+                className="h-[36px] px-5 bg-[var(--md-primary)] text-white rounded-[var(--md-radius-sm)] text-[13px] font-medium disabled:opacity-50"
+              >
+                สร้างหน้า
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
@@ -940,7 +1090,7 @@ export default function PageBuilderPage() {
                       className="flex-1 h-[32px] px-2 text-[12px] border border-[var(--md-outline)] rounded-[var(--md-radius-sm)] bg-transparent"
                     >
                       <option value="">-- เลือกหน้า --</option>
-                      {PAGE_OPTIONS.filter((p) => p.value !== pageSlug).map((p) => (
+                      {allPages.filter((p) => p.value !== pageSlug).map((p) => (
                         <option key={p.value} value={p.value}>
                           {p.label}
                         </option>
