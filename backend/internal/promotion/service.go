@@ -82,6 +82,7 @@ type BonusRuleInput struct {
 type ScanBonus struct {
 	PointBonus      int
 	CurrencyBonuses []CurrencyBonusItem
+	PromotionIDs    []string
 }
 
 type CurrencyBonusItem struct {
@@ -425,6 +426,7 @@ func (s *Service) CalcBonus(ctx context.Context, tenantID, productID string, bas
 	result := &ScanBonus{}
 	var fixedPointTotal int
 	highestMultiplier := 0
+	promoSet := map[string]bool{}
 
 	for rows.Next() {
 		var currency, bonusType, expiryAction, promotionID string
@@ -432,6 +434,11 @@ func (s *Service) CalcBonus(ctx context.Context, tenantID, productID string, bas
 		var expiresAt *time.Time
 		if err := rows.Scan(&currency, &bonusType, &bonusAmount, &expiresAt, &expiryAction, &promotionID); err != nil {
 			continue
+		}
+
+		if promotionID != "" && !promoSet[promotionID] {
+			promoSet[promotionID] = true
+			result.PromotionIDs = append(result.PromotionIDs, promotionID)
 		}
 
 		if currency == "point" || currency == "" {

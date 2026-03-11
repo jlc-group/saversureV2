@@ -6,7 +6,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { isLoggedIn, setToken } from "@/lib/auth";
 import { useTenant } from "@/components/TenantProvider";
+import { Card, CardContent } from "@/components/ui/card";
 import {
+  clearPendingScan,
   getPendingScanTarget,
   resolvePendingCodeFromSearch,
   setPendingScan,
@@ -49,23 +51,16 @@ function LoginPageInner() {
   );
 
   useEffect(() => {
-    if (pendingCode) {
-      setPendingScan(pendingCode, "qr");
-    }
+    if (pendingCode) setPendingScan(pendingCode, "qr");
   }, [pendingCode]);
 
   useEffect(() => {
-    if (isLoggedIn()) {
-      router.replace(getPendingScanTarget("/scan"));
-    }
+    if (isLoggedIn()) router.replace(getPendingScanTarget("/scan"));
   }, [router]);
 
   useEffect(() => {
     if (!tenantId) return;
-    api
-      .get<{ client_id?: string; enabled?: boolean }>(
-        `/api/v1/auth/google/config?tenant_id=${encodeURIComponent(tenantId)}`
-      )
+    api.get<{ client_id?: string; enabled?: boolean }>(`/api/v1/auth/google/config?tenant_id=${encodeURIComponent(tenantId)}`)
       .then((data) => setGoogleClientId(data.client_id || ""))
       .catch(() => {});
   }, [tenantId]);
@@ -77,23 +72,17 @@ function LoginPageInner() {
       router.replace("/register/complete");
       return;
     }
-    router.replace(getPendingScanTarget("/scan"));
+    if (!pendingCode) clearPendingScan();
+    router.replace(pendingCode ? getPendingScanTarget("/scan") : "/scan");
   };
 
   const handleLineLogin = async () => {
-    if (!tenantId) {
-      setError("ยังไม่พบ tenant ของแบรนด์นี้");
-      return;
-    }
-
+    if (!tenantId) { setError("ยังไม่พบ tenant ของแบรนด์นี้"); return; }
     setLineLoading(true);
     setError("");
     try {
       const query = new URLSearchParams({ tenant_id: tenantId });
-      if (pendingCode) {
-        query.set("redirect_code", pendingCode);
-        setPendingScan(pendingCode, "line");
-      }
+      if (pendingCode) { query.set("redirect_code", pendingCode); setPendingScan(pendingCode, "line"); }
       const data = await api.get<{ url: string }>(`/api/v1/auth/line?${query.toString()}`);
       window.location.href = data.url;
     } catch (err: unknown) {
@@ -104,22 +93,12 @@ function LoginPageInner() {
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tenantId) {
-      setError("ยังไม่พบ tenant ของแบรนด์นี้");
-      return;
-    }
-
+    if (!tenantId) { setError("ยังไม่พบ tenant ของแบรนด์นี้"); return; }
     setLoading(true);
     setError("");
     try {
-      const data = await api.post<AuthResponse>("/api/v1/auth/login", {
-        tenant_id: tenantId,
-        email: email.trim(),
-        password,
-      });
-      if (pendingCode) {
-        setPendingScan(pendingCode, "email");
-      }
+      const data = await api.post<AuthResponse>("/api/v1/auth/login", { tenant_id: tenantId, email: email.trim(), password });
+      if (pendingCode) setPendingScan(pendingCode, "email");
       finishAuth(data);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "เข้าสู่ระบบไม่สำเร็จ");
@@ -129,27 +108,13 @@ function LoginPageInner() {
   };
 
   const handleGoogleLogin = async () => {
-    if (!tenantId) {
-      setError("ยังไม่พบ tenant ของแบรนด์นี้");
-      return;
-    }
-    if (!googleClientId) {
-      setError("Google Login ยังไม่ถูกตั้งค่าสำหรับแบรนด์นี้");
-      return;
-    }
-
+    if (!tenantId) { setError("ยังไม่พบ tenant ของแบรนด์นี้"); return; }
+    if (!googleClientId) { setError("Google Login ยังไม่ถูกตั้งค่าสำหรับแบรนด์นี้"); return; }
     setGoogleLoading(true);
     setError("");
-
     try {
       await new Promise<void>((resolve, reject) => {
-        const existing = document.querySelector<HTMLScriptElement>(
-          'script[src="https://accounts.google.com/gsi/client"]'
-        );
-        if (existing) {
-          resolve();
-          return;
-        }
+        if (document.querySelector<HTMLScriptElement>('script[src="https://accounts.google.com/gsi/client"]')) { resolve(); return; }
         const script = document.createElement("script");
         script.src = "https://accounts.google.com/gsi/client";
         script.async = true;
@@ -158,27 +123,17 @@ function LoginPageInner() {
         script.onerror = () => reject(new Error("โหลด Google script ไม่สำเร็จ"));
         document.head.appendChild(script);
       });
-
       await new Promise<void>((resolve, reject) => {
         window.google?.accounts?.id?.initialize({
           client_id: googleClientId,
           callback: async (response: { credential?: string }) => {
             try {
-              if (!response.credential) {
-                throw new Error("ไม่ได้รับ Google credential");
-              }
-              if (pendingCode) {
-                setPendingScan(pendingCode, "google");
-              }
-              const data = await api.post<AuthResponse>("/api/v1/auth/google/login", {
-                tenant_id: tenantId,
-                id_token: response.credential,
-              });
+              if (!response.credential) throw new Error("ไม่ได้รับ Google credential");
+              if (pendingCode) setPendingScan(pendingCode, "google");
+              const data = await api.post<AuthResponse>("/api/v1/auth/google/login", { tenant_id: tenantId, id_token: response.credential });
               finishAuth(data);
               resolve();
-            } catch (err) {
-              reject(err);
-            }
+            } catch (err) { reject(err); }
           },
           ux_mode: "popup",
           context: "signin",
@@ -192,164 +147,148 @@ function LoginPageInner() {
     }
   };
 
-  const cardClass =
-    "w-full rounded-[24px] border border-white/60 bg-white/90 p-5 shadow-[0_20px_50px_rgba(18,52,29,0.12)] backdrop-blur";
-  const inputClass =
-    "h-12 w-full rounded-2xl border border-[var(--outline)] bg-white px-4 text-[14px] outline-none transition focus:border-[var(--primary)]";
-
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,var(--surface-dim)_0%,#ffffff_46%,#f7faf7_100%)]">
-      <div className="mx-auto flex min-h-screen w-full max-w-[520px] flex-col px-5 pb-8 pt-6">
-        <div className="relative overflow-hidden rounded-[32px] bg-[linear-gradient(135deg,var(--primary)_0%,var(--primary-dark,#245c31)_100%)] px-5 pb-6 pt-7 text-white shadow-[0_24px_60px_rgba(31,85,45,0.28)]">
-          <div className="absolute inset-0 opacity-20">
-            <div className="absolute -right-10 top-0 h-32 w-32 rounded-full bg-white/25 blur-2xl" />
-            <div className="absolute bottom-0 left-0 h-28 w-28 rounded-full bg-white/15 blur-2xl" />
-          </div>
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto flex min-h-screen w-full flex-col">
+        {/* Header */}
+        <div className="relative overflow-hidden bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-green-dark)_100%)] px-5 pb-10 pt-10 text-white">
+          <div className="absolute -right-8 -top-8 h-36 w-36 rounded-full bg-white/10" />
+          <div className="absolute -bottom-6 -left-4 h-20 w-20 rounded-full bg-white/5" />
 
-          <div className="relative">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="flex h-14 w-14 items-center justify-center rounded-[20px] bg-white/15 ring-1 ring-white/25">
-                  {branding?.logo_url ? (
-                    <img
-                      src={branding.logo_url}
-                      alt={brandName}
-                      className="h-9 w-9 object-contain"
-                    />
-                  ) : (
-                    <span className="text-xl font-bold">{brandName.slice(0, 1)}</span>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-[0.24em] text-white/75">
-                    Brand Login
-                  </p>
-                  <h1 className="text-2xl font-bold leading-tight">{brandName}</h1>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-8 rounded-[24px] bg-white/12 p-4 ring-1 ring-white/15">
-              <p className="text-xs uppercase tracking-[0.18em] text-white/70">
-                พร้อมสแกนต่อ
-              </p>
-              <p className="mt-2 text-lg font-semibold leading-snug">
-                เข้าสู่ระบบหรือสมัครสมาชิก แล้วระบบจะพาคุณกลับไปที่หน้าสแกนทันที
-              </p>
-              {pendingCode && (
-                <div className="mt-4 inline-flex rounded-full bg-black/20 px-4 py-2 text-sm font-medium tracking-[0.16em]">
-                  CODE {pendingCode}
-                </div>
+          <div className="relative flex items-center gap-3.5">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 ring-1 ring-white/30">
+              {branding?.logo_url ? (
+                <img src={branding.logo_url} alt={brandName} className="h-9 w-9 object-contain" />
+              ) : (
+                <span className="text-xl font-bold">{brandName.slice(0, 1)}</span>
               )}
             </div>
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-widest text-white/60">เข้าสู่ระบบ</p>
+              <h1 className="text-xl font-bold leading-tight">{brandName}</h1>
+            </div>
           </div>
+
+          {pendingCode ? (
+            <div className="relative mt-5 rounded-xl bg-white/15 px-4 py-3 ring-1 ring-white/20">
+              <p className="text-[11px] text-white/60">รหัสสินค้าที่รอสแกน</p>
+              <p className="text-base font-bold tracking-widest mt-0.5">{pendingCode}</p>
+              <p className="text-[12px] text-white/70 mt-1">เข้าสู่ระบบแล้วระบบจะสะสมแต้มให้อัตโนมัติ</p>
+            </div>
+          ) : (
+            <p className="relative mt-3 text-[13px] text-white/70 leading-relaxed">
+              สะสมแต้ม แลกของรางวัล และรับสิทธิพิเศษมากมาย
+            </p>
+          )}
         </div>
 
-        <div className="mt-5 space-y-4">
+        {/* Content */}
+        <div className="flex flex-col gap-3 px-4 py-5">
           {error && (
-            <div className="rounded-2xl border border-[var(--error)]/20 bg-[var(--error-light)] px-4 py-3 text-sm text-[var(--error)]">
-              {error}
-            </div>
+            <Card className="border-red-200 bg-red-50 shadow-sm">
+              <CardContent className="p-3 flex items-start gap-2.5">
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 shrink-0 text-destructive mt-0.5"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" /></svg>
+                <p className="text-sm text-destructive">{error}</p>
+              </CardContent>
+            </Card>
           )}
 
-          <div className={cardClass}>
-            <div className="space-y-3">
-              <button
-                type="button"
-                onClick={handleLineLogin}
-                disabled={lineLoading}
-                className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#06C755] px-4 text-sm font-semibold text-white transition active:scale-[0.99] disabled:opacity-60"
-              >
-                <span className="text-base">LINE</span>
-                <span>{lineLoading ? "กำลังเชื่อมต่อ..." : "เข้าสู่ระบบด้วย LINE"}</span>
-              </button>
+          {/* Login methods */}
+          <Card className="border-0 shadow-md">
+            <CardContent className="p-5">
+              <p className="mb-3 text-xs font-semibold text-muted-foreground">เลือกวิธีเข้าสู่ระบบ</p>
 
-              <button
-                type="button"
-                onClick={handleGoogleLogin}
-                disabled={googleLoading}
-                className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-[var(--outline)] bg-white px-4 text-sm font-semibold text-[var(--on-surface)] transition active:scale-[0.99] disabled:opacity-60"
-              >
-                <span className="text-base">G</span>
-                <span>{googleLoading ? "กำลังเชื่อมต่อ..." : "เข้าสู่ระบบด้วย Google"}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowEmailForm((prev) => !prev)}
-                className="flex h-12 w-full items-center justify-center rounded-2xl bg-[var(--primary)]/8 px-4 text-sm font-semibold text-[var(--primary)] transition active:scale-[0.99]"
-              >
-                เข้าสู่ระบบด้วย Email
-              </button>
-            </div>
-
-            {showEmailForm && (
-              <form onSubmit={handleEmailLogin} className="mt-4 space-y-3 border-t border-[var(--outline-variant)] pt-4">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="email@example.com"
-                  className={inputClass}
-                  required
-                />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="รหัสผ่าน"
-                  className={inputClass}
-                  required
-                />
+              <div className="space-y-2.5">
                 <button
-                  type="submit"
-                  disabled={loading}
-                  className="h-12 w-full rounded-2xl bg-[var(--primary)] text-sm font-semibold text-white transition active:scale-[0.99] disabled:opacity-60"
+                  type="button"
+                  onClick={handleLineLogin}
+                  disabled={lineLoading}
+                  className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl bg-[#06C755] text-sm font-semibold text-white transition active:scale-[0.98] disabled:opacity-60"
                 >
-                  {loading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                    <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.105.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.282.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
+                  </svg>
+                  <span>{lineLoading ? "กำลังเชื่อมต่อ..." : "เข้าสู่ระบบด้วย LINE"}</span>
                 </button>
-              </form>
-            )}
-          </div>
 
-          <div className={cardClass}>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-base font-semibold text-[var(--on-surface)]">
-                  ยังไม่มีบัญชี?
-                </p>
-                <p className="mt-1 text-sm text-[var(--on-surface-variant)]">
-                  สมัครสมาชิกใหม่ แล้วกลับไปสแกนสะสมแต้มต่อได้ทันที
-                </p>
+                <button
+                  type="button"
+                  onClick={handleGoogleLogin}
+                  disabled={googleLoading}
+                  className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl border border-border bg-white text-sm font-semibold text-foreground transition active:scale-[0.98] disabled:opacity-60"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                  </svg>
+                  <span>{googleLoading ? "กำลังเชื่อมต่อ..." : "เข้าสู่ระบบด้วย Google"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowEmailForm((p) => !p)}
+                  className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl bg-muted text-sm font-semibold text-foreground transition active:scale-[0.98]"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <rect x="2" y="4" width="20" height="16" rx="3" />
+                    <path d="m2 7 10 7 10-7" />
+                  </svg>
+                  <span>เข้าสู่ระบบด้วย Email</span>
+                </button>
               </div>
-              <Link
-                href={pendingCode ? `/register?code=${encodeURIComponent(pendingCode)}` : "/register"}
-                className="shrink-0 rounded-full bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white"
-              >
-                สมัครสมาชิก
-              </Link>
-            </div>
 
-            <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-[var(--surface-container,#f5f7f4)] px-4 py-3">
-              <div>
-                <p className="text-sm font-medium text-[var(--on-surface)]">
-                  ลืมรหัสผ่าน?
-                </p>
-                <p className="text-xs text-[var(--on-surface-variant)]">
-                  รีเซ็ตรหัสผ่านด้วย OTP ผ่านเบอร์โทรศัพท์
-                </p>
+              {showEmailForm && (
+                <form onSubmit={handleEmailLogin} className="mt-4 space-y-3 border-t border-border pt-4">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-muted-foreground">อีเมล</label>
+                    <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@example.com" required
+                      className="h-11 w-full rounded-lg border border-input bg-muted px-3.5 text-sm outline-none transition focus:border-[var(--jh-green)] focus:bg-white focus:ring-2 focus:ring-[var(--jh-green)]/20" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-muted-foreground">รหัสผ่าน</label>
+                    <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="รหัสผ่านของคุณ" required
+                      className="h-11 w-full rounded-lg border border-input bg-muted px-3.5 text-sm outline-none transition focus:border-[var(--jh-green)] focus:bg-white focus:ring-2 focus:ring-[var(--jh-green)]/20" />
+                  </div>
+                  <button type="submit" disabled={loading}
+                    className="h-11 w-full rounded-xl bg-[var(--jh-green)] text-sm font-semibold text-white transition active:scale-[0.98] disabled:opacity-50">
+                    {loading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
+                  </button>
+                </form>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Register + Forgot */}
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-bold">ยังไม่มีบัญชี?</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">สมัครสมาชิกฟรี</p>
+                </div>
+                <Link href={pendingCode ? `/register?code=${encodeURIComponent(pendingCode)}` : "/register"} className="shrink-0 rounded-full bg-[var(--jh-green)] px-4 py-1.5 text-xs font-bold text-white">
+                  สมัครสมาชิก
+                </Link>
               </div>
-              <Link
-                href="/forgot-password"
-                className="rounded-full border border-[var(--outline)] px-4 py-2 text-sm font-semibold text-[var(--on-surface)]"
-              >
-                รีเซ็ต
-              </Link>
-            </div>
-          </div>
 
-          <p className="px-1 text-center text-xs leading-6 text-[var(--on-surface-variant)]">
-            เมื่อเข้าสู่ระบบสำเร็จ ระบบจะกลับไปยังหน้าสแกนหลัก และถ้ามีรหัสที่สแกนค้างไว้จะทำรายการต่อให้อัตโนมัติ
+              <div className="my-3 h-px bg-border" />
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-bold">ลืมรหัสผ่าน?</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">รีเซ็ตผ่าน OTP</p>
+                </div>
+                <Link href="/forgot-password" className="shrink-0 rounded-full border border-border px-4 py-1.5 text-xs font-bold text-foreground">
+                  รีเซ็ต
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+
+          <p className="px-2 text-center text-[11px] text-muted-foreground">
+            เข้าสู่ระบบสำเร็จ ระบบจะพาไปหน้าสะสมแต้มอัตโนมัติ
           </p>
         </div>
       </div>
@@ -359,7 +298,7 @@ function LoginPageInner() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[var(--surface-dim)]" />}>
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
       <LoginPageInner />
     </Suspense>
   );

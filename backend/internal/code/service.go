@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"saversure/internal/ledger"
@@ -53,8 +54,62 @@ type ScanResult struct {
 	TotalPoints         int    `json:"total_points,omitempty"`
 	BonusCurrency       string `json:"bonus_currency,omitempty"`
 	BonusCurrencyAmount int    `json:"bonus_currency_amount,omitempty"`
+	BonusCurrencyName   string `json:"bonus_currency_name,omitempty"`
+	BonusCurrencyIcon   string `json:"bonus_currency_icon,omitempty"`
 	CampaignID          string `json:"campaign_id,omitempty"`
 	Message             string `json:"message"`
+	MessageTH           string  `json:"message_th,omitempty"`
+	MessageEN           string  `json:"message_en,omitempty"`
+	ProductName         *string `json:"product_name,omitempty"`
+	ProductSKU          *string `json:"product_sku,omitempty"`
+	ProductImageURL     *string `json:"product_image_url,omitempty"`
+}
+
+type ScanPreview struct {
+	Ref1             string  `json:"ref1,omitempty"`
+	ProductName      *string `json:"product_name,omitempty"`
+	ProductSKU       *string `json:"product_sku,omitempty"`
+	ProductImageURL  *string `json:"product_image_url,omitempty"`
+	FirstScannerName *string `json:"first_scanner_name,omitempty"`
+	FirstScannedAt   *string `json:"first_scanned_at,omitempty"`
+}
+
+type queryRower interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+type currencyMeta struct {
+	Name string
+	Icon string
+}
+
+func (s *Service) loadCurrencyMeta(ctx context.Context, tenantID, code string) currencyMeta {
+	if code == "" {
+		return currencyMeta{}
+	}
+
+	var meta currencyMeta
+	err := s.db.QueryRow(ctx,
+		`SELECT COALESCE(name, code), COALESCE(NULLIF(icon, ''), '')
+		 FROM point_currencies
+		 WHERE tenant_id = $1 AND code = $2
+		 LIMIT 1`,
+		tenantID, code,
+	).Scan(&meta.Name, &meta.Icon)
+	if err == nil {
+		return meta
+	}
+
+	meta.Name = strings.ToUpper(code)
+	switch strings.ToLower(code) {
+	case "diamond", "gem":
+		meta.Icon = "💎"
+	case "point", "coin":
+		meta.Icon = "🪙"
+	default:
+		meta.Icon = "⭐"
+	}
+	return meta
 }
 
 // Scan validates a QR code (or ref1 manual entry) and awards points if valid.
@@ -69,35 +124,9 @@ func (s *Service) Scan(ctx context.Context, tenantID, userID string, input ScanI
 		return nil, ErrProfileIncomplete
 	}
 
-	var prefix string
-	var serial int64
-
-	if input.Code != "" {
-		var valid bool
-		if strings.Contains(input.Code, "-") {
-			prefix, serial, valid = s.signer.ValidateCode(input.Code)
-		} else {
-			knownPrefixes, pfxErr := s.loadKnownPrefixes(ctx, tenantID)
-			if pfxErr != nil {
-				return nil, fmt.Errorf("load prefixes: %w", pfxErr)
-			}
-			hmacLen := s.loadHMACLength(ctx, tenantID)
-			prefix, serial, valid = s.signer.ValidateCompactCode(input.Code, knownPrefixes, hmacLen)
-		}
-		if !valid {
-			return nil, ErrInvalidCode
-		}
-	} else {
-		// Resolve ref1 -> batch, serial
-		runningNumber, ok := codegen.RunningNumberFromRef1(input.Ref1)
-		if !ok {
-			return nil, ErrInvalidCode
-		}
-		p, ser, err := s.resolveRef1ToBatch(ctx, tenantID, runningNumber)
-		if err != nil {
-			return nil, err
-		}
-		prefix, serial = p, ser
+	prefix, serial, err := s.resolveInput(ctx, tenantID, input)
+	if err != nil {
+		return nil, err
 	}
 
 	// Check daily scan quota
@@ -183,6 +212,11 @@ func (s *Service) Scan(ctx context.Context, tenantID, userID string, input ScanI
 		).Scan(&productID)
 	}
 
+	productName, productSKU, productImageURL, loadedProductID, _ := s.loadProductSnapshot(ctx, tx, tenantID, batchID, serial)
+	if productID == nil && loadedProductID != nil {
+		productID = loadedProductID
+	}
+
 	// Load tenant/campaign settings to compute ref1 from serial
 	var rawTenantSettings, rawCampaignSettings string
 	_ = tx.QueryRow(ctx,
@@ -264,11 +298,13 @@ func (s *Service) Scan(ctx context.Context, tenantID, userID string, input ScanI
 	// Check promotional bonus via bonus_rules (multiplier + fixed + currency bonuses)
 	bonusPoints := 0
 	var currencyBonuses []promotion.CurrencyBonusItem
+	var promotionIDs []string
 	if productID != nil && *productID != "" && s.promoSvc != nil {
 		br, err := s.promoSvc.CalcBonus(ctx, tenantID, *productID, pointsPerScan)
 		if err == nil && br != nil {
 			bonusPoints = br.PointBonus
 			currencyBonuses = br.CurrencyBonuses
+			promotionIDs = br.PromotionIDs
 		}
 	}
 	totalPoints := pointsPerScan + bonusPoints
@@ -302,10 +338,21 @@ func (s *Service) Scan(ctx context.Context, tenantID, userID string, input ScanI
 	}
 
 	// Record scan history with location (scan_type = success)
+	var bonusCurrPtr *string
+	var bonusCurrAmtPtr *int
+	if bonusCurrency != "" && bonusCurrencyAmount > 0 {
+		bonusCurrPtr = &bonusCurrency
+		bonusCurrAmtPtr = &bonusCurrencyAmount
+	}
+	var promoIDPtr *string
+	if len(promotionIDs) > 0 {
+		promoIDPtr = &promotionIDs[0]
+	}
 	_, err = tx.Exec(ctx,
-		`INSERT INTO scan_history (tenant_id, user_id, code_id, campaign_id, batch_id, points_earned, latitude, longitude, scanned_at, scan_type)
-		 VALUES ($1, $2, (SELECT id FROM codes WHERE tenant_id = $1 AND batch_id = $3 AND serial_number = $4), $5, $3, $6, $7, $8, NOW(), 'success')`,
+		`INSERT INTO scan_history (tenant_id, user_id, code_id, campaign_id, batch_id, points_earned, latitude, longitude, scanned_at, scan_type, bonus_currency, bonus_currency_amount, promotion_id)
+		 VALUES ($1, $2, (SELECT id FROM codes WHERE tenant_id = $1 AND batch_id = $3 AND serial_number = $4), $5, $3, $6, $7, $8, NOW(), 'success', $9, COALESCE($10, 0), $11)`,
 		tenantID, userID, batchID, serial, campaignID, totalPoints, input.Latitude, input.Longitude,
+		bonusCurrPtr, bonusCurrAmtPtr, promoIDPtr,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("insert scan history: %w", err)
@@ -315,12 +362,27 @@ func (s *Service) Scan(ctx context.Context, tenantID, userID string, input ScanI
 		return nil, fmt.Errorf("commit: %w", err)
 	}
 
+	currencyMeta := s.loadCurrencyMeta(ctx, tenantID, bonusCurrency)
+
+	msgTH := fmt.Sprintf("คุณได้รับ %d แต้ม", totalPoints)
 	msg := fmt.Sprintf("You earned %d points!", totalPoints)
 	if bonusPoints > 0 {
+		msgTH = fmt.Sprintf("คุณได้รับ %d แต้ม (%d แต้มพื้นฐาน + %d แต้มโบนัส)", totalPoints, pointsPerScan, bonusPoints)
 		msg = fmt.Sprintf("You earned %d points! (%d base + %d bonus)", totalPoints, pointsPerScan, bonusPoints)
 	}
 	if bonusCurrencyAmount > 0 {
-		msg += fmt.Sprintf(" + %d %s", bonusCurrencyAmount, bonusCurrency)
+		labelTH := bonusCurrency
+		if currencyMeta.Name != "" {
+			labelTH = currencyMeta.Name
+		}
+		icon := currencyMeta.Icon
+		if icon != "" {
+			msgTH += fmt.Sprintf(" และโบนัส %s %d %s", icon, bonusCurrencyAmount, labelTH)
+			msg += fmt.Sprintf(" + %s %d %s", icon, bonusCurrencyAmount, bonusCurrency)
+		} else {
+			msgTH += fmt.Sprintf(" และโบนัส %d %s", bonusCurrencyAmount, labelTH)
+			msg += fmt.Sprintf(" + %d %s", bonusCurrencyAmount, bonusCurrency)
+		}
 	}
 
 	return &ScanResult{
@@ -331,9 +393,114 @@ func (s *Service) Scan(ctx context.Context, tenantID, userID string, input ScanI
 		TotalPoints:         totalPoints,
 		BonusCurrency:       bonusCurrency,
 		BonusCurrencyAmount: bonusCurrencyAmount,
+		BonusCurrencyName:   currencyMeta.Name,
+		BonusCurrencyIcon:   currencyMeta.Icon,
 		CampaignID:          campaignID,
 		Message:             msg,
+		MessageTH:           msgTH,
+		MessageEN:           msg,
+		ProductName:         productName,
+		ProductSKU:          productSKU,
+		ProductImageURL:     productImageURL,
 	}, nil
+}
+
+func (s *Service) resolveInput(ctx context.Context, tenantID string, input ScanInput) (string, int64, error) {
+	if input.Code != "" {
+		if strings.Contains(input.Code, "-") {
+			prefix, serial, valid := s.signer.ValidateCode(input.Code)
+			if !valid {
+				return "", 0, ErrInvalidCode
+			}
+			return prefix, serial, nil
+		}
+
+		knownPrefixes, err := s.loadKnownPrefixes(ctx, tenantID)
+		if err != nil {
+			return "", 0, fmt.Errorf("load prefixes: %w", err)
+		}
+		hmacLen := s.loadHMACLength(ctx, tenantID)
+		prefix, serial, valid := s.signer.ValidateCompactCode(input.Code, knownPrefixes, hmacLen)
+		if !valid {
+			return "", 0, ErrInvalidCode
+		}
+		return prefix, serial, nil
+	}
+
+	runningNumber, ok := codegen.RunningNumberFromRef1(input.Ref1)
+	if !ok {
+		return "", 0, ErrInvalidCode
+	}
+	return s.resolveRef1ToBatch(ctx, tenantID, runningNumber)
+}
+
+func (s *Service) loadProductSnapshot(ctx context.Context, q queryRower, tenantID, batchID string, serial int64) (*string, *string, *string, *string, error) {
+	var productID, productName, productSKU, productImageURL *string
+	err := q.QueryRow(ctx,
+		`SELECT r.product_id::text,
+		        COALESCE(rp.name, bp.name),
+		        COALESCE(rp.sku, bp.sku),
+		        COALESCE(rp.image_url, bp.image_url)
+		 FROM batches b
+		 LEFT JOIN rolls r
+		   ON r.batch_id = b.id
+		  AND r.tenant_id = b.tenant_id
+		  AND $3 BETWEEN r.serial_start AND r.serial_end
+		 LEFT JOIN products rp ON rp.id = r.product_id
+		 LEFT JOIN products bp ON bp.id = b.product_id
+		 WHERE b.id = $1 AND b.tenant_id = $2
+		 LIMIT 1`,
+		batchID, tenantID, serial,
+	).Scan(&productID, &productName, &productSKU, &productImageURL)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	return productName, productSKU, productImageURL, productID, nil
+}
+
+func (s *Service) PreviewScan(ctx context.Context, tenantID string, input ScanInput) (*ScanPreview, error) {
+	prefix, serial, err := s.resolveInput(ctx, tenantID, input)
+	if err != nil {
+		return nil, err
+	}
+
+	var batchID string
+	err = s.db.QueryRow(ctx,
+		`SELECT id
+		 FROM batches
+		 WHERE tenant_id = $1 AND prefix = $2
+		   AND $3 BETWEEN serial_start AND serial_end
+		 LIMIT 1`,
+		tenantID, prefix, serial,
+	).Scan(&batchID)
+	if err != nil {
+		return nil, ErrBatchNotFound
+	}
+
+	var preview ScanPreview
+	var firstScannerName, firstScannedAt *string
+	productName, productSKU, productImageURL, _, _ := s.loadProductSnapshot(ctx, s.db, tenantID, batchID, serial)
+	preview.ProductName = productName
+	preview.ProductSKU = productSKU
+	preview.ProductImageURL = productImageURL
+
+	_ = s.db.QueryRow(ctx,
+		`SELECT c.ref1,
+		        u.display_name,
+		        c.scanned_at::text
+		 FROM codes c
+		 LEFT JOIN users u ON u.id = c.scanned_by
+		 WHERE c.tenant_id = $1 AND c.batch_id = $2 AND c.serial_number = $3
+		 LIMIT 1`,
+		tenantID, batchID, serial,
+	).Scan(&preview.Ref1, &firstScannerName, &firstScannedAt)
+	preview.FirstScannerName = firstScannerName
+	preview.FirstScannedAt = firstScannedAt
+	if preview.Ref1 == "" {
+		preview.Ref1 = input.Ref1
+	}
+
+	return &preview, nil
 }
 
 // recordDuplicateScan logs a duplicate scan attempt (same user = duplicate_self, other user = duplicate_other).

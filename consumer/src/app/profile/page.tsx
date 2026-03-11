@@ -2,10 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
 import { isLoggedIn, logout } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 
 interface PointBalance {
   current: number;
@@ -26,7 +30,7 @@ interface ProfileData {
 export default function ProfilePage() {
   const router = useRouter();
   const [loggedIn, setLoggedIn] = useState(false);
-  const [points, setPoints] = useState(0);
+  const [points, setPoints] = useState<PointBalance>({ current: 0, total_earned: 0, total_spent: 0 });
   const [profile, setProfile] = useState<ProfileData | null>(null);
 
   useEffect(() => {
@@ -34,7 +38,7 @@ export default function ProfilePage() {
     setLoggedIn(li);
     if (li) {
       api.get<PointBalance>("/api/v1/points/balance")
-        .then((d) => setPoints(d.current ?? 0))
+        .then((d) => setPoints(d))
         .catch(() => {});
       api.get<ProfileData>("/api/v1/profile")
         .then((d) => setProfile(d))
@@ -42,134 +46,154 @@ export default function ProfilePage() {
     }
   }, []);
 
+  const displayName =
+    profile?.display_name ||
+    [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
+    "สมาชิก";
+
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#f4fbf4_0%,#ffffff_44%)] pb-28">
+    <div className="min-h-screen pb-24 bg-background">
       <Navbar />
-      <div className="mx-auto max-w-[560px] px-4 pt-20">
-        <div className="overflow-hidden rounded-[32px] bg-[linear-gradient(135deg,var(--primary)_0%,var(--primary-dark,#245c31)_100%)] px-5 pb-6 pt-6 text-white shadow-[0_24px_60px_rgba(31,85,45,0.22)]">
-          <p className="text-xs uppercase tracking-[0.2em] text-white/70">My Profile</p>
-          <h1 className="mt-2 text-[28px] font-bold">บัญชีของฉัน</h1>
-          <p className="mt-2 text-sm text-white/80">
-            จัดการข้อมูลสมาชิก ดูสถานะการยืนยัน และเข้าถึงเมนูหลักของ consumer portal
-          </p>
+
+      <div className="pt-16">
+        {/* Header */}
+        <div className="bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-green-dark)_100%)] px-5 pt-8 pb-14 text-white relative overflow-hidden">
+          <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/10" />
+          <div className="relative">
+            <h1 className="text-xl font-bold">โปรไฟล์</h1>
+            <p className="text-[13px] text-white/70 mt-0.5">จัดการข้อมูลสมาชิกของคุณ</p>
+          </div>
         </div>
 
-        <div className="mt-5">
-          {loggedIn ? (
-            <>
-              <div className="rounded-[28px] border border-white/60 bg-white/90 p-5 shadow-[0_20px_50px_rgba(18,52,29,0.08)]">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--primary)]/10">
-                    <svg viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8 text-[var(--primary)]">
-                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold text-[var(--on-surface)]">
-                      {profile?.display_name ||
-                        [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
-                        "สมาชิก"}
-                    </p>
-                    <p className="text-sm text-[var(--on-surface-variant)]">
-                      {profile?.email || profile?.phone || "บัญชีผู้ใช้งาน"}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-5 grid grid-cols-2 gap-3">
-                  <div className="rounded-2xl bg-[var(--surface-container,#f5f7f4)] px-4 py-4">
-                    <p className="text-xs uppercase tracking-[0.14em] text-[var(--on-surface-variant)]">แต้มคงเหลือ</p>
-                    <p className="mt-2 text-3xl font-bold text-[#3c9b4d]">
-                      {points.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl bg-[var(--surface-container,#f5f7f4)] px-4 py-4">
-                    <p className="text-xs uppercase tracking-[0.14em] text-[var(--on-surface-variant)]">สถานะโปรไฟล์</p>
-                    <p className="mt-2 text-base font-semibold text-[var(--on-surface)]">
-                      {profile?.profile_completed ? "ข้อมูลครบแล้ว" : "ยังต้องยืนยันเพิ่มเติม"}
-                    </p>
-                    <p className="mt-1 text-xs text-[var(--on-surface-variant)]">
-                      {profile?.phone_verified ? "เบอร์โทรยืนยันแล้ว" : "ยังไม่ยืนยันเบอร์โทร"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-3">
-                <div
-                  className="flex cursor-pointer items-center rounded-[24px] border border-white/60 bg-white/90 p-4 shadow-[0_20px_50px_rgba(18,52,29,0.08)]"
-                  onClick={() => router.push("/history")}
-                >
-                  <div
-                    className="mr-3 flex h-10 w-10 items-center justify-center rounded-xl"
-                    style={{ background: "rgba(148, 201, 69, 0.15)" }}
-                  >
-                    <svg viewBox="0 0 24 24" fill="#35974D" className="w-4 h-4">
-                      <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z" />
-                    </svg>
-                  </div>
-                  <span className="text-base font-medium text-[var(--on-surface)] flex-1">ประวัติสะสมแต้ม</span>
-                  <svg width="6" height="10" viewBox="0 0 6 10" fill="none">
-                    <path d="M1 9L5 5L1 1" stroke="black" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-
-                <div
-                  className="flex cursor-pointer items-center rounded-[24px] border border-white/60 bg-white/90 p-4 shadow-[0_20px_50px_rgba(18,52,29,0.08)]"
-                  onClick={() => router.push("/scan")}
-                >
-                  <div
-                    className="mr-3 flex h-10 w-10 items-center justify-center rounded-xl"
-                    style={{ background: "rgba(148, 201, 69, 0.15)" }}
-                  >
-                    <svg viewBox="0 0 24 24" fill="#35974D" className="w-4 h-4">
-                      <path d="M9.5 6.5v3h-3v-3h3M11 5H5v6h6V5zm-1.5 9.5v3h-3v-3h3M11 13H5v6h6v-6zm6.5-6.5v3h-3v-3h3M19 5h-6v6h6V5z" />
-                    </svg>
-                  </div>
-                  <span className="text-base font-medium text-[var(--on-surface)] flex-1">ไปหน้าสแกนหลัก</span>
-                  <svg width="6" height="10" viewBox="0 0 6 10" fill="none">
-                    <path d="M1 9L5 5L1 1" stroke="black" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-
-                {!profile?.profile_completed && (
-                  <div
-                    className="flex cursor-pointer items-center rounded-[24px] border border-amber-200 bg-amber-50 p-4"
-                    onClick={() => router.push("/register/complete")}
-                  >
-                    <div className="flex-1">
-                      <p className="text-base font-semibold text-amber-900">กรอกข้อมูลสมาชิกให้ครบ</p>
-                      <p className="mt-1 text-sm text-amber-700">
-                        ยืนยันเบอร์โทรและข้อมูลพื้นฐานก่อนเริ่มสแกนสะสมแต้ม
+        {loggedIn ? (
+          <>
+            {/* Profile Card */}
+            <div className="px-4 -mt-8 relative z-10">
+              <Card className="border-0 shadow-md">
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-3.5">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-secondary">
+                      <svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7 text-[var(--jh-green)]">
+                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-lg font-bold truncate">{displayName}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {profile?.email || profile?.phone || ""}
                       </p>
+                      <div className="mt-1 flex gap-1.5">
+                        <Badge variant={profile?.profile_completed ? "default" : "secondary"} className={`text-[10px] px-2 py-0 ${profile?.profile_completed ? "bg-green-50 text-[var(--jh-green)]" : "bg-amber-50 text-amber-700"}`}>
+                          {profile?.profile_completed ? "ข้อมูลครบถ้วน" : "รอยืนยัน"}
+                        </Badge>
+                        {profile?.phone_verified && (
+                          <Badge variant="default" className="text-[10px] px-2 py-0 bg-blue-50 text-blue-700">
+                            เบอร์ยืนยันแล้ว
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
-                )}
-              </div>
+                </CardContent>
+              </Card>
+            </div>
 
+            {/* Points Stats */}
+            <div className="px-4 mt-3">
+              <Card className="border-0 shadow-sm">
+                <CardContent className="p-4">
+                  <div className="grid grid-cols-3 divide-x divide-border">
+                    <div className="text-center px-2">
+                      <p className="text-[11px] text-muted-foreground">คงเหลือ</p>
+                      <p className="text-xl font-bold text-[var(--jh-green)] mt-0.5">{points.current.toLocaleString()}</p>
+                    </div>
+                    <div className="text-center px-2">
+                      <p className="text-[11px] text-muted-foreground">สะสมทั้งหมด</p>
+                      <p className="text-xl font-bold text-foreground mt-0.5">{points.total_earned.toLocaleString()}</p>
+                    </div>
+                    <div className="text-center px-2">
+                      <p className="text-[11px] text-muted-foreground">ใช้ไปแล้ว</p>
+                      <p className="text-xl font-bold text-foreground mt-0.5">{points.total_spent.toLocaleString()}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Incomplete profile warning */}
+            {!profile?.profile_completed && (
+              <div className="px-4 mt-3">
+                <Card className="border-amber-200 bg-amber-50 shadow-sm">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100">
+                        <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-amber-600"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" /></svg>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-amber-900">กรอกข้อมูลให้ครบถ้วน</p>
+                        <p className="text-xs text-amber-700/80 mt-0.5">ยืนยันเบอร์โทรเพื่อรับสิทธิประโยชน์เต็มรูปแบบ</p>
+                      </div>
+                      <Link href="/register/complete" className="rounded-full bg-amber-600 px-3 py-1 text-xs font-bold text-white">
+                        ยืนยัน
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Quick links */}
+            <div className="px-4 mt-4">
+              <Card className="border-0 shadow-sm">
+                <CardContent className="p-0">
+                  {[
+                    { href: "/history", label: "ประวัติสะสมแต้ม", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5"><path d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> },
+                    { href: "/history/redeems", label: "ประวัติการแลกแต้ม", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5"><path d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12" /></svg> },
+                    { href: "/scan", label: "สแกนสะสมแต้ม", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5"><path d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5z" /></svg> },
+                  ].map((item, i) => (
+                    <div key={item.href}>
+                      <Link href={item.href} className="flex items-center gap-3.5 px-4 py-3.5 transition hover:bg-muted">
+                        <span className="text-[var(--jh-green)]">{item.icon}</span>
+                        <span className="flex-1 text-sm font-medium">{item.label}</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 text-muted-foreground"><path d="M9 18l6-6-6-6" /></svg>
+                      </Link>
+                      {i < 2 && <Separator />}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Logout */}
+            <div className="px-4 mt-6 mb-4">
               <button
                 onClick={() => logout()}
-                className="mt-6 w-full rounded-[24px] border-2 border-[#FD3642] bg-white py-3 text-base font-bold text-[#FD3642]"
+                className="w-full rounded-xl border border-red-200 bg-white py-3 text-sm font-bold text-destructive transition hover:bg-red-50"
               >
                 ออกจากระบบ
               </button>
-            </>
-          ) : (
-            <div className="rounded-[28px] border border-white/60 bg-white/90 p-6 text-center shadow-[0_20px_50px_rgba(18,52,29,0.08)]">
-              <p className="text-lg" style={{ color: "rgba(0,0,0,0.45)" }}>
-                กรุณาเข้าสู่ระบบ
-              </p>
-              <button
-                onClick={() => router.push("/login")}
-                className="mt-3 px-8 py-2 rounded-full text-white text-lg font-bold"
-                style={{ background: "#1a9444" }}
-              >
-                เข้าสู่ระบบ
-              </button>
             </div>
-          )}
-        </div>
+          </>
+        ) : (
+          <div className="px-4 -mt-8 relative z-10">
+            <Card className="border-0 shadow-md">
+              <CardContent className="flex flex-col items-center py-16 px-6">
+                <div className="w-20 h-20 mb-4 rounded-full bg-secondary flex items-center justify-center">
+                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-10 h-10 text-[var(--jh-green)]">
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-bold">กรุณาเข้าสู่ระบบ</h3>
+                <p className="text-sm text-muted-foreground mt-1 mb-6 text-center">เข้าสู่ระบบเพื่อดูข้อมูลบัญชีและสิทธิพิเศษของคุณ</p>
+                <Link href="/login" className="rounded-full bg-[var(--jh-green)] px-8 py-2.5 text-sm font-bold text-white">
+                  เข้าสู่ระบบ
+                </Link>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
+
       <BottomNav />
     </div>
   );

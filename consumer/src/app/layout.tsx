@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import TenantProvider from "@/components/TenantProvider";
+import PopupRenderer from "@/components/PopupRenderer";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -18,8 +19,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="th">
       <head />
-      <body className="min-h-screen bg-[var(--surface-dim)]">
-        <TenantProvider>{children}</TenantProvider>
+      <body>
+        <TenantProvider>
+          {children}
+          <PopupRenderer />
+        </TenantProvider>
       </body>
     </html>
   );

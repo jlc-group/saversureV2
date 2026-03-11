@@ -288,6 +288,36 @@ const navGroups: NavGroup[] = [
         ),
       },
       {
+        href: "/page-builder",
+        label: "Page Builder",
+        roles: ["super_admin", "brand_admin"],
+        icon: (
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
+            <path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z" />
+          </svg>
+        ),
+      },
+      {
+        href: "/popup-manager",
+        label: "Popup Manager",
+        roles: ["super_admin", "brand_admin"],
+        icon: (
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
+            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 12h2v5H7v-5zm4-3h2v8h-2V9zm4-2h2v10h-2V7z" />
+          </svg>
+        ),
+      },
+      {
+        href: "/menu-editor",
+        label: "Menu Editor",
+        roles: ["super_admin", "brand_admin"],
+        icon: (
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
+            <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
+          </svg>
+        ),
+      },
+      {
         href: "/settings/staff",
         label: "Staff",
         roles: ["super_admin", "brand_admin"],

@@ -27,6 +27,16 @@ func (h *Handler) List(c *gin.Context) {
 	sortBy := c.Query("sort_by")   // column key (see allowedSortColumns)
 	sortDir := c.Query("sort_dir") // asc | desc
 
+	if codeID != "" {
+		entries, err := h.svc.ListByCodeID(c.Request.Context(), tenantID, codeID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"data": entries, "total": len(entries)})
+		return
+	}
+
 	entries, total, err := h.svc.List(c.Request.Context(), tenantID, ListFilter{
 		Status:   status,
 		ScanType: scanType,
@@ -54,6 +64,25 @@ func (h *Handler) GetAlerts(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": list})
+}
+
+// GetMyScans returns the authenticated consumer's own scan history with product info.
+func (h *Handler) GetMyScans(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+
+	entries, total, err := h.svc.ListByUser(c.Request.Context(), tenantID, userID, limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": entries, "total": total})
 }
 
 func (h *Handler) GetByID(c *gin.Context) {

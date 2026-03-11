@@ -35,8 +35,14 @@ export function getUser(): User | null {
   }
 }
 
+const SYSTEM_TENANT_ID = "00000000-0000-0000-0000-000000000001";
+
 export async function login(email: string, password: string): Promise<User> {
-  const tokens = await api.post<TokenPair>("/api/v1/auth/login", { email, password });
+  const tokens = await api.post<TokenPair>("/api/v1/auth/login", {
+    tenant_id: SYSTEM_TENANT_ID,
+    email,
+    password,
+  });
   localStorage.setItem("access_token", tokens.access_token);
   localStorage.setItem("refresh_token", tokens.refresh_token);
   return getUser()!;

@@ -39,7 +39,10 @@ import (
 	"saversure/internal/linebot"
 	"saversure/internal/luckydraw"
 	mw "saversure/internal/middleware"
+	"saversure/internal/navmenu"
 	"saversure/internal/news"
+	"saversure/internal/pageconfig"
+	"saversure/internal/popup"
 	"saversure/internal/notification"
 	"saversure/internal/opsdigest"
 	"saversure/internal/otp"
@@ -158,6 +161,9 @@ func main() {
 	promoHandler := promotion.NewHandler(promoSvc)
 	factoryHandler := factory.NewHandler(db)
 	newsHandler := news.NewHandler(db)
+	pageConfigHandler := pageconfig.NewHandler(db)
+	popupHandler := popup.NewHandler(db)
+	navMenuHandler := navmenu.NewHandler(db)
 	supportHandler := support.NewHandler(db)
 	luckyDrawHandler := luckydraw.NewHandler(db)
 	donationHandler := donation.NewHandler(db)
@@ -553,6 +559,40 @@ func main() {
 		factoryRoutes.DELETE("/:id/products/:product_id", factoryHandler.RemoveProduct)
 	}
 
+	// Page Config CMS (Admin)
+	pageConfigRoutes := tenanted.Group("/page-configs")
+	pageConfigRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		pageConfigRoutes.GET("", pageConfigHandler.List)
+		pageConfigRoutes.GET("/:slug", pageConfigHandler.GetBySlug)
+		pageConfigRoutes.PUT("", pageConfigHandler.Upsert)
+		pageConfigRoutes.DELETE("/:slug", pageConfigHandler.Delete)
+		pageConfigRoutes.GET("/:slug/versions", pageConfigHandler.ListVersions)
+		pageConfigRoutes.POST("/:slug/restore", pageConfigHandler.RestoreVersion)
+		pageConfigRoutes.POST("/duplicate", pageConfigHandler.Duplicate)
+	}
+
+	// Popup Management (Admin)
+	popupRoutes := tenanted.Group("/popups")
+	popupRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		popupRoutes.GET("", popupHandler.List)
+		popupRoutes.GET("/:id", popupHandler.GetByID)
+		popupRoutes.POST("", popupHandler.Create)
+		popupRoutes.PATCH("/:id", popupHandler.Update)
+		popupRoutes.DELETE("/:id", popupHandler.Delete)
+	}
+
+	// Nav Menu Management (Admin)
+	navMenuRoutes := tenanted.Group("/nav-menus")
+	navMenuRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		navMenuRoutes.GET("", navMenuHandler.List)
+		navMenuRoutes.GET("/:type", navMenuHandler.GetByType)
+		navMenuRoutes.PUT("", navMenuHandler.Upsert)
+		navMenuRoutes.DELETE("/:type", navMenuHandler.Delete)
+	}
+
 	// News Management (Admin)
 	newsAdminRoutes := tenanted.Group("/news")
 	newsAdminRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
@@ -770,6 +810,9 @@ func main() {
 		publicRoutes.GET("/badges", gamifyHandler.ListBadges)
 		publicRoutes.GET("/tiers", tierHandler.List)
 		publicRoutes.GET("/branding", brandingHandler.GetPublic)
+		publicRoutes.GET("/page-config/:slug", pageConfigHandler.GetPublic)
+		publicRoutes.GET("/popups", popupHandler.ListActive)
+		publicRoutes.GET("/nav-menu/:type", navMenuHandler.GetPublic)
 	}
 
 	// Consumer Profile (self)
@@ -798,6 +841,7 @@ func main() {
 		myRoutes.GET("/tier", tierHandler.GetUserTier)
 		myRoutes.GET("/pdpa", authHandler.GetPDPA)
 		myRoutes.POST("/pdpa/withdraw", authHandler.WithdrawPDPA)
+		myRoutes.GET("/scans", scanHistoryHandler.GetMyScans)
 	}
 
 	// --- Server ---

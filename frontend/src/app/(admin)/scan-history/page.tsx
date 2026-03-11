@@ -23,6 +23,10 @@ interface ScanEntry {
   campaign_name: string | null;
   scan_type: string;
   points_earned: number;
+  bonus_currency: string | null;
+  bonus_currency_amount: number;
+  promotion_id: string | null;
+  promotion_name: string | null;
   latitude: number | null;
   longitude: number | null;
   province: string | null;
@@ -305,12 +309,29 @@ export default function ScanHistoryPage() {
                   )}
                 </td>
 
-                {/* Points */}
+                {/* Points + Bonus */}
                 <td className="px-4 py-3 text-right">
-                  {e.points_earned > 0
-                    ? <span className="text-[14px] font-bold text-green-600">+{e.points_earned}</span>
-                    : <span className="text-[12px] text-[var(--md-on-surface-variant)]">—</span>
-                  }
+                  <div className="flex flex-col items-end gap-0.5">
+                    {e.points_earned > 0
+                      ? <span className="text-[14px] font-bold text-green-600">+{e.points_earned}</span>
+                      : <span className="text-[12px] text-[var(--md-on-surface-variant)]">—</span>
+                    }
+                    {e.bonus_currency && e.bonus_currency_amount > 0 && (
+                      <span className="text-[10px] font-medium text-purple-600 bg-purple-50 dark:bg-purple-950/30 px-1.5 py-0.5 rounded whitespace-nowrap">
+                        +{e.bonus_currency_amount} {e.bonus_currency}
+                      </span>
+                    )}
+                    {e.promotion_name && (
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/promotions/${e.promotion_id}`)}
+                        className="text-[9px] text-[var(--md-primary)] hover:underline truncate max-w-[120px]"
+                        title={e.promotion_name}
+                      >
+                        🏷️ {e.promotion_name}
+                      </button>
+                    )}
+                  </div>
                 </td>
 
                 {/* Time — local yyyy-mm-dd hh:mm:ss */}
@@ -403,16 +424,36 @@ export default function ScanHistoryPage() {
                       className={`px-6 py-4 ${e.scan_type !== "success" ? "bg-amber-50/60 dark:bg-amber-950/10" : ""}`}
                     >
                       {/* Row header */}
-                      <div className="flex items-center gap-2 mb-3">
+                      <div className="flex items-center gap-2 mb-3 flex-wrap">
                         <span className="w-5 h-5 flex items-center justify-center rounded-full bg-[var(--md-surface-container)] text-[10px] font-bold text-[var(--md-on-surface-variant)]">{idx + 1}</span>
                         <span className={`px-2 py-0.5 rounded text-[11px] font-medium ${scanTypeStyle[e.scan_type] || ""}`}>
                           {scanTypeLabel[e.scan_type] || e.scan_type}
                         </span>
-                        {e.points_earned > 0
-                          ? <span className="ml-auto text-[13px] font-bold text-green-600">+{e.points_earned} แต้ม</span>
-                          : <span className="ml-auto text-[12px] text-[var(--md-on-surface-variant)]">ไม่ได้รับแต้ม</span>
-                        }
+                        <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
+                          {e.points_earned > 0
+                            ? <span className="text-[13px] font-bold text-green-600">+{e.points_earned} แต้ม</span>
+                            : <span className="text-[12px] text-[var(--md-on-surface-variant)]">ไม่ได้รับแต้ม</span>
+                          }
+                          {e.bonus_currency && e.bonus_currency_amount > 0 && (
+                            <span className="text-[11px] font-medium text-purple-600 bg-purple-50 dark:bg-purple-950/30 px-2 py-0.5 rounded-full">
+                              +{e.bonus_currency_amount} {e.bonus_currency}
+                            </span>
+                          )}
+                        </div>
                       </div>
+                      {e.promotion_name && (
+                        <div className="mb-3 flex items-center gap-1.5 text-[12px] bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 px-3 py-1.5 rounded-[6px]">
+                          <span>🏷️</span>
+                          <span className="font-medium">โปรโมชั่น:</span>
+                          <button
+                            type="button"
+                            onClick={() => { setCodeDetail(null); router.push(`/promotions/${e.promotion_id}`); }}
+                            className="font-medium hover:underline"
+                          >
+                            {e.promotion_name}
+                          </button>
+                        </div>
+                      )}
 
                       {/* Detail grid */}
                       <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[13px]">

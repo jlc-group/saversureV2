@@ -7,6 +7,7 @@ export interface PendingScanContext {
 }
 
 const STORAGE_KEY = "pending_scan_context";
+const MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
 
 function normalizeCode(code: string | null | undefined): string {
   return (code || "").trim().toUpperCase();
@@ -33,6 +34,13 @@ export function getPendingScan(): PendingScanContext | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as PendingScanContext;
     if (!parsed?.code) return null;
+
+    const age = Date.now() - (parsed.created_at || 0);
+    if (age > MAX_AGE_MS) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+
     return {
       code: normalizeCode(parsed.code),
       source: parsed.source,

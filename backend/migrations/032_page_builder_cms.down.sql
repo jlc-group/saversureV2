@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS nav_menus;
+DROP TABLE IF EXISTS popups;
+DROP TABLE IF EXISTS page_configs;

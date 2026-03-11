@@ -7,46 +7,37 @@ const tabs = [
   {
     href: "/",
     label: "หน้าหลัก",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-        <path d="M12 3l9 7h-2v9h-5v-6H10v6H5v-9H3l9-7z" />
-      </svg>
-    ),
-  },
-  {
-    href: "/history",
-    label: "ประวัติ",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-        <path d="M13 3a9 9 0 100 18 9 9 0 000-18zm1 10h-5V7h2v4h3v2z" />
+    icon: (active: boolean) => (
+      <svg viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+        <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
       </svg>
     ),
   },
   {
     href: "/scan",
-    label: "สะสมแต้ม",
-    isCenter: true,
-    icon: (
-      <svg viewBox="0 0 24 24" fill="white" className="w-6 h-6">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+    label: "สแกน",
+    icon: (active: boolean) => (
+      <svg viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+        <path d="M9.5 6.5v3h-3v-3h3M11 5H5v6h6V5zm-1.5 9.5v3h-3v-3h3M11 13H5v6h6v-6zm6.5-6.5v3h-3v-3h3M19 5h-6v6h6V5z" fill={active ? "currentColor" : "none"} />
       </svg>
     ),
+    primary: true,
   },
   {
-    href: "/rewards",
-    label: "แลกแต้ม",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-        <path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z" />
+    href: "/history",
+    label: "ประวัติ",
+    icon: (active: boolean) => (
+      <svg viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+        <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
   },
   {
     href: "/profile",
-    label: "โปรไฟล์",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-        <path d="M12 12c2.76 0 5-2.24 5-5S14.76 2 12 2 7 4.24 7 7s2.24 5 5 5zm0 2c-3.33 0-8 1.67-8 5v1h16v-1c0-3.33-4.67-5-8-5z" />
+    label: "บัญชี",
+    icon: (active: boolean) => (
+      <svg viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+        <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
       </svg>
     ),
   },
@@ -56,63 +47,33 @@ export default function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/60 bg-white/92 backdrop-blur">
-      <div className="relative mx-auto flex h-[68px] max-w-[560px] items-end">
+    <nav className="app-fixed-bar fixed bottom-0 z-50 border-t border-border bg-white/95 backdrop-blur-md">
+      <div className="flex h-16 items-center justify-around px-2">
         {tabs.map((tab) => {
-          const isActive = tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);
+          const isActive =
+            tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);
 
-          if (tab.isCenter) {
+          if (tab.primary) {
             return (
-              <Link
-                key={tab.href}
-                href={tab.href}
-                className="relative flex flex-1 flex-col items-center justify-end pb-[6px]"
-                style={{ height: "68px" }}
-              >
-                <div
-                  className="absolute flex items-center justify-center rounded-full"
-                  style={{
-                    width: "56px",
-                    height: "56px",
-                    top: "-28px",
-                    background: "var(--scan-btn-gradient)",
-                    boxShadow: "4px 4px 25px rgba(148, 201, 69, 0.45)",
-                  }}
-                >
-                  {tab.icon}
+              <Link key={tab.href} href={tab.href} className="flex flex-col items-center gap-0.5">
+                <div className={`flex h-11 w-11 items-center justify-center rounded-full ${isActive ? "bg-[var(--jh-green)] text-white" : "bg-secondary text-[var(--jh-green)]"} transition`}>
+                  {tab.icon(isActive)}
                 </div>
-                <div style={{ height: "24px" }} />
-                <span
-                  className="text-xs"
-                  style={{ color: isActive ? "var(--primary)" : "rgba(0,0,0,0.45)" }}
-                >
+                <span className={`text-[10px] font-semibold ${isActive ? "text-[var(--jh-green)]" : "text-muted-foreground"}`}>
                   {tab.label}
                 </span>
-                {isActive && (
-                  <span
-                    className="absolute top-0 rounded-b-full"
-                    style={{ width: "40px", height: "4px", background: "var(--primary)" }}
-                  />
-                )}
               </Link>
             );
           }
 
           return (
-            <Link
-              key={tab.href}
-              href={tab.href}
-              className="relative flex h-[68px] flex-1 flex-col items-center justify-center"
-              style={{ color: isActive ? "var(--primary)" : "rgba(0,0,0,0.45)" }}
-            >
-              {tab.icon}
-              <span className="text-xs mt-0.5">{tab.label}</span>
-              {isActive && (
-                <span
-                  className="absolute top-0 rounded-b-full"
-                  style={{ width: "40px", height: "4px", background: "var(--primary)" }}
-                />
-              )}
+            <Link key={tab.href} href={tab.href} className="flex flex-col items-center gap-1 py-1.5">
+              <span className={`${isActive ? "text-[var(--jh-green)]" : "text-muted-foreground"} transition`}>
+                {tab.icon(isActive)}
+              </span>
+              <span className={`text-[10px] font-semibold ${isActive ? "text-[var(--jh-green)]" : "text-muted-foreground"}`}>
+                {tab.label}
+              </span>
             </Link>
           );
         })}

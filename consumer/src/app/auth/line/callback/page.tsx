@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { setToken } from "@/lib/auth";
 import { getTenantId } from "@/lib/tenant";
 import {
+  clearPendingScan,
   getPendingScanTarget,
   setPendingScan,
 } from "@/lib/pendingScan";
@@ -53,6 +54,7 @@ function LineCallbackInner() {
         if (redirectCode) {
           router.push(getPendingScanTarget("/scan"));
         } else {
+          clearPendingScan();
           router.push("/scan");
         }
       })

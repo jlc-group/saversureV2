@@ -134,7 +134,22 @@ func (h *Handler) Scan(c *gin.Context) {
 		case errors.Is(err, ErrInvalidCode):
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_code", "message": "This QR code is not valid"})
 		case errors.Is(err, ErrCodeUsed):
-			c.JSON(http.StatusConflict, gin.H{"error": "code_used", "message": "This code has already been used"})
+			preview, _ := h.svc.PreviewScan(c.Request.Context(), c.GetString("tenant_id"), input)
+			resp := gin.H{
+				"error":      "code_used",
+				"message":    "This code has already been used",
+				"message_th": "รหัสนี้ถูกใช้ไปแล้ว",
+				"message_en": "This code has already been used",
+			}
+			if preview != nil {
+				resp["ref1"] = preview.Ref1
+				resp["product_name"] = preview.ProductName
+				resp["product_sku"] = preview.ProductSKU
+				resp["product_image_url"] = preview.ProductImageURL
+				resp["first_scanner_name"] = preview.FirstScannerName
+				resp["first_scanned_at"] = preview.FirstScannedAt
+			}
+			c.JSON(http.StatusConflict, resp)
 		case errors.Is(err, ErrBatchRecalled):
 			c.JSON(http.StatusGone, gin.H{"error": "batch_recalled", "message": "This code is no longer valid"})
 		case errors.Is(err, ErrBatchNotFound):

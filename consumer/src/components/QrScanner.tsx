@@ -14,6 +14,8 @@ export default function QrScanner({ onScan, onError }: QrScannerProps) {
   const [ready, setReady] = useState(false);
   const [permError, setPermError] = useState("");
   const processedRef = useRef(false);
+  const runningRef = useRef(false);
+  const stoppingRef = useRef(false);
 
   useEffect(() => {
     const scannerId = "qr-reader-" + Date.now();
@@ -22,28 +24,70 @@ export default function QrScanner({ onScan, onError }: QrScannerProps) {
 
     const scanner = new Html5Qrcode(scannerId);
     scannerRef.current = scanner;
+    let cancelled = false;
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason;
+      const message =
+        typeof reason === "string"
+          ? reason
+          : reason?.message || "";
+      if (
+        message.includes("play() request was interrupted") ||
+        message.includes("media was removed from the document") ||
+        reason?.name === "AbortError"
+      ) {
+        event.preventDefault();
+      }
+    };
+    window.addEventListener("unhandledrejection", handleUnhandledRejection);
+
+    const stopScanner = async () => {
+      if (!runningRef.current || stoppingRef.current) return;
+      stoppingRef.current = true;
+      try {
+        await scanner.stop();
+      } catch {
+        // ignore stop race conditions from html5-qrcode internals
+      } finally {
+        runningRef.current = false;
+        stoppingRef.current = false;
+      }
+    };
 
     scanner
       .start(
         { facingMode: "environment" },
         { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1 },
-        (decodedText) => {
+        async (decodedText) => {
           if (processedRef.current) return;
           processedRef.current = true;
-          scanner.stop().catch(() => {});
+          setReady(false);
+          await stopScanner();
           onScan(decodedText);
         },
         () => {}
       )
-      .then(() => setReady(true))
+      .then(async () => {
+        runningRef.current = true;
+        if (cancelled) {
+          await stopScanner();
+          return;
+        }
+        setReady(true);
+      })
       .catch((err) => {
         const msg = typeof err === "string" ? err : err?.message || "ไม่สามารถเข้าถึงกล้องได้";
+        if (cancelled || msg.includes("play() request was interrupted")) {
+          return;
+        }
         setPermError(msg);
         onError?.(msg);
       });
 
     return () => {
-      scanner.stop().catch(() => {});
+      cancelled = true;
+      window.removeEventListener("unhandledrejection", handleUnhandledRejection);
+      void stopScanner();
     };
   }, []);
 

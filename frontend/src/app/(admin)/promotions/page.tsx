@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 
 const TIME_OPTIONS = (() => {
@@ -58,6 +59,7 @@ interface PointCurrency {
 }
 
 export default function PromotionsPage() {
+  const router = useRouter();
   const [promos, setPromos] = useState<Promotion[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [currencies, setCurrencies] = useState<PointCurrency[]>([]);
@@ -552,8 +554,14 @@ export default function PromotionsPage() {
               return (
                 <tr key={p.id} className="border-b border-[var(--md-outline-variant)] last:border-b-0 hover:bg-[var(--md-surface-dim)] transition-colors">
                   <td className="px-6 py-4">
-                    <p className="text-[14px] font-medium text-[var(--md-on-surface)]">{p.name}</p>
-                    {p.description && <p className="text-[12px] text-[var(--md-on-surface-variant)] mt-0.5 truncate max-w-[250px]">{p.description}</p>}
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/promotions/${p.id}`)}
+                      className="text-left group"
+                    >
+                      <p className="text-[14px] font-medium text-[var(--md-on-surface)] group-hover:text-[var(--md-primary)] transition-colors">{p.name}</p>
+                      {p.description && <p className="text-[12px] text-[var(--md-on-surface-variant)] mt-0.5 truncate max-w-[250px]">{p.description}</p>}
+                    </button>
                     {p.rejection_note && p.status === "rejected" && (
                       <p className="text-[11px] text-[var(--md-error)] mt-1 bg-red-50 dark:bg-red-950/30 px-2 py-1 rounded">เหตุผล: {p.rejection_note}</p>
                     )}

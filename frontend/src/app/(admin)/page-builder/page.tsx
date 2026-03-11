@@ -1,0 +1,996 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { api } from "@/lib/api";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+
+/* ------------------------------------------------------------------ */
+/*  Types                                                              */
+/* ------------------------------------------------------------------ */
+
+interface Section {
+  id: string;
+  type: string;
+  order: number;
+  visible: boolean;
+  props: Record<string, unknown>;
+}
+
+interface PageConfig {
+  id: string;
+  page_slug: string;
+  sections: Section[];
+  status: string;
+  version: number;
+}
+
+const PAGE_OPTIONS = [
+  { value: "home", label: "หน้าแรก (Home)" },
+  { value: "scan", label: "หน้าสแกน (Scan)" },
+  { value: "rewards", label: "หน้ารางวัล (Rewards)" },
+  { value: "history", label: "หน้าประวัติ (History)" },
+  { value: "profile", label: "หน้าโปรไฟล์ (Profile)" },
+  { value: "news", label: "หน้าข่าวสาร (News)" },
+];
+
+/* ------------------------------------------------------------------ */
+/*  Section Type Registry (mirrors consumer sections)                  */
+/* ------------------------------------------------------------------ */
+
+interface SectionTypeDef {
+  label: string;
+  icon: string;
+  description: string;
+  defaultProps: Record<string, unknown>;
+  fields: FieldDef[];
+}
+
+interface FieldDef {
+  key: string;
+  label: string;
+  type: "text" | "textarea" | "number" | "boolean" | "select" | "image" | "items";
+  options?: { value: string; label: string }[];
+  itemFields?: FieldDef[];
+}
+
+const sectionTypes: Record<string, SectionTypeDef> = {
+  hero_banner: {
+    label: "Hero Banner",
+    icon: "🖼️",
+    description: "แบนเนอร์ใหญ่หัวหน้า",
+    defaultProps: {
+      title: "ยินดีต้อนรับ",
+      subtitle: "",
+      image_url: "",
+      cta_text: "",
+      cta_link: "/scan",
+    },
+    fields: [
+      { key: "title", label: "หัวข้อ", type: "text" },
+      { key: "subtitle", label: "คำอธิบาย", type: "text" },
+      { key: "image_url", label: "รูปภาพ (URL)", type: "image" },
+      { key: "cta_text", label: "ข้อความปุ่ม", type: "text" },
+      { key: "cta_link", label: "ลิงก์ปุ่ม", type: "text" },
+    ],
+  },
+  points_summary: {
+    label: "Points Summary",
+    icon: "🪙",
+    description: "แสดงแต้มสะสมและข้อมูลผู้ใช้",
+    defaultProps: { show_greeting: true },
+    fields: [
+      { key: "show_greeting", label: "แสดงคำทักทาย", type: "boolean" },
+    ],
+  },
+  banner_carousel: {
+    label: "Banner Carousel",
+    icon: "🎠",
+    description: "Slideshow แบนเนอร์",
+    defaultProps: { auto_play: true, interval_ms: 5000, items: [] },
+    fields: [
+      { key: "auto_play", label: "เลื่อนอัตโนมัติ", type: "boolean" },
+      { key: "interval_ms", label: "ความเร็ว (ms)", type: "number" },
+      {
+        key: "items",
+        label: "รายการแบนเนอร์",
+        type: "items",
+        itemFields: [
+          { key: "image_url", label: "รูปภาพ URL", type: "image" },
+          { key: "link", label: "ลิงก์", type: "text" },
+          { key: "alt", label: "คำอธิบายภาพ", type: "text" },
+        ],
+      },
+    ],
+  },
+  feature_menu: {
+    label: "Feature Menu",
+    icon: "🔲",
+    description: "Grid ไอคอนเมนูลัด",
+    defaultProps: {
+      columns: 4,
+      items: [
+        { icon: "scan", label: "สแกน QR", link: "/scan" },
+        { icon: "gift", label: "แลกรางวัล", link: "/rewards" },
+        { icon: "history", label: "ประวัติ", link: "/history" },
+        { icon: "user", label: "โปรไฟล์", link: "/profile" },
+      ],
+    },
+    fields: [
+      { key: "columns", label: "จำนวนคอลัมน์", type: "number" },
+      {
+        key: "items",
+        label: "รายการเมนู",
+        type: "items",
+        itemFields: [
+          {
+            key: "icon",
+            label: "ไอคอน",
+            type: "select",
+            options: [
+              { value: "scan", label: "Scan" },
+              { value: "gift", label: "Gift" },
+              { value: "history", label: "History" },
+              { value: "user", label: "User" },
+              { value: "news", label: "News" },
+              { value: "star", label: "Star" },
+              { value: "heart", label: "Heart" },
+              { value: "trophy", label: "Trophy" },
+            ],
+          },
+          { key: "label", label: "ชื่อเมนู", type: "text" },
+          { key: "link", label: "ลิงก์", type: "text" },
+        ],
+      },
+    ],
+  },
+  promo_banner: {
+    label: "Promo Banner",
+    icon: "🎉",
+    description: "แถบโปรโมชั่น",
+    defaultProps: {
+      title: "โปรโมชั่น",
+      description: "",
+      image_url: "",
+      link: "/rewards",
+      bg_color: "",
+      emoji: "🎉",
+    },
+    fields: [
+      { key: "title", label: "หัวข้อ", type: "text" },
+      { key: "description", label: "คำอธิบาย", type: "textarea" },
+      { key: "image_url", label: "รูปภาพ (URL)", type: "image" },
+      { key: "link", label: "ลิงก์", type: "text" },
+      { key: "bg_color", label: "สีพื้นหลัง", type: "text" },
+      { key: "emoji", label: "Emoji", type: "text" },
+    ],
+  },
+  rich_text: {
+    label: "Rich Text",
+    icon: "📝",
+    description: "เนื้อหา HTML/ข้อความ",
+    defaultProps: { title: "", content: "", alignment: "left" },
+    fields: [
+      { key: "title", label: "หัวข้อ", type: "text" },
+      { key: "content", label: "เนื้อหา (HTML)", type: "textarea" },
+      {
+        key: "alignment",
+        label: "การจัดตำแหน่ง",
+        type: "select",
+        options: [
+          { value: "left", label: "ซ้าย" },
+          { value: "center", label: "กลาง" },
+          { value: "right", label: "ขวา" },
+        ],
+      },
+    ],
+  },
+  recent_news: {
+    label: "Recent News",
+    icon: "📰",
+    description: "ข่าวสารล่าสุด",
+    defaultProps: { limit: 3, show_image: true },
+    fields: [
+      { key: "limit", label: "จำนวนข่าว", type: "number" },
+      { key: "show_image", label: "แสดงรูปภาพ", type: "boolean" },
+    ],
+  },
+  feature_list: {
+    label: "Feature List",
+    icon: "📋",
+    description: "รายการ feature พร้อมไอคอน",
+    defaultProps: {
+      heading: "",
+      items: [
+        { icon: "shield", title: "ปลอดภัย", description: "เชื่อมต่อผ่าน LINE" },
+        { icon: "bolt", title: "สะสมแต้มง่าย", description: "สแกน QR Code รับแต้มทันที" },
+      ],
+    },
+    fields: [
+      { key: "heading", label: "หัวข้อ", type: "text" },
+      {
+        key: "items",
+        label: "รายการ",
+        type: "items",
+        itemFields: [
+          {
+            key: "icon",
+            label: "ไอคอน",
+            type: "select",
+            options: [
+              { value: "shield", label: "Shield" },
+              { value: "bolt", label: "Bolt" },
+              { value: "sparkle", label: "Sparkle" },
+            ],
+          },
+          { key: "title", label: "หัวข้อ", type: "text" },
+          { key: "description", label: "คำอธิบาย", type: "text" },
+        ],
+      },
+    ],
+  },
+  spacer: {
+    label: "Spacer",
+    icon: "↕️",
+    description: "ช่องว่าง",
+    defaultProps: { height: 16 },
+    fields: [{ key: "height", label: "ความสูง (px)", type: "number" }],
+  },
+};
+
+/* ------------------------------------------------------------------ */
+/*  Sortable Section Card                                              */
+/* ------------------------------------------------------------------ */
+
+function SortableSectionCard({
+  section,
+  isActive,
+  onSelect,
+  onToggleVisible,
+  onRemove,
+}: {
+  section: Section;
+  isActive: boolean;
+  onSelect: () => void;
+  onToggleVisible: () => void;
+  onRemove: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: section.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const meta = sectionTypes[section.type];
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-3 p-3 rounded-[var(--md-radius-sm)] border transition-all cursor-pointer ${
+        isActive
+          ? "border-[var(--md-primary)] bg-[var(--md-primary-light)]/10"
+          : "border-[var(--md-outline-variant)] bg-[var(--md-surface)] hover:bg-[var(--md-surface-container)]"
+      } ${!section.visible ? "opacity-50" : ""}`}
+      onClick={onSelect}
+    >
+      <button
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing text-[var(--md-on-surface-variant)] hover:text-[var(--md-on-surface)] touch-none"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+          <path d="M11 18c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm-2-8c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm6 4c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+        </svg>
+      </button>
+
+      <span className="text-lg">{meta?.icon || "📦"}</span>
+
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] font-medium text-[var(--md-on-surface)] truncate">
+          {meta?.label || section.type}
+        </p>
+        <p className="text-[11px] text-[var(--md-on-surface-variant)] truncate">
+          {meta?.description || ""}
+        </p>
+      </div>
+
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleVisible();
+        }}
+        className="text-[var(--md-on-surface-variant)] hover:text-[var(--md-on-surface)]"
+        title={section.visible ? "ซ่อน" : "แสดง"}
+      >
+        {section.visible ? (
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+            <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+            <path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z" />
+          </svg>
+        )}
+      </button>
+
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove();
+        }}
+        className="text-[var(--md-error)] hover:text-[var(--md-error)]/80"
+        title="ลบ"
+      >
+        <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+          <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Section Properties Editor                                          */
+/* ------------------------------------------------------------------ */
+
+function SectionEditor({
+  section,
+  onChange,
+}: {
+  section: Section;
+  onChange: (updated: Section) => void;
+}) {
+  const typeDef = sectionTypes[section.type];
+  if (!typeDef) return <p className="text-sm text-[var(--md-on-surface-variant)]">Unknown section type</p>;
+
+  const updateProp = (key: string, value: unknown) => {
+    onChange({ ...section, props: { ...section.props, [key]: value } });
+  };
+
+  const fieldClass =
+    "w-full h-[40px] px-3 border border-[var(--md-outline)] rounded-[var(--md-radius-sm)] text-[13px] text-[var(--md-on-surface)] bg-transparent outline-none focus:border-[var(--md-primary)] focus:border-2 transition-all";
+
+  const textareaClass =
+    "w-full min-h-[80px] px-3 py-2 border border-[var(--md-outline)] rounded-[var(--md-radius-sm)] text-[13px] text-[var(--md-on-surface)] bg-transparent outline-none resize-y focus:border-[var(--md-primary)] focus:border-2 transition-all";
+
+  const renderField = (field: FieldDef) => {
+    const value = section.props[field.key];
+
+    if (field.type === "items") {
+      const items = (value as Record<string, unknown>[]) || [];
+      return (
+        <div key={field.key} className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase tracking-[0.4px]">
+              {field.label}
+            </label>
+            <button
+              onClick={() => {
+                const newItem: Record<string, unknown> = {};
+                field.itemFields?.forEach((f) => (newItem[f.key] = ""));
+                updateProp(field.key, [...items, newItem]);
+              }}
+              className="text-[12px] text-[var(--md-primary)] font-medium hover:underline"
+            >
+              + เพิ่ม
+            </button>
+          </div>
+          {items.map((item, idx) => (
+            <div
+              key={idx}
+              className="border border-[var(--md-outline-variant)] rounded-[var(--md-radius-sm)] p-3 space-y-2 relative"
+            >
+              <button
+                onClick={() => {
+                  const updated = items.filter((_, i) => i !== idx);
+                  updateProp(field.key, updated);
+                }}
+                className="absolute top-2 right-2 text-[var(--md-error)] text-xs"
+              >
+                ✕
+              </button>
+              {field.itemFields?.map((subField) => (
+                <div key={subField.key}>
+                  <label className="text-[11px] text-[var(--md-on-surface-variant)] mb-1 block">
+                    {subField.label}
+                  </label>
+                  {subField.type === "select" ? (
+                    <select
+                      value={(item[subField.key] as string) || ""}
+                      onChange={(e) => {
+                        const updated = [...items];
+                        updated[idx] = { ...updated[idx], [subField.key]: e.target.value };
+                        updateProp(field.key, updated);
+                      }}
+                      className={fieldClass}
+                    >
+                      <option value="">-- เลือก --</option>
+                      {subField.options?.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type={subField.type === "number" ? "number" : "text"}
+                      value={(item[subField.key] as string) ?? ""}
+                      onChange={(e) => {
+                        const updated = [...items];
+                        updated[idx] = { ...updated[idx], [subField.key]: e.target.value };
+                        updateProp(field.key, updated);
+                      }}
+                      className={fieldClass}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div key={field.key}>
+        <label className="text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5 block uppercase tracking-[0.4px]">
+          {field.label}
+        </label>
+        {field.type === "boolean" ? (
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!value}
+              onChange={(e) => updateProp(field.key, e.target.checked)}
+              className="w-4 h-4 accent-[var(--md-primary)]"
+            />
+            <span className="text-[13px] text-[var(--md-on-surface)]">
+              {value ? "เปิด" : "ปิด"}
+            </span>
+          </label>
+        ) : field.type === "textarea" ? (
+          <textarea
+            value={(value as string) ?? ""}
+            onChange={(e) => updateProp(field.key, e.target.value)}
+            className={textareaClass}
+          />
+        ) : field.type === "select" ? (
+          <select
+            value={(value as string) ?? ""}
+            onChange={(e) => updateProp(field.key, e.target.value)}
+            className={fieldClass}
+          >
+            {field.options?.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        ) : field.type === "number" ? (
+          <input
+            type="number"
+            value={(value as number) ?? 0}
+            onChange={(e) => updateProp(field.key, Number(e.target.value))}
+            className={fieldClass}
+          />
+        ) : (
+          <input
+            type="text"
+            value={(value as string) ?? ""}
+            onChange={(e) => updateProp(field.key, e.target.value)}
+            className={fieldClass}
+          />
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 pb-3 border-b border-[var(--md-outline-variant)]">
+        <span className="text-xl">{typeDef.icon}</span>
+        <div>
+          <p className="text-[14px] font-medium text-[var(--md-on-surface)]">
+            {typeDef.label}
+          </p>
+          <p className="text-[11px] text-[var(--md-on-surface-variant)]">
+            {typeDef.description}
+          </p>
+        </div>
+      </div>
+      {typeDef.fields.map(renderField)}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Add Section Modal                                                  */
+/* ------------------------------------------------------------------ */
+
+function AddSectionModal({
+  open,
+  onAdd,
+  onClose,
+}: {
+  open: boolean;
+  onAdd: (type: string) => void;
+  onClose: () => void;
+}) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-xl)] md-elevation-3 w-full max-w-[520px] max-h-[80vh] overflow-hidden">
+        <div className="flex items-center justify-between p-5 border-b border-[var(--md-outline-variant)]">
+          <h3 className="text-[18px] font-medium text-[var(--md-on-surface)]">
+            เพิ่ม Section
+          </h3>
+          <button onClick={onClose} className="text-[var(--md-on-surface-variant)]">
+            ✕
+          </button>
+        </div>
+        <div className="p-5 overflow-y-auto max-h-[60vh] grid grid-cols-2 gap-3">
+          {Object.entries(sectionTypes).map(([type, meta]) => (
+            <button
+              key={type}
+              onClick={() => {
+                onAdd(type);
+                onClose();
+              }}
+              className="flex items-start gap-3 p-4 rounded-[var(--md-radius-sm)] border border-[var(--md-outline-variant)] hover:bg-[var(--md-surface-container)] transition-all text-left"
+            >
+              <span className="text-2xl">{meta.icon}</span>
+              <div>
+                <p className="text-[13px] font-medium text-[var(--md-on-surface)]">
+                  {meta.label}
+                </p>
+                <p className="text-[11px] text-[var(--md-on-surface-variant)] mt-0.5">
+                  {meta.description}
+                </p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Main Page                                                          */
+/* ------------------------------------------------------------------ */
+
+export default function PageBuilderPage() {
+  const [pageSlug, setPageSlug] = useState("home");
+  const [sections, setSections] = useState<Section[]>([]);
+  const [status, setStatus] = useState<"draft" | "published">("published");
+  const [version, setVersion] = useState(0);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [versions, setVersions] = useState<{ version: number; status: string; updated_at: string }[]>([]);
+  const [loadingVersions, setLoadingVersions] = useState(false);
+  const [showDuplicate, setShowDuplicate] = useState(false);
+  const [dupTarget, setDupTarget] = useState("");
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+
+  const fetchConfig = useCallback(async (slug: string) => {
+    setLoading(true);
+    setActiveId(null);
+    setDirty(false);
+    try {
+      const data = await api.get<PageConfig>(`/api/v1/page-configs/${slug}`);
+      setSections(data.sections || []);
+      setStatus((data.status as "draft" | "published") || "published");
+      setVersion(data.version || 0);
+    } catch {
+      setSections([]);
+      setStatus("published");
+      setVersion(0);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchConfig(pageSlug);
+  }, [pageSlug, fetchConfig]);
+
+  const fetchVersions = async (slug: string) => {
+    setLoadingVersions(true);
+    try {
+      const data = await api.get<{ data: typeof versions }>(`/api/v1/page-configs/${slug}/versions`);
+      setVersions(data.data || []);
+    } catch {
+      setVersions([]);
+    } finally {
+      setLoadingVersions(false);
+    }
+  };
+
+  const restoreVersion = async (ver: number) => {
+    if (!confirm(`Restore version ${ver}?`)) return;
+    try {
+      const result = await api.post<PageConfig>(`/api/v1/page-configs/${pageSlug}/restore`, { version: ver });
+      setSections(result.sections || []);
+      setVersion(result.version || 0);
+      setShowHistory(false);
+      setDirty(false);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Restore failed");
+    }
+  };
+
+  const handleDuplicate = async () => {
+    if (!dupTarget) return;
+    try {
+      await api.post("/api/v1/page-configs/duplicate", {
+        from_slug: pageSlug,
+        to_slug: dupTarget,
+      });
+      alert(`Duplicated to "${dupTarget}" (as draft)`);
+      setShowDuplicate(false);
+      setDupTarget("");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Duplicate failed");
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaved(false);
+    try {
+      const ordered = sections.map((s, i) => ({ ...s, order: i + 1 }));
+      const result = await api.put<PageConfig>("/api/v1/page-configs", {
+        page_slug: pageSlug,
+        sections: ordered,
+        status,
+      });
+      setVersion(result.version || version + 1);
+      setSaved(true);
+      setDirty(false);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateSections = (fn: (prev: Section[]) => Section[]) => {
+    setSections((prev) => {
+      const next = fn(prev);
+      setDirty(true);
+      return next;
+    });
+  };
+
+  const addSection = (type: string) => {
+    const typeDef = sectionTypes[type];
+    if (!typeDef) return;
+    const newSection: Section = {
+      id: `${type}-${Date.now()}`,
+      type,
+      order: sections.length + 1,
+      visible: true,
+      props: { ...typeDef.defaultProps },
+    };
+    updateSections((prev) => [...prev, newSection]);
+    setActiveId(newSection.id);
+  };
+
+  const removeSection = (id: string) => {
+    updateSections((prev) => prev.filter((s) => s.id !== id));
+    if (activeId === id) setActiveId(null);
+  };
+
+  const toggleVisible = (id: string) => {
+    updateSections((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, visible: !s.visible } : s)),
+    );
+  };
+
+  const updateSection = (updated: Section) => {
+    updateSections((prev) =>
+      prev.map((s) => (s.id === updated.id ? updated : s)),
+    );
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    updateSections((prev) => {
+      const oldIdx = prev.findIndex((s) => s.id === active.id);
+      const newIdx = prev.findIndex((s) => s.id === over.id);
+      return arrayMove(prev, oldIdx, newIdx);
+    });
+  };
+
+  const activeSection = sections.find((s) => s.id === activeId);
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-[28px] font-normal text-[var(--md-on-surface)] tracking-[-0.5px]">
+            Page Builder
+          </h1>
+          <p className="text-[14px] text-[var(--md-on-surface-variant)] mt-1">
+            จัดการ layout ของ Consumer Frontend
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          {dirty && (
+            <span className="text-[12px] text-[var(--md-warning)] font-medium">
+              ● มีการเปลี่ยนแปลง
+            </span>
+          )}
+          {saved && (
+            <span className="text-[12px] text-[var(--md-success)] font-medium">
+              ✓ บันทึกแล้ว
+            </span>
+          )}
+          <select
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value as "draft" | "published");
+              setDirty(true);
+            }}
+            className="h-[40px] px-3 border border-[var(--md-outline)] rounded-[var(--md-radius-sm)] text-[13px] text-[var(--md-on-surface)] bg-transparent"
+          >
+            <option value="published">Published</option>
+            <option value="draft">Draft</option>
+          </select>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="h-[40px] px-5 bg-[var(--md-primary)] text-white rounded-[var(--md-radius-xl)] text-[14px] font-medium hover:bg-[var(--md-primary-dark)] transition-all disabled:opacity-50 flex items-center gap-2"
+          >
+            {saving ? (
+              <>
+                <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Saving...
+              </>
+            ) : (
+              "Save"
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Page Selector */}
+      <div className="flex gap-2 mb-6 flex-wrap">
+        {PAGE_OPTIONS.map((p) => (
+          <button
+            key={p.value}
+            onClick={() => setPageSlug(p.value)}
+            className={`h-[36px] px-4 rounded-[var(--md-radius-sm)] text-[13px] font-medium transition-all ${
+              pageSlug === p.value
+                ? "bg-[var(--md-primary)] text-white"
+                : "bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)] hover:bg-[var(--md-surface-container-high)]"
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <svg className="animate-spin w-6 h-6 text-[var(--md-primary)]" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        </div>
+      ) : (
+        <div className="flex flex-col xl:flex-row gap-6">
+          {/* Left: Section List */}
+          <div className="xl:w-[360px] flex-shrink-0">
+            <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-[15px] font-medium text-[var(--md-on-surface)]">
+                  Sections ({sections.length})
+                </h2>
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="h-[32px] px-3 bg-[var(--md-primary)] text-white rounded-[var(--md-radius-sm)] text-[12px] font-medium hover:bg-[var(--md-primary-dark)] transition-all flex items-center gap-1"
+                >
+                  + เพิ่ม
+                </button>
+              </div>
+
+              {sections.length === 0 ? (
+                <div className="text-center py-10">
+                  <p className="text-[14px] text-[var(--md-on-surface-variant)]">
+                    ยังไม่มี section
+                  </p>
+                  <p className="text-[12px] text-[var(--md-on-surface-variant)] mt-1">
+                    กด &quot;+ เพิ่ม&quot; เพื่อเริ่มสร้าง layout
+                  </p>
+                </div>
+              ) : (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={sections.map((s) => s.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className="space-y-2">
+                      {sections.map((section) => (
+                        <SortableSectionCard
+                          key={section.id}
+                          section={section}
+                          isActive={activeId === section.id}
+                          onSelect={() => setActiveId(section.id)}
+                          onToggleVisible={() => toggleVisible(section.id)}
+                          onRemove={() => removeSection(section.id)}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              )}
+
+              {/* Actions */}
+              <div className="mt-4 flex items-center justify-between">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setShowHistory(!showHistory);
+                      if (!showHistory) fetchVersions(pageSlug);
+                    }}
+                    className="h-[28px] px-2.5 text-[11px] font-medium text-[var(--md-on-surface-variant)] hover:bg-[var(--md-surface-container)] rounded-[var(--md-radius-sm)] transition-all"
+                  >
+                    History
+                  </button>
+                  <button
+                    onClick={() => setShowDuplicate(!showDuplicate)}
+                    className="h-[28px] px-2.5 text-[11px] font-medium text-[var(--md-on-surface-variant)] hover:bg-[var(--md-surface-container)] rounded-[var(--md-radius-sm)] transition-all"
+                  >
+                    Duplicate
+                  </button>
+                </div>
+                {version > 0 && (
+                  <span className="text-[11px] text-[var(--md-on-surface-variant)]">
+                    v{version}
+                  </span>
+                )}
+              </div>
+
+              {/* Version History Panel */}
+              {showHistory && (
+                <div className="mt-3 border border-[var(--md-outline-variant)] rounded-[var(--md-radius-sm)] p-3">
+                  <p className="text-[12px] font-medium text-[var(--md-on-surface)] mb-2">
+                    Version History
+                  </p>
+                  {loadingVersions ? (
+                    <p className="text-[11px] text-[var(--md-on-surface-variant)]">Loading...</p>
+                  ) : versions.length === 0 ? (
+                    <p className="text-[11px] text-[var(--md-on-surface-variant)]">No history yet</p>
+                  ) : (
+                    <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
+                      {versions.map((v) => (
+                        <div
+                          key={v.version}
+                          className="flex items-center justify-between p-2 rounded bg-[var(--md-surface-container)] text-[11px]"
+                        >
+                          <div>
+                            <span className="font-medium text-[var(--md-on-surface)]">
+                              v{v.version}
+                            </span>
+                            <span className="ml-2 text-[var(--md-on-surface-variant)]">
+                              {v.status}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => restoreVersion(v.version)}
+                            className="text-[var(--md-primary)] font-medium hover:underline"
+                          >
+                            Restore
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Duplicate Panel */}
+              {showDuplicate && (
+                <div className="mt-3 border border-[var(--md-outline-variant)] rounded-[var(--md-radius-sm)] p-3">
+                  <p className="text-[12px] font-medium text-[var(--md-on-surface)] mb-2">
+                    Duplicate layout to another page
+                  </p>
+                  <div className="flex gap-2">
+                    <select
+                      value={dupTarget}
+                      onChange={(e) => setDupTarget(e.target.value)}
+                      className="flex-1 h-[32px] px-2 text-[12px] border border-[var(--md-outline)] rounded-[var(--md-radius-sm)] bg-transparent"
+                    >
+                      <option value="">-- เลือกหน้า --</option>
+                      {PAGE_OPTIONS.filter((p) => p.value !== pageSlug).map((p) => (
+                        <option key={p.value} value={p.value}>
+                          {p.label}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={handleDuplicate}
+                      disabled={!dupTarget}
+                      className="h-[32px] px-3 bg-[var(--md-primary)] text-white text-[11px] font-medium rounded-[var(--md-radius-sm)] disabled:opacity-50"
+                    >
+                      Duplicate
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right: Section Editor */}
+          <div className="flex-1">
+            <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 p-5 sticky top-8">
+              {activeSection ? (
+                <SectionEditor
+                  section={activeSection}
+                  onChange={updateSection}
+                />
+              ) : (
+                <div className="text-center py-16">
+                  <svg viewBox="0 0 24 24" fill="var(--md-on-surface-variant)" className="w-12 h-12 mx-auto mb-3 opacity-40">
+                    <path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z" />
+                  </svg>
+                  <p className="text-[14px] text-[var(--md-on-surface-variant)]">
+                    เลือก section เพื่อแก้ไข
+                  </p>
+                  <p className="text-[12px] text-[var(--md-on-surface-variant)] mt-1">
+                    หรือกด &quot;+ เพิ่ม&quot; เพื่อสร้าง section ใหม่
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Section Modal */}
+      <AddSectionModal
+        open={showAddModal}
+        onAdd={addSection}
+        onClose={() => setShowAddModal(false)}
+      />
+    </div>
+  );
+}

@@ -17,28 +17,32 @@ func NewService(db *pgxpool.Pool) *Service {
 
 // ScanEntry is one row from scan_history (each scan attempt: success or duplicate).
 type ScanEntry struct {
-	ID              string   `json:"id"`
-	CodeID          string   `json:"code_id"`
-	TenantID        string   `json:"tenant_id"`
-	BatchID         string   `json:"batch_id"`
-	SerialNumber    int64    `json:"serial_number"`
-	Ref1            string   `json:"ref1"`
-	Ref2            string   `json:"ref2"`
-	CodeStatus      string   `json:"code_status"`
-	ScannedBy       *string  `json:"scanned_by"`       // user_id UUID
-	ScannerName     *string  `json:"scanner_name"`     // display name
-	ScannerPhone    *string  `json:"scanner_phone"`    // phone
-	BatchPrefix     string   `json:"batch_prefix"`
-	ProductName     *string  `json:"product_name"`     // from rolls → products or batch → products
-	ProductSKU      *string  `json:"product_sku"`
-	ProductImageURL *string  `json:"product_image_url"`
-	CampaignName    *string  `json:"campaign_name"`
-	ScanType        string   `json:"scan_type"` // success, duplicate_self, duplicate_other
-	PointsEarned    int      `json:"points_earned"`
-	Latitude        *float64 `json:"latitude"`
-	Longitude       *float64 `json:"longitude"`
-	Province        *string  `json:"province"`
-	CreatedAt       string   `json:"created_at"`
+	ID                  string   `json:"id"`
+	CodeID              string   `json:"code_id"`
+	TenantID            string   `json:"tenant_id"`
+	BatchID             string   `json:"batch_id"`
+	SerialNumber        int64    `json:"serial_number"`
+	Ref1                string   `json:"ref1"`
+	Ref2                string   `json:"ref2"`
+	CodeStatus          string   `json:"code_status"`
+	ScannedBy           *string  `json:"scanned_by"`
+	ScannerName         *string  `json:"scanner_name"`
+	ScannerPhone        *string  `json:"scanner_phone"`
+	BatchPrefix         string   `json:"batch_prefix"`
+	ProductName         *string  `json:"product_name"`
+	ProductSKU          *string  `json:"product_sku"`
+	ProductImageURL     *string  `json:"product_image_url"`
+	CampaignName        *string  `json:"campaign_name"`
+	ScanType            string   `json:"scan_type"`
+	PointsEarned        int      `json:"points_earned"`
+	BonusCurrency       *string  `json:"bonus_currency,omitempty"`
+	BonusCurrencyAmount int      `json:"bonus_currency_amount"`
+	PromotionID         *string  `json:"promotion_id,omitempty"`
+	PromotionName       *string  `json:"promotion_name,omitempty"`
+	Latitude            *float64 `json:"latitude"`
+	Longitude           *float64 `json:"longitude"`
+	Province            *string  `json:"province"`
+	CreatedAt           string   `json:"created_at"`
 }
 
 // allowedSortColumns maps safe frontend sort keys to SQL expressions.
@@ -129,6 +133,8 @@ func (s *Service) List(ctx context.Context, tenantID string, f ListFilter) ([]Sc
 		        COALESCE(rp.image_url, bp.image_url),
 		        cam.name,
 		        COALESCE(sh.scan_type, 'success'), COALESCE(sh.points_earned, 0),
+		        sh.bonus_currency, COALESCE(sh.bonus_currency_amount, 0),
+		        sh.promotion_id::text, promo.name,
 		        sh.latitude, sh.longitude, sh.province,
 		        sh.scanned_at::text
 		 FROM scan_history sh
@@ -139,6 +145,7 @@ func (s *Service) List(ctx context.Context, tenantID string, f ListFilter) ([]Sc
 		 LEFT JOIN rolls r ON r.batch_id = sh.batch_id AND c.serial_number BETWEEN r.serial_start AND r.serial_end
 		 LEFT JOIN products rp ON rp.id = r.product_id
 		 LEFT JOIN products bp ON bp.id = b.product_id
+		 LEFT JOIN promotions promo ON promo.id = sh.promotion_id
 		 WHERE %s
 		 ORDER BY %s %s NULLS LAST, sh.scanned_at DESC
 		 LIMIT $%d OFFSET $%d`,
@@ -159,7 +166,77 @@ func (s *Service) List(ctx context.Context, tenantID string, f ListFilter) ([]Sc
 		if err := rows.Scan(&e.ID, &e.CodeID, &e.TenantID, &e.BatchID, &e.SerialNumber, &e.Ref1, &e.Ref2,
 			&e.CodeStatus, &scannedBy, &scannerName, &scannerPhone, &e.BatchPrefix,
 			&e.ProductName, &e.ProductSKU, &e.ProductImageURL, &e.CampaignName,
-			&e.ScanType, &e.PointsEarned, &e.Latitude, &e.Longitude, &e.Province, &e.CreatedAt); err != nil {
+			&e.ScanType, &e.PointsEarned, &e.BonusCurrency, &e.BonusCurrencyAmount,
+			&e.PromotionID, &e.PromotionName,
+			&e.Latitude, &e.Longitude, &e.Province, &e.CreatedAt); err != nil {
+			return nil, 0, fmt.Errorf("scan row: %w", err)
+		}
+		e.ScannedBy = scannedBy
+		e.ScannerName = scannerName
+		e.ScannerPhone = scannerPhone
+		entries = append(entries, e)
+	}
+	return entries, total, nil
+}
+
+// ListByUser returns scan history for a specific user (consumer self-view).
+func (s *Service) ListByUser(ctx context.Context, tenantID, userID string, limit, offset int) ([]ScanEntry, int64, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+
+	var total int64
+	_ = s.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM scan_history sh WHERE sh.tenant_id = $1 AND sh.user_id = $2`,
+		tenantID, userID,
+	).Scan(&total)
+
+	rows, err := s.db.Query(ctx,
+		`SELECT sh.id, COALESCE(sh.code_id::text, ''), sh.tenant_id, sh.batch_id,
+		        COALESCE(c.serial_number, 0), COALESCE(c.ref1, ''), COALESCE(c.ref2, ''),
+		        COALESCE(c.status, ''),
+		        sh.user_id::text,
+		        COALESCE(NULLIF(u.display_name,''), NULLIF(TRIM(CONCAT(u.first_name,' ',u.last_name)),''), u.email, sh.user_id::text),
+		        u.phone,
+		        COALESCE(b.prefix, ''),
+		        COALESCE(rp.name, bp.name),
+		        COALESCE(rp.sku, bp.sku),
+		        COALESCE(rp.image_url, bp.image_url),
+		        cam.name,
+		        COALESCE(sh.scan_type, 'success'), COALESCE(sh.points_earned, 0),
+		        sh.bonus_currency, COALESCE(sh.bonus_currency_amount, 0),
+		        sh.promotion_id::text, promo.name,
+		        sh.latitude, sh.longitude, sh.province,
+		        sh.scanned_at::text
+		 FROM scan_history sh
+		 LEFT JOIN codes c ON c.id = sh.code_id AND c.tenant_id = sh.tenant_id
+		 LEFT JOIN batches b ON b.id = sh.batch_id
+		 LEFT JOIN campaigns cam ON cam.id = sh.campaign_id
+		 LEFT JOIN users u ON u.id = sh.user_id
+		 LEFT JOIN rolls r ON r.batch_id = sh.batch_id AND c.serial_number BETWEEN r.serial_start AND r.serial_end
+		 LEFT JOIN products rp ON rp.id = r.product_id
+		 LEFT JOIN products bp ON bp.id = b.product_id
+		 LEFT JOIN promotions promo ON promo.id = sh.promotion_id
+		 WHERE sh.tenant_id = $1 AND sh.user_id = $2
+		 ORDER BY sh.scanned_at DESC
+		 LIMIT $3 OFFSET $4`,
+		tenantID, userID, limit, offset,
+	)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list user scans: %w", err)
+	}
+	defer rows.Close()
+
+	var entries []ScanEntry
+	for rows.Next() {
+		var e ScanEntry
+		var scannedBy, scannerName, scannerPhone *string
+		if err := rows.Scan(&e.ID, &e.CodeID, &e.TenantID, &e.BatchID, &e.SerialNumber, &e.Ref1, &e.Ref2,
+			&e.CodeStatus, &scannedBy, &scannerName, &scannerPhone, &e.BatchPrefix,
+			&e.ProductName, &e.ProductSKU, &e.ProductImageURL, &e.CampaignName,
+			&e.ScanType, &e.PointsEarned, &e.BonusCurrency, &e.BonusCurrencyAmount,
+			&e.PromotionID, &e.PromotionName,
+			&e.Latitude, &e.Longitude, &e.Province, &e.CreatedAt); err != nil {
 			return nil, 0, fmt.Errorf("scan row: %w", err)
 		}
 		e.ScannedBy = scannedBy
@@ -218,6 +295,10 @@ func (s *Service) loadPrimaryScanFallback(ctx context.Context, tenantID, codeID 
 			cam.name,
 			'success',
 			0,
+			NULL::varchar,
+			0,
+			NULL::uuid,
+			NULL::varchar,
 			NULL::float8,
 			NULL::float8,
 			NULL::text,
@@ -235,6 +316,7 @@ func (s *Service) loadPrimaryScanFallback(ctx context.Context, tenantID, codeID 
 		&entry.ID, &entry.CodeID, &entry.TenantID, &entry.BatchID, &entry.SerialNumber, &entry.Ref1, &entry.Ref2,
 		&entry.CodeStatus, &scannedBy, &scannerName, &scannerPhone, &entry.BatchPrefix, &entry.ProductName,
 		&entry.ProductSKU, &entry.ProductImageURL, &entry.CampaignName, &entry.ScanType, &entry.PointsEarned,
+		&entry.BonusCurrency, &entry.BonusCurrencyAmount,
 		&entry.Latitude, &entry.Longitude, &entry.Province, &entry.CreatedAt,
 	)
 	if err != nil {
@@ -261,6 +343,8 @@ func (s *Service) GetByID(ctx context.Context, tenantID, id string) (*ScanEntry,
 		        COALESCE(rp.name, bp.name), COALESCE(rp.sku, bp.sku), COALESCE(rp.image_url, bp.image_url),
 		        cam.name,
 		        COALESCE(sh.scan_type, 'success'), COALESCE(sh.points_earned, 0),
+		        sh.bonus_currency, COALESCE(sh.bonus_currency_amount, 0),
+		        sh.promotion_id::text, promo.name,
 		        sh.latitude, sh.longitude, sh.province,
 		        sh.scanned_at::text
 		 FROM scan_history sh
@@ -271,11 +355,14 @@ func (s *Service) GetByID(ctx context.Context, tenantID, id string) (*ScanEntry,
 		 LEFT JOIN rolls r ON r.batch_id = sh.batch_id AND c.serial_number BETWEEN r.serial_start AND r.serial_end
 		 LEFT JOIN products rp ON rp.id = r.product_id
 		 LEFT JOIN products bp ON bp.id = b.product_id
+		 LEFT JOIN promotions promo ON promo.id = sh.promotion_id
 		 WHERE sh.id = $1 AND sh.tenant_id = $2`,
 		id, tenantID,
 	).Scan(&e.ID, &e.CodeID, &e.TenantID, &e.BatchID,
 		&e.SerialNumber, &e.Ref1, &e.Ref2, &e.CodeStatus, &scannedBy, &scannerName, &scannerPhone,
 		&e.BatchPrefix, &e.ProductName, &e.ProductSKU, &e.ProductImageURL, &e.CampaignName, &e.ScanType, &e.PointsEarned,
+		&e.BonusCurrency, &e.BonusCurrencyAmount,
+		&e.PromotionID, &e.PromotionName,
 		&e.Latitude, &e.Longitude, &e.Province, &e.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("scan not found: %w", err)

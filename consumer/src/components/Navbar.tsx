@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Drawer from "./Drawer";
 import { getUser, isLoggedIn } from "@/lib/auth";
@@ -8,66 +8,55 @@ import { useTenant } from "./TenantProvider";
 
 export default function Navbar() {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [hasUser, setHasUser] = useState(false);
   const router = useRouter();
-  const user = getUser();
-  const loggedIn = isLoggedIn();
   const { brandName, branding } = useTenant();
+
+  useEffect(() => {
+    setLoggedIn(isLoggedIn());
+    setHasUser(!!getUser());
+  }, []);
 
   return (
     <>
-      <header className="fixed left-0 right-0 top-0 z-[999] border-b border-white/50 bg-white/85 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-[560px] items-center justify-between px-4">
+      <header className="app-fixed-bar fixed top-0 z-[999] border-b border-border bg-white/95 backdrop-blur-md">
+        <div className="flex h-14 items-center justify-between px-4">
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
-            className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--primary)]/10"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted"
           >
-            <svg className="h-5 w-5" viewBox="0 0 24 24" stroke="currentColor" fill="none">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M4 6h16M4 12h16M4 18h16"
-              />
+            <svg className="h-5 w-5" viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round">
+              <path d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
 
           <div
-            className="flex min-w-0 cursor-pointer items-center gap-3"
+            className="flex min-w-0 cursor-pointer items-center gap-2"
             onClick={() => router.push("/")}
           >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--primary)]/10">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary">
               {branding?.logo_url ? (
-                <img
-                  src={branding.logo_url}
-                  alt={brandName}
-                  className="h-7 w-7 object-contain"
-                />
+                <img src={branding.logo_url} alt={brandName} className="h-5 w-5 object-contain" />
               ) : (
-                <span className="text-sm font-bold text-[var(--primary)]">
-                  {brandName.slice(0, 1)}
-                </span>
+                <span className="text-xs font-bold text-[var(--jh-green)]">{brandName.slice(0, 2)}</span>
               )}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-[var(--on-surface)]">
-                {brandName}
-              </p>
-              <p className="truncate text-xs text-[var(--on-surface-variant)]">
-                Consumer Portal
-              </p>
+              <p className="truncate text-sm font-bold text-foreground leading-tight">{brandName}</p>
             </div>
           </div>
 
-          <div className="cursor-pointer" onClick={() => router.push("/profile")}>
-            {loggedIn && user ? (
-              <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-[var(--primary)]/10">
-                <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-[var(--primary)]">
+          <div className="cursor-pointer" onClick={() => router.push(loggedIn ? "/profile" : "/login")}>
+            {loggedIn && hasUser ? (
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary">
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-[var(--jh-green)]">
                   <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
                 </svg>
               </div>
             ) : (
-              <div className="rounded-full border border-[var(--outline)] px-3 py-2 text-xs font-semibold text-[var(--on-surface)]">
+              <div className="rounded-full bg-[var(--jh-green)] px-3.5 py-1.5 text-xs font-semibold text-white">
                 Login
               </div>
             )}

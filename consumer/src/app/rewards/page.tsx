@@ -2,35 +2,45 @@
 
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 export default function RewardsPage() {
   return (
-    <div className="pb-28">
+    <div className="pb-24 min-h-screen bg-background">
       <Navbar />
+
       <div className="pt-16">
-        <div
-          className="px-5 pt-6 pb-4"
-          style={{ background: "var(--green-gradient)" }}
-        >
-          <h1 className="text-3xl font-bold text-white">ช้อปออนไลน์</h1>
+        {/* Header */}
+        <div className="bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-green-dark)_100%)] px-5 pt-8 pb-14 text-white relative overflow-hidden">
+          <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/10" />
+          <h1 className="text-xl font-bold relative">แลกรางวัล</h1>
+          <p className="text-[13px] text-white/70 mt-1 relative">แลกของรางวัลและสิทธิพิเศษ</p>
         </div>
 
-        <div className="px-4 pt-4">
-          <div className="bg-white rounded-lg p-6 text-center elevation-1">
-            <div className="w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-3"
-              style={{ background: "rgba(148, 201, 69, 0.15)" }}
-            >
-              <svg viewBox="0 0 24 24" fill="#3c9b4d" className="w-8 h-8">
-                <path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z" />
-              </svg>
-            </div>
-            <p className="text-xl font-bold" style={{ color: "#3c9b4d" }}>เร็วๆ นี้</p>
-            <p className="text-lg mt-1" style={{ color: "rgba(0,0,0,0.45)" }}>
-              ช้อปออนไลน์กำลังจะเปิดให้บริการเร็วๆ นี้
-            </p>
-          </div>
+        <div className="px-4 -mt-6 relative z-10">
+          <Card className="border-0 shadow-md">
+            <CardContent className="flex flex-col items-center py-16 px-6">
+              <div className="relative w-20 h-20 mb-4 rounded-full bg-secondary flex items-center justify-center">
+                <svg viewBox="0 0 24 24" fill="none" stroke="var(--jh-green)" strokeWidth="1.5" className="w-10 h-10">
+                  <path d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                </svg>
+                <Badge className="absolute -top-1 -right-1 bg-amber-400 text-amber-900 text-[10px] px-1.5 py-0 font-bold">
+                  SOON
+                </Badge>
+              </div>
+              <h3 className="text-lg font-bold text-[var(--jh-green)]">Coming Soon</h3>
+              <p className="text-sm text-muted-foreground mt-1 text-center leading-relaxed">
+                เรากำลังเตรียมของรางวัลและสิทธิพิเศษมากมาย<br />ให้คุณได้แลกแต้ม เร็วๆ นี้
+              </p>
+              <button className="mt-6 rounded-full border-2 border-[var(--jh-green)] px-6 py-2 text-sm font-bold text-[var(--jh-green)] transition active:scale-[0.98]">
+                แจ้งเตือนเมื่อเปิดใช้งาน
+              </button>
+            </CardContent>
+          </Card>
         </div>
       </div>
+
       <BottomNav />
     </div>
   );
