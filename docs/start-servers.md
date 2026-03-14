@@ -122,3 +122,23 @@ npm run dev
   `cd backend && go run ./cmd/migrate up`  
   หรือจาก root: `make migrate-up`
 - **Frontend (Admin/Consumer):** Node.js 20+, `npm install` ใน `frontend/` และ `consumer/` แล้ว
+
+---
+
+## Dev Migration Reset
+
+ถ้าจะทดสอบ V1 -> V2 migration หลายรอบในเครื่อง dev แนะนำให้ reset V2 ทั้งก้อนจาก baseline แทนการลบข้อมูลปลายทางทีละ table
+
+**สร้าง baseline snapshot**
+```powershell
+cd D:\Dev\apps\saversureV2
+powershell -ExecutionPolicy Bypass -File scripts/create-v2-baseline-snapshot.ps1
+```
+
+**reset V2 จาก baseline**
+```powershell
+cd D:\Dev\apps\saversureV2
+powershell -ExecutionPolicy Bypass -File scripts/reset-v2-from-baseline.ps1 -Force
+```
+
+หลัง reset เสร็จ ให้เปิด `Migration Center` แล้วรัน `Dry Run` ก่อนทุกครั้ง

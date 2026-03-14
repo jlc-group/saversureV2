@@ -53,6 +53,41 @@ cd consumer && npm install && npm run dev
 cloudflared tunnel run saversure
 ```
 
+## Dev Migration Reset
+
+For repeated V1 -> V2 migration testing in development, prefer resetting the whole V2 database to a clean baseline instead of deleting destination rows module by module.
+
+Recommended baseline:
+
+- V1 source database: `saversure_v1_backup`
+- V2 target database: `saversure`
+- Baseline dump file: `backup/v2_dev_baseline.dump`
+
+Useful commands:
+
+```bash
+# Create/update a clean V2 baseline snapshot
+make baseline-snapshot
+
+# Reset V2 from the saved baseline before rerunning migration tests
+make baseline-reset
+```
+
+PowerShell equivalents:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/create-v2-baseline-snapshot.ps1
+powershell -ExecutionPolicy Bypass -File scripts/reset-v2-from-baseline.ps1 -Force
+```
+
+Why this is preferred in dev:
+
+- `customer` migration depends on `users.v1_user_id`, mapping state, and the immutable `point_ledger`
+- `redeem_history` writes into `reward_reservations`, which is also a live V2 table
+- resetting the full V2 baseline avoids stale mapping rows and partial cleanup bugs
+
+See [docs/dev-migration-reset.md](docs/dev-migration-reset.md) for the recommended workflow.
+
 ## Project Structure
 
 ```

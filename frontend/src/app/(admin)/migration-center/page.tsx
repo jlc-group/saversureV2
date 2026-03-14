@@ -301,6 +301,16 @@ export default function MigrationCenterPage() {
             <h2 className="text-[18px] font-medium text-[var(--md-on-surface)]">Create Migration Job</h2>
             <p className="text-[13px] text-[var(--md-on-surface-variant)] mt-1">Dry Run เป็นค่าเริ่มต้น เพื่อเช็ค source, mapping, blockers และ estimated rows ก่อน execute จริง</p>
 
+            <div className="mt-4 rounded-[var(--md-radius-lg)] border border-[var(--md-outline-variant)] bg-[var(--md-surface-container)] px-4 py-4">
+              <p className="text-[13px] font-medium text-[var(--md-on-surface)]">Recommended dev flow</p>
+              <div className="mt-2 space-y-1 text-[12px] text-[var(--md-on-surface-variant)]">
+                <p>1. reset V2 จาก baseline ก่อน rerun ด้วย `scripts/reset-v2-from-baseline.ps1`</p>
+                <p>2. ตรวจว่า Source Connection ชี้ไปที่ `saversure_v1_backup`</p>
+                <p>3. รัน Dry Run ก่อนทุกครั้ง แล้วค่อย Execute</p>
+                <p>4. อย่าลบข้อมูลปลายทางราย table ด้วยมือ โดยเฉพาะ customer และ redeem history</p>
+              </div>
+            </div>
+
             <div className="mt-5 grid grid-cols-1 gap-3">
               {moduleOptions.map((item) => {
                 const selected = selectedModules.includes(item.key);
@@ -359,6 +369,9 @@ export default function MigrationCenterPage() {
                   onChange={(e) => setChunkSize(Number(e.target.value || 1000))}
                   className="w-full h-[40px] rounded-[var(--md-radius-sm)] border border-[var(--md-outline)] px-3 text-[14px] bg-transparent outline-none focus:border-[var(--md-primary)]"
                 />
+                <p className="mt-2 text-[12px] text-[var(--md-on-surface-variant)]">
+                  ตอนนี้ช่วยเรื่อง planning/progress มากกว่าความเร็วจริง หากจะ rerun บ่อยใน dev ให้ reset baseline ก่อนจะคุ้มกว่า
+                </p>
               </div>
             </div>
 
@@ -385,6 +398,10 @@ export default function MigrationCenterPage() {
               >
                 {submitting ? "กำลังสร้าง job..." : mode === "dry_run" ? "Run Dry Run" : "Run Migration"}
               </button>
+            </div>
+
+            <div className="mt-4 rounded-[var(--md-radius-lg)] bg-[#fff8e1] px-4 py-3 text-[12px] text-[#ef6c00]">
+              ถ้าชุดข้อมูลใหญ่โดยเฉพาะ `scan_history` ยังช้า หลัง reset flow ลงตัวแล้วค่อยปรับเป็น batch insert จะได้ผลกว่าการเพิ่ม delete-then-reimport ทุก module
             </div>
           </section>
 

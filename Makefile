@@ -1,4 +1,4 @@
-.PHONY: dev build migrate-up migrate-down docker-up docker-down test clean
+.PHONY: dev build migrate-up migrate-down docker-up docker-down test clean baseline-snapshot baseline-reset
 
 # Development
 dev:
@@ -25,6 +25,13 @@ docker-down:
 # Test
 test:
 	cd backend && go test ./... -v
+
+# Dev migration reset helpers
+baseline-snapshot:
+	powershell -ExecutionPolicy Bypass -File scripts/create-v2-baseline-snapshot.ps1
+
+baseline-reset:
+	powershell -ExecutionPolicy Bypass -File scripts/reset-v2-from-baseline.ps1 -Force
 
 # Clean
 clean:

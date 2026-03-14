@@ -565,7 +565,7 @@ func (s *Service) finishModule(ctx context.Context, jobID, moduleName, status st
 	_, err := s.db.Exec(ctx,
 		`UPDATE migration_job_modules
 		 SET status = $3,
-		     current_step = CASE WHEN $3 = 'completed' THEN 'completed' ELSE current_step END,
+		     current_step = $3,
 		     estimated_count = $4,
 		     processed_count = $5,
 		     success_count = $6,
