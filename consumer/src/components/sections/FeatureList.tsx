@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface FeatureItem {
@@ -19,7 +20,7 @@ const defaultIcon = (
   </svg>
 );
 
-const featureIcons: Record<string, JSX.Element> = {
+const featureIcons: Record<string, React.ReactElement> = {
   shield: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5">
       <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0 1 12 2.944a11.955 11.955 0 0 1-8.618 3.04A12.02 12.02 0 0 0 3 12c0 4.97 3.022 9.078 7.262 10.672.396.149.833.149 1.229 0C16.978 21.078 21 16.97 21 12c0-1.065-.138-2.098-.382-3.016z" />

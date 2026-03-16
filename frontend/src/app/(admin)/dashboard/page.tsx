@@ -69,13 +69,13 @@ export default function DashboardPage() {
     const fetchAll = async () => {
       try {
         const [sum, chart, funnelRes, activityRes] = await Promise.all([
-          api.get<Summary>("/api/v1/dashboard/summary"),
-          api.get<{ data: ScanChartPoint[] }>("/api/v1/dashboard/scan-chart?group_by=day"),
+          api.get<Summary>("/api/v1/dashboard/summary").catch(() => null),
+          api.get<{ data: ScanChartPoint[] }>("/api/v1/dashboard/scan-chart?group_by=day").catch(() => null),
           api.get<FunnelData>("/api/v1/dashboard/funnel").catch(() => null),
-          api.get<{ data: ActivityItem[] }>("/api/v1/dashboard/recent-activity?limit=10").catch(() => ({ data: [] })),
+          api.get<{ data: ActivityItem[] }>("/api/v1/dashboard/recent-activity?limit=10").catch(() => ({ data: [] as ActivityItem[] })),
         ]);
-        if (sum && typeof sum.campaigns === "number") setSummary(sum);
-        if (chart?.data) setChartData(chart.data);
+        if (sum && typeof sum === "object" && "campaigns" in sum) setSummary(sum);
+        if (chart && chart.data) setChartData(chart.data);
         if (funnelRes) setFunnel(funnelRes);
         if (activityRes?.data) setActivity(activityRes.data);
       } catch {

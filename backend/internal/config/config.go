@@ -4,22 +4,24 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
 type Config struct {
-	App       AppConfig
-	DB        DBConfig
-	LegacyV1  DBConfig
-	Redis     RedisConfig
-	NATS      NATSConfig
-	JWT       JWTConfig
-	MinIO     MinIOConfig
-	SMS       SMSConfig
-	HMAC      HMACConfig
-	RateLimit RateLimitConfig
-	LINE      LINEConfig
-	Google    GoogleConfig
+	App         AppConfig
+	DB          DBConfig
+	LegacyV1    DBConfig
+	Redis       RedisConfig
+	NATS        NATSConfig
+	JWT         JWTConfig
+	MinIO       MinIOConfig
+	SMS         SMSConfig
+	HMAC        HMACConfig
+	RateLimit   RateLimitConfig
+	LINE        LINEConfig
+	Google      GoogleConfig
+	CORSOrigins []string
 }
 
 type LINEConfig struct {
@@ -176,6 +178,15 @@ func Load() (*Config, error) {
 			ClientID:     getEnv("GOOGLE_CLIENT_ID", ""),
 			GeminiAPIKey: getEnv("GEMINI_API_KEY", ""),
 		},
+	}
+
+	// Parse CORS origins (comma-separated)
+	if origins := getEnv("CORS_ORIGINS", ""); origins != "" {
+		for _, o := range strings.Split(origins, ",") {
+			if trimmed := strings.TrimSpace(o); trimmed != "" {
+				cfg.CORSOrigins = append(cfg.CORSOrigins, trimmed)
+			}
+		}
 	}
 
 	if cfg.DB.Password == "" {

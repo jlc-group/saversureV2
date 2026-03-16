@@ -23,8 +23,10 @@ export default function PageRenderer({
 }: PageRendererProps) {
   const [sections, setSections] = useState<SectionDefinition[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
+    setError(false);
     api
       .get<PageConfigResponse>(
         `/api/v1/public/page-config/${encodeURIComponent(pageSlug)}`,
@@ -34,7 +36,9 @@ export default function PageRenderer({
           setSections(res.sections);
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        setError(true);
+      })
       .finally(() => setLoading(false));
   }, [pageSlug]);
 
@@ -46,7 +50,7 @@ export default function PageRenderer({
     );
   }
 
-  if (!sections || sections.length === 0) {
+  if (error || !sections || sections.length === 0) {
     return <>{fallback}</>;
   }
 

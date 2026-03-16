@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import DOMPurify from "dompurify";
 import { api } from "@/lib/api";
 
 interface PopupData {
@@ -112,7 +113,7 @@ export default function PopupRenderer() {
           {popup.content && (
             <div
               className="mt-2 text-sm text-gray-600 leading-relaxed [&_h3]:text-base [&_h3]:font-bold [&_h3]:text-gray-900 [&_b]:font-bold [&_p]:mt-1"
-              dangerouslySetInnerHTML={{ __html: popup.content }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(popup.content) }}
             />
           )}
           <div className="mt-4 flex gap-2">

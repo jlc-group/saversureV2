@@ -637,14 +637,24 @@ func (s *Service) SampleCodes(ctx context.Context, tenantID, rollID string, coun
 	return records, nil
 }
 
+var validSettingsTables = map[string]bool{
+	"tenants":   true,
+	"campaigns": true,
+}
+
 func (s *Service) fetchSettings(ctx context.Context, table, id string) map[string]any {
+	if !validSettingsTables[table] {
+		return nil
+	}
 	var raw []byte
 	err := s.db.QueryRow(ctx, fmt.Sprintf(`SELECT COALESCE(settings, '{}'::jsonb)::text FROM %s WHERE id = $1`, table), id).Scan(&raw)
 	if err != nil {
 		return nil
 	}
 	var m map[string]any
-	json.Unmarshal(raw, &m)
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return nil
+	}
 	return m
 }
 
@@ -658,6 +668,8 @@ func (s *Service) fetchCampaignSettings(ctx context.Context, campaignID, tenantI
 		return nil
 	}
 	var m map[string]any
-	json.Unmarshal(raw, &m)
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return nil
+	}
 	return m
 }

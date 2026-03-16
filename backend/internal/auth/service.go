@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -259,7 +260,9 @@ func (s *Service) LoginByPhone(ctx context.Context, tenantID, phone, password st
 		return nil, ErrInvalidCredentials
 	}
 
-	s.db.Exec(ctx, `UPDATE users SET last_login_at = NOW() WHERE id = $1`, userID)
+	if _, err := s.db.Exec(ctx, `UPDATE users SET last_login_at = NOW() WHERE id = $1`, userID); err != nil {
+		slog.Error("failed to update last_login_at", "error", err, "user_id", userID)
+	}
 
 	tokens, err := s.generateTokenPair(userID, resolvedTenantID, role, factoryID)
 	if err != nil {
@@ -291,7 +294,9 @@ func (s *Service) Login(ctx context.Context, input LoginInput) (*TokenPair, erro
 		return nil, ErrInvalidCredentials
 	}
 
-	s.db.Exec(ctx, `UPDATE users SET last_login_at = NOW() WHERE id = $1`, userID)
+	if _, err := s.db.Exec(ctx, `UPDATE users SET last_login_at = NOW() WHERE id = $1`, userID); err != nil {
+		slog.Error("failed to update last_login_at", "error", err, "user_id", userID)
+	}
 
 	tokens, err := s.generateTokenPair(userID, tenantID, role, factoryID)
 	if err != nil {

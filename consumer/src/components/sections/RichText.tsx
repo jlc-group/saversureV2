@@ -1,5 +1,6 @@
 "use client";
 
+import DOMPurify from "dompurify";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface RichTextProps {
@@ -31,7 +32,7 @@ export default function RichText({
           )}
           <div
             className="prose prose-sm max-w-none text-foreground/80"
-            dangerouslySetInnerHTML={{ __html: content }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }}
           />
         </CardContent>
       </Card>

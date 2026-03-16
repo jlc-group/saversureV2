@@ -407,9 +407,15 @@ func (s *Service) Confirm(ctx context.Context, tenantID, userID, reservationID s
 
 	if time.Now().After(r.ExpiresAt) {
 		// Expired: release the reservation
-		s.inventorySvc.ReleaseReservation(ctx, tx, r.RewardID)
-		tx.Exec(ctx, `UPDATE reward_reservations SET status = 'EXPIRED' WHERE id = $1`, r.ID)
-		tx.Commit(ctx)
+		if err := s.inventorySvc.ReleaseReservation(ctx, tx, r.RewardID); err != nil {
+			return nil, fmt.Errorf("release expired reservation inventory: %w", err)
+		}
+		if _, err := tx.Exec(ctx, `UPDATE reward_reservations SET status = 'EXPIRED' WHERE id = $1`, r.ID); err != nil {
+			return nil, fmt.Errorf("mark reservation expired: %w", err)
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return nil, fmt.Errorf("commit expired reservation: %w", err)
+		}
 		return nil, ErrReservationExpired
 	}
 

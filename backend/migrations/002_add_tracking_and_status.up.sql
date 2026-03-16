@@ -21,5 +21,5 @@ CREATE INDEX IF NOT EXISTS idx_users_tenant_status ON users(tenant_id, status);
 
 -- Scans table for scan history (if not already using codes table)
 -- codes table already has what we need, just add indexes
-CREATE INDEX IF NOT EXISTS idx_codes_created ON codes(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_codes_scanned_at ON codes(scanned_at DESC);
 CREATE INDEX IF NOT EXISTS idx_codes_scanned_by ON codes(scanned_by) WHERE scanned_by IS NOT NULL;

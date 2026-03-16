@@ -236,7 +236,7 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(mw.RequestLogger())
-	r.Use(mw.CORS())
+	r.Use(mw.CORS(cfg.CORSOrigins))
 
 	// Health check
 	r.GET("/health", func(c *gin.Context) {
@@ -819,8 +819,9 @@ func main() {
 		}
 	}
 
-	// Public APIs (consumer-facing — no role restriction)
-	publicRoutes := tenanted.Group("/public")
+	// Public APIs (consumer-facing — no auth, tenant from header)
+	publicRoutes := api.Group("/public")
+	publicRoutes.Use(mw.TenantFromHeader())
 	{
 		publicRoutes.GET("/rewards", rewardHandler.ListPublic)
 		publicRoutes.GET("/rewards/:id", rewardHandler.GetDetail)
