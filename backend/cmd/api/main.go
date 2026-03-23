@@ -793,26 +793,29 @@ func main() {
 		platformAdminRoutes.GET("/users/:id", platformHandler.GetPlatformUser)
 	}
 
-	// File Upload (requires MinIO)
+	// File Upload (requires MinIO, rate limited)
 	if uploadHandler != nil {
 		uploadRoutes := tenanted.Group("/upload")
 		uploadRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+		uploadRoutes.Use(mw.RateLimit(rdb, "upload", cfg.RateLimit.Upload, time.Minute))
 		{
 			uploadRoutes.POST("/file", uploadHandler.UploadFile)
 		}
 		// factory_user สามารถ upload รูปหลักฐานได้
 		uploadImageRoute := tenanted.Group("/upload")
 		uploadImageRoute.Use(mw.RequireRole("super_admin", "brand_admin", "factory_user"))
+		uploadImageRoute.Use(mw.RateLimit(rdb, "upload", cfg.RateLimit.Upload, time.Minute))
 		{
 			uploadImageRoute.POST("/image", uploadHandler.UploadImage)
 			uploadImageRoute.POST("/ai-generate", uploadHandler.AIGenerateImage)
 		}
 	}
 
-	// Export Management
+	// Export Management (rate limited)
 	if exportHandler != nil {
 		exportRoutes := tenanted.Group("/exports")
 		exportRoutes.Use(mw.RequireRole("super_admin", "brand_admin", "factory_user"))
+		exportRoutes.Use(mw.RateLimit(rdb, "export", cfg.RateLimit.Export, time.Minute))
 		{
 			exportRoutes.POST("", exportHandler.Create)
 			exportRoutes.GET("", exportHandler.List)
@@ -831,6 +834,7 @@ func main() {
 		publicRoutes.GET("/lucky-draw/:id/winners", luckyDrawHandler.GetWinners)
 		publicRoutes.GET("/donations", donationHandler.ListActive)
 		publicRoutes.GET("/missions", gamifyHandler.ListActiveMissions)
+		publicRoutes.GET("/missions/:id", gamifyHandler.GetMission)
 		publicRoutes.GET("/leaderboard", gamifyHandler.GetLeaderboard)
 		publicRoutes.GET("/badges", gamifyHandler.ListBadges)
 		publicRoutes.GET("/tiers", tierHandler.List)

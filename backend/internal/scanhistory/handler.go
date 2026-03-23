@@ -6,6 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"saversure/internal/apperror"
 )
 
 type Handler struct {
@@ -30,7 +32,7 @@ func (h *Handler) List(c *gin.Context) {
 	if codeID != "" {
 		entries, err := h.svc.ListByCodeID(c.Request.Context(), tenantID, codeID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			apperror.Respond(c, err)
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"data": entries, "total": len(entries)})
@@ -48,7 +50,7 @@ func (h *Handler) List(c *gin.Context) {
 		Offset:   offset,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": entries, "total": total})
@@ -60,7 +62,7 @@ func (h *Handler) GetAlerts(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	list, err := h.svc.ListSuspicious(c.Request.Context(), tenantID, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": list})
@@ -79,7 +81,7 @@ func (h *Handler) GetMyScans(c *gin.Context) {
 
 	entries, total, err := h.svc.ListByUser(c.Request.Context(), tenantID, userID, limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": entries, "total": total})

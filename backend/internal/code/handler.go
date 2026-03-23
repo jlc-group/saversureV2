@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+
+	"saversure/internal/apperror"
 )
 
 type Handler struct {
@@ -25,7 +27,7 @@ func (h *Handler) Lookup(c *gin.Context) {
 	}
 	result, err := h.svc.Lookup(c.Request.Context(), c.GetString("tenant_id"), code)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "lookup_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, result)
@@ -55,7 +57,7 @@ func (h *Handler) ResolveRef1(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not_found", "message": "Code not found"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "resolve_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, result)
@@ -116,7 +118,7 @@ func (h *Handler) ResolveRedirectV2(c *gin.Context) {
 func (h *Handler) Scan(c *gin.Context) {
 	var input ScanInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 	if input.Code == "" && input.Ref1 == "" {
@@ -163,7 +165,7 @@ func (h *Handler) Scan(c *gin.Context) {
 		case errors.Is(err, ErrProfileIncomplete):
 			c.JSON(http.StatusForbidden, gin.H{"error": "profile_incomplete", "message": "กรุณาลงทะเบียนสมาชิกก่อน"})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "scan_failed", "message": err.Error()})
+			apperror.Respond(c, err)
 		}
 		return
 	}

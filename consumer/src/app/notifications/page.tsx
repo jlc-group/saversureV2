@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { isLoggedIn } from "@/lib/auth";
 import BottomNav from "@/components/BottomNav";
+import Navbar from "@/components/Navbar";
 import Link from "next/link";
 
 interface Notification {
@@ -132,6 +133,7 @@ export default function NotificationsPage() {
   if (!loggedIn) {
     return (
       <div className="pb-20">
+        <Navbar />
         <div className="bg-white sticky top-0 z-10 border-b border-[var(--outline-variant)]">
           <div className="max-w-[480px] mx-auto flex items-center h-14 px-4">
             <Link href="/" className="text-[var(--on-surface)]">
@@ -158,6 +160,7 @@ export default function NotificationsPage() {
 
   return (
     <div className="pb-20">
+      <Navbar />
       <div className="bg-white sticky top-0 z-10 border-b border-[var(--outline-variant)]">
         <div className="max-w-[480px] mx-auto flex items-center justify-between h-14 px-4">
           <div className="flex items-center gap-3">

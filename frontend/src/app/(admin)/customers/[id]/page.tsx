@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import toast from "react-hot-toast";
 import { api } from "@/lib/api";
 
 interface CustomerDetail {
@@ -138,7 +139,7 @@ export default function CustomerDetailPage() {
     e.preventDefault();
     const amount = parseInt(refundAmount, 10);
     if (!amount || amount <= 0) {
-      alert("กรุณาระบุจำนวน points ที่ถูกต้อง");
+      toast.error("กรุณาระบุจำนวน points ที่ถูกต้อง");
       return;
     }
     setRefundSubmitting(true);
@@ -155,7 +156,7 @@ export default function CustomerDetailPage() {
       setData(res);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Refund failed";
-      alert(msg);
+      toast.error(msg);
     } finally {
       setRefundSubmitting(false);
     }
@@ -182,14 +183,14 @@ export default function CustomerDetailPage() {
     setActionSubmitting(true);
     try {
       await api.post(`/api/v1/customers/${id}/transfer-line`, { from_user_id: selectedUser.id });
-      alert("ย้าย LINE สำเร็จ");
+      toast.success("ย้าย LINE สำเร็จ");
       setTransferModal(false);
       setSelectedUser(null);
       setSearchQuery("");
       const res = await api.get<CustomerDetail>(`/api/v1/customers/${id}/detail`);
       setData(res);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Transfer failed");
+      toast.error(err instanceof Error ? err.message : "Transfer failed");
     } finally {
       setActionSubmitting(false);
     }
@@ -201,14 +202,14 @@ export default function CustomerDetailPage() {
     setActionSubmitting(true);
     try {
       await api.post("/api/v1/customers/merge", { keep_user_id: id, remove_user_id: selectedUser.id });
-      alert("Merge สำเร็จ");
+      toast.success("Merge สำเร็จ");
       setMergeModal(false);
       setSelectedUser(null);
       setSearchQuery("");
       const res = await api.get<CustomerDetail>(`/api/v1/customers/${id}/detail`);
       setData(res);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Merge failed");
+      toast.error(err instanceof Error ? err.message : "Merge failed");
     } finally {
       setActionSubmitting(false);
     }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout, getUser } from "@/lib/auth";
@@ -380,18 +380,13 @@ const STORAGE_KEY = "sidebar_collapsed";
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const [user, setUser] = useState<ReturnType<typeof getUser>>(null);
-  const [collapsed, setCollapsed] = useState(false);
+  const [user] = useState<ReturnType<typeof getUser>>(() => getUser());
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try { return localStorage.getItem(STORAGE_KEY) === "true"; } catch { return false; }
+  });
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const { tenants, activeTenant, isSuperAdmin, switchTenant } = useTenantContext();
-
-  useEffect(() => {
-    setUser(getUser());
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved === "true") setCollapsed(true);
-    } catch { /* SSR safe */ }
-  }, []);
 
   const toggleCollapse = () => {
     const next = !collapsed;

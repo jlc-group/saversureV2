@@ -63,6 +63,19 @@ backend/api_out.txt
 backend/api.exe~
 frontend/dev_err.txt
 frontend/dev_out.txt
+*.log
+server.log
+backend/server.log
 
 # Large SQL dumps (V1 backup data)
 backup/*.sql
+
+# Local dev scripts
+start_server.ps1
+test_api.ps1
+
+# Claude / AI config (local)
+.claude/
+
+# Local task planning
+tasks/

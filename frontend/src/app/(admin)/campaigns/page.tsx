@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import { api } from "@/lib/api";
+import { ImageUpload } from "@/components/ui/image-upload";
 
 interface Campaign {
   id: string;
   name: string;
   description?: string;
   type: string;
+  image_url?: string | null;
   status: string;
   start_date: string | null;
   end_date: string | null;
@@ -28,9 +31,20 @@ export default function CampaignsPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", description: "", type: "loyalty" });
+  const [form, setForm] = useState({ name: "", description: "", type: "loyalty", image_url: "" });
   const [submitting, setSubmitting] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  const filteredCampaigns = campaigns.filter((c) => {
+    const matchesSearch =
+      !search ||
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      (c.description || "").toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = statusFilter === "all" || c.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   const fetchCampaigns = async () => {
     try {
@@ -56,10 +70,10 @@ export default function CampaignsPage() {
       }
       setShowForm(false);
       setEditingId(null);
-      setForm({ name: "", description: "", type: "loyalty" });
+      setForm({ name: "", description: "", type: "loyalty", image_url: "" });
       fetchCampaigns();
     } catch {
-      alert("Failed to save campaign");
+      toast.error("Failed to save campaign");
     } finally {
       setSubmitting(false);
     }
@@ -72,7 +86,7 @@ export default function CampaignsPage() {
       await api.post(`/api/v1/campaigns/${id}/publish`, {});
       fetchCampaigns();
     } catch {
-      alert("Failed to publish campaign");
+      toast.error("Failed to publish campaign");
     } finally {
       setActionId(null);
     }
@@ -80,14 +94,14 @@ export default function CampaignsPage() {
 
   const handleEdit = (c: Campaign) => {
     setEditingId(c.id);
-    setForm({ name: c.name, description: c.description || "", type: c.type });
+    setForm({ name: c.name, description: c.description || "", type: c.type, image_url: c.image_url || "" });
     setShowForm(true);
   };
 
   const cancelForm = () => {
     setShowForm(false);
     setEditingId(null);
-    setForm({ name: "", description: "", type: "loyalty" });
+    setForm({ name: "", description: "", type: "loyalty", image_url: "" });
   };
 
   const fieldClass = `
@@ -118,6 +132,33 @@ export default function CampaignsPage() {
         </button>
       </div>
 
+      {/* Search & Filter */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6">
+        <div className="relative flex-1">
+          <svg viewBox="0 0 24 24" fill="currentColor" className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-[var(--md-on-surface-variant)] opacity-60">
+            <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+          </svg>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="ค้นหาแคมเปญ..."
+            className={`${fieldClass} !pl-10`}
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className={`${fieldClass} w-full sm:w-[180px]`}
+        >
+          <option value="all">All</option>
+          <option value="draft">Draft</option>
+          <option value="active">Active</option>
+          <option value="paused">Paused</option>
+          <option value="ended">Ended</option>
+        </select>
+      </div>
+
       {/* Create/Edit form */}
       {showForm && (
         <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 p-6 mb-6">
@@ -143,6 +184,13 @@ export default function CampaignsPage() {
               <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5 tracking-[0.4px] uppercase">Description</label>
               <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} className="w-full px-4 py-3 border border-[var(--md-outline)] rounded-[var(--md-radius-sm)] text-[14px] text-[var(--md-on-surface)] bg-transparent outline-none resize-none focus:border-[var(--md-primary)] focus:border-2 transition-all duration-200" />
             </div>
+            <div>
+              <ImageUpload
+                value={form.image_url}
+                onChange={(url) => setForm({ ...form, image_url: url })}
+                label="รูปภาพแคมเปญ"
+              />
+            </div>
             <button type="submit" disabled={submitting} className="h-[40px] px-6 bg-[var(--md-primary)] text-white rounded-[var(--md-radius-xl)] text-[14px] font-medium tracking-[0.1px] hover:bg-[var(--md-primary-dark)] disabled:opacity-60 active:scale-[0.98] transition-all duration-200">
               {submitting ? "Saving..." : editingId ? "Save Changes" : "Create"}
             </button>
@@ -165,10 +213,10 @@ export default function CampaignsPage() {
           <tbody>
             {loading ? (
               <tr><td colSpan={5} className="px-6 py-12 text-center"><div className="inline-flex items-center gap-3 text-[var(--md-on-surface-variant)]"><svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Loading...</div></td></tr>
-            ) : campaigns.length === 0 ? (
-              <tr><td colSpan={5} className="px-6 py-12 text-center"><div className="text-[var(--md-on-surface-variant)]"><svg viewBox="0 0 24 24" fill="currentColor" className="w-12 h-12 mx-auto mb-3 opacity-30"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z" /></svg><p className="text-[14px]">No campaigns yet</p></div></td></tr>
+            ) : filteredCampaigns.length === 0 ? (
+              <tr><td colSpan={5} className="px-6 py-12 text-center"><div className="text-[var(--md-on-surface-variant)]"><svg viewBox="0 0 24 24" fill="currentColor" className="w-12 h-12 mx-auto mb-3 opacity-30"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z" /></svg><p className="text-[14px]">{campaigns.length === 0 ? "No campaigns yet" : "No matching campaigns"}</p></div></td></tr>
             ) : (
-              campaigns.map((c) => {
+              filteredCampaigns.map((c) => {
                 const s = statusStyle[c.status] || statusStyle.draft;
                 return (
                   <tr key={c.id} className="border-b border-[var(--md-outline-variant)] last:border-b-0 hover:bg-[var(--md-surface-dim)] transition-colors duration-150">

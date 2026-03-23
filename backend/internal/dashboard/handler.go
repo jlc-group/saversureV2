@@ -6,6 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"saversure/internal/apperror"
 )
 
 type Handler struct {
@@ -20,7 +22,7 @@ func (h *Handler) Summary(c *gin.Context) {
 	tenantID := c.GetString("tenant_id")
 	summary, err := h.svc.GetSummary(c.Request.Context(), tenantID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, summary)
@@ -38,7 +40,7 @@ func (h *Handler) ScanChart(c *gin.Context) {
 
 	data, err := h.svc.GetScanChart(c.Request.Context(), tenantID, groupBy, days)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": data, "group_by": groupBy})
@@ -50,7 +52,7 @@ func (h *Handler) TopProducts(c *gin.Context) {
 
 	products, err := h.svc.GetTopProducts(c.Request.Context(), tenantID, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": products})
@@ -60,7 +62,7 @@ func (h *Handler) ConversionFunnel(c *gin.Context) {
 	tenantID := c.GetString("tenant_id")
 	data, err := h.svc.GetConversionFunnel(c.Request.Context(), tenantID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, data)
@@ -70,7 +72,7 @@ func (h *Handler) GeoHeatmap(c *gin.Context) {
 	tenantID := c.GetString("tenant_id")
 	points, err := h.svc.GetGeoHeatmap(c.Request.Context(), tenantID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": points})
@@ -85,7 +87,7 @@ func (h *Handler) RecentActivity(c *gin.Context) {
 
 	activities, err := h.svc.GetRecentActivity(c.Request.Context(), tenantID, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": activities})

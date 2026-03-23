@@ -2,8 +2,11 @@ package inventory
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
+
+	"saversure/internal/apperror"
 )
 
 type Handler struct {
@@ -17,13 +20,13 @@ func NewHandler(svc *Service) *Handler {
 func (h *Handler) CreateReward(c *gin.Context) {
 	var input CreateRewardInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
 	reward, err := h.svc.CreateReward(c.Request.Context(), c.GetString("tenant_id"), input)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -31,19 +34,22 @@ func (h *Handler) CreateReward(c *gin.Context) {
 }
 
 func (h *Handler) List(c *gin.Context) {
-	rewards, err := h.svc.List(c.Request.Context(), c.GetString("tenant_id"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+
+	rewards, total, err := h.svc.List(c.Request.Context(), c.GetString("tenant_id"), limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error"})
+		apperror.Respond(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": rewards})
+	c.JSON(http.StatusOK, gin.H{"data": rewards, "total": total})
 }
 
 func (h *Handler) GetByID(c *gin.Context) {
 	reward, err := h.svc.GetByID(c.Request.Context(), c.GetString("tenant_id"), c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "not_found"})
+		apperror.RespondNotFound(c, "not_found")
 		return
 	}
 	c.JSON(http.StatusOK, reward)
@@ -52,13 +58,13 @@ func (h *Handler) GetByID(c *gin.Context) {
 func (h *Handler) UpdateReward(c *gin.Context) {
 	var input UpdateRewardInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
 	reward, err := h.svc.UpdateReward(c.Request.Context(), c.GetString("tenant_id"), c.Param("id"), input)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -68,13 +74,13 @@ func (h *Handler) UpdateReward(c *gin.Context) {
 func (h *Handler) UpdateInventory(c *gin.Context) {
 	var input UpdateInventoryInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
 	reward, err := h.svc.UpdateInventory(c.Request.Context(), c.GetString("tenant_id"), c.Param("id"), input)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 

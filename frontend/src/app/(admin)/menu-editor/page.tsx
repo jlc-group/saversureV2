@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { ImageUpload } from "@/components/ui/image-upload";
+import toast from "react-hot-toast";
 
 interface MenuItem {
   icon: string;
@@ -213,7 +214,7 @@ export default function MenuEditorPage() {
       setDirty(false);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Save failed");
+      toast.error(err instanceof Error ? err.message : "Save failed");
     } finally {
       setSaving(false);
     }

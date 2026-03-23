@@ -1,9 +1,14 @@
 package campaign
 
 import (
+	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
+
+	"saversure/internal/apperror"
 )
 
 type Handler struct {
@@ -17,13 +22,13 @@ func NewHandler(svc *Service) *Handler {
 func (h *Handler) Create(c *gin.Context) {
 	var input CreateInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
 	campaign, err := h.svc.Create(c.Request.Context(), c.GetString("tenant_id"), c.GetString("user_id"), input)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -31,19 +36,26 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) List(c *gin.Context) {
-	campaigns, err := h.svc.List(c.Request.Context(), c.GetString("tenant_id"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+
+	campaigns, total, err := h.svc.List(c.Request.Context(), c.GetString("tenant_id"), limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "detail": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": campaigns})
+	c.JSON(http.StatusOK, gin.H{"data": campaigns, "total": total})
 }
 
 func (h *Handler) GetByID(c *gin.Context) {
 	campaign, err := h.svc.GetByID(c.Request.Context(), c.GetString("tenant_id"), c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "not_found"})
+		if errors.Is(err, pgx.ErrNoRows) {
+			apperror.RespondNotFound(c, "campaign_not_found")
+			return
+		}
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -53,13 +65,13 @@ func (h *Handler) GetByID(c *gin.Context) {
 func (h *Handler) Update(c *gin.Context) {
 	var input UpdateInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
 	campaign, err := h.svc.Update(c.Request.Context(), c.GetString("tenant_id"), c.Param("id"), input)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -69,7 +81,7 @@ func (h *Handler) Update(c *gin.Context) {
 func (h *Handler) Publish(c *gin.Context) {
 	campaign, err := h.svc.Publish(c.Request.Context(), c.GetString("tenant_id"), c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot_publish", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 

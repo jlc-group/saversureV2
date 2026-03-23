@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useTenantContext } from "@/lib/tenant-context";
+import toast from "react-hot-toast";
 
 interface Tenant {
   id: string;
@@ -42,7 +43,7 @@ export default function TenantsPage() {
       const res = await api.get<{ data: Tenant[] }>("/api/v1/tenants");
       setTenants(res?.data || []);
     } catch {
-      alert("Failed to load tenants");
+      toast.error("Failed to load tenants");
     } finally {
       setLoading(false);
     }
@@ -67,7 +68,7 @@ export default function TenantsPage() {
       setCreateForm({ name: "", slug: "", shortcode: "" });
       fetchTenants();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to create tenant");
+      toast.error(err instanceof Error ? err.message : "Failed to create tenant");
     } finally {
       setSaving(false);
     }
@@ -86,7 +87,7 @@ export default function TenantsPage() {
       setEditDialog(null);
       fetchTenants();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to update tenant");
+      toast.error(err instanceof Error ? err.message : "Failed to update tenant");
     } finally {
       setSaving(false);
     }

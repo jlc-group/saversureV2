@@ -2,7 +2,7 @@
 
 export interface PendingScanContext {
   code: string;
-  source?: "qr" | "manual" | "line" | "email" | "google" | "register";
+  source?: "qr" | "manual" | "line" | "email" | "google" | "register" | "phone";
   created_at: number;
 }
 

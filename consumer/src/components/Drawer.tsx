@@ -18,7 +18,24 @@ interface DrawerMenuItem {
   icon: string;
   label: string;
   link: string;
-  visible: boolean;
+  visible?: boolean;
+}
+
+interface RawNavItem {
+  icon: string;
+  label: string;
+  link?: string;
+  path?: string;
+  visible?: boolean;
+}
+
+function normalizeNavItems(raw: RawNavItem[]): DrawerMenuItem[] {
+  return raw.map((item) => ({
+    icon: item.icon,
+    label: item.label,
+    link: item.link || item.path || "/",
+    visible: item.visible !== false,
+  }));
 }
 
 const FALLBACK_ITEMS: DrawerMenuItem[] = [
@@ -43,10 +60,12 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
 
   useEffect(() => {
     api
-      .get<{ items: DrawerMenuItem[] }>("/api/v1/public/nav-menu/drawer")
+      .get<{ items: RawNavItem[] }>("/api/v1/public/nav-menu/drawer")
       .then((d) => {
         if (d.items && d.items.length > 0) {
-          setMenuItems(d.items.filter((i) => i.visible));
+          const normalized = normalizeNavItems(d.items);
+          const visible = normalized.filter((i) => i.visible !== false);
+          if (visible.length > 0) setMenuItems(visible);
         }
       })
       .catch(() => {});
@@ -87,18 +106,20 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
           transform: open ? "translateX(0)" : "translateX(-100%)",
         }}
       >
-        {/* Header */}
-        <div className="bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-green-dark)_100%)] px-5 pb-5 pt-10 text-white relative overflow-hidden">
-          <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-white/10" />
+        {/* Header with animated gradient */}
+        <div className="bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-teal)_50%,var(--jh-green-dark)_100%)] bg-[length:200%_200%] animate-gradient px-5 pb-5 pt-10 text-white relative overflow-hidden">
+          <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-white/10 animate-float" />
+          <div className="absolute right-12 top-8 h-6 w-6 rounded-full bg-[var(--jh-yellow)]/20 animate-float-delay-1" />
+          <div className="absolute left-4 -bottom-2 h-10 w-10 rounded-full bg-white/5 animate-float-delay-2" />
           <div className="flex items-center gap-3 relative">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15 shadow-lg animate-bounce-in">
               {branding?.logo_url ? (
                 <img src={branding.logo_url} alt={brandName} className="h-7 w-7 object-contain" />
               ) : (
                 <span className="text-base font-bold">{brandName.slice(0, 1)}</span>
               )}
             </div>
-            <div>
+            <div className="animate-slide-up">
               <p className="text-base font-bold">{brandName}</p>
               <p className="text-[11px] text-white/60">Consumer Portal</p>
             </div>
@@ -106,13 +127,13 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
         </div>
 
         {/* User card */}
-        <div className="p-4">
+        <div className="p-4 animate-slide-up">
           <div
-            className="flex cursor-pointer items-center rounded-xl bg-secondary p-3.5"
+            className="flex cursor-pointer items-center rounded-xl bg-secondary p-3.5 transition-all hover:shadow-md active:scale-[0.98]"
             onClick={() => navigate("/profile")}
           >
-            <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-full bg-white">
-              <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-[var(--jh-green)]">
+            <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[var(--jh-green)] to-[var(--jh-lime)] shadow-md">
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-white">
                 <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
               </svg>
             </div>
@@ -123,7 +144,7 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
               {loggedIn ? (
                 <>
                   <div className="flex items-baseline gap-1 mt-0.5">
-                    <span className="text-xl font-bold text-[var(--jh-green)]">
+                    <span className="text-xl font-bold text-[var(--jh-green)] animate-shimmer">
                       {(primaryBalance?.balance ?? 0).toLocaleString()}
                     </span>
                     <span className="text-xs text-muted-foreground">
@@ -160,16 +181,26 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
         <Separator />
 
         {/* Menu — dynamically fetched */}
-        <div className="p-2">
-          {menuItems.map((item) => {
+        <div className="p-2 stagger-children">
+          {menuItems.map((item, idx) => {
             const renderIcon = getNavIcon(item.icon);
+            const iconColors = [
+              "text-[var(--jh-green)]",
+              "text-[var(--jh-teal)]",
+              "text-[var(--jh-orange)]",
+              "text-[var(--jh-purple)]",
+              "text-[var(--jh-pink)]",
+              "text-[var(--jh-green)]",
+              "text-[var(--jh-teal)]",
+              "text-[var(--jh-orange)]",
+            ];
             return (
               <button
                 key={item.link}
-                className="flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-left transition hover:bg-secondary active:bg-secondary"
+                className="flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-left transition-all hover:bg-secondary hover:translate-x-1 active:scale-[0.98]"
                 onClick={() => navigate(item.link)}
               >
-                <span className="text-[var(--jh-green)]">{renderIcon(false)}</span>
+                <span className={iconColors[idx % iconColors.length]}>{renderIcon(false)}</span>
                 <span className="text-sm font-medium text-foreground">{item.label}</span>
               </button>
             );
@@ -181,7 +212,7 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
             <Separator className="mx-4" />
             <div className="p-2">
               <button
-                className="flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-left text-destructive transition hover:bg-red-50"
+                className="flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-left text-red-400 transition-all hover:bg-red-50 hover:text-red-500"
                 onClick={handleLogout}
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5">

@@ -131,6 +131,25 @@ func (s *Service) ListMissions(ctx context.Context, tenantID string, activeOnly 
 	return items, nil
 }
 
+func (s *Service) GetMissionByID(ctx context.Context, tenantID, id string) (*Mission, error) {
+	var m Mission
+	err := s.db.QueryRow(ctx,
+		`SELECT id, tenant_id, title, description, image_url, type,
+		        condition::text, reward_type, reward_points, reward_badge_id,
+		        reward_currency, start_date::text, end_date::text, active,
+		        sort_order, created_at::text
+		 FROM missions WHERE id = $1 AND tenant_id = $2`,
+		id, tenantID,
+	).Scan(&m.ID, &m.TenantID, &m.Title, &m.Description, &m.ImageURL,
+		&m.Type, &m.Condition, &m.RewardType, &m.RewardPoints, &m.RewardBadgeID,
+		&m.RewardCurrency, &m.StartDate, &m.EndDate, &m.Active,
+		&m.SortOrder, &m.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("get mission: %w", err)
+	}
+	return &m, nil
+}
+
 func (s *Service) CreateMission(ctx context.Context, input CreateMissionInput) (*Mission, error) {
 	if input.Type == "" {
 		input.Type = "count"

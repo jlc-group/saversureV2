@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 import { api } from "@/lib/api";
 
 interface Customer {
@@ -68,7 +69,7 @@ export default function CustomersPage() {
     try {
       await api.patch(`/api/v1/customers/${id}`, { status });
       fetchData();
-    } catch { alert("Failed to update"); } finally { setActionId(null); }
+    } catch { toast.error("Failed to update"); } finally { setActionId(null); }
   };
 
   const totalPages = Math.max(1, Math.ceil(total / limit));

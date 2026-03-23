@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"saversure/internal/apperror"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -29,7 +31,7 @@ func (h *Handler) ReverseGeocode(c *gin.Context) {
 
 	result, err := h.svc.ReverseGeocode(lat, lng)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, result)
@@ -41,7 +43,7 @@ func (h *Handler) BackfillProvinces(c *gin.Context) {
 
 	updated, err := h.svc.BackfillProvinces(c.Request.Context(), tenantID, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"updated": updated})

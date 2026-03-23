@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import toast from "react-hot-toast";
 
 interface CodeExportConfig {
   ref1_length?: number;
@@ -62,7 +63,7 @@ export default function SettingsPage() {
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
-      alert(`Failed to load tenant settings: ${msg}`);
+      toast.error(`Failed to load tenant settings: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -88,7 +89,7 @@ export default function SettingsPage() {
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
-      alert(`Failed to save settings: ${msg}`);
+      toast.error(`Failed to save settings: ${msg}`);
     } finally {
       setSaving(false);
     }

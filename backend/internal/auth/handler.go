@@ -5,6 +5,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
+	"saversure/internal/apperror"
 )
 
 type Handler struct {
@@ -18,7 +20,7 @@ func NewHandler(svc *Service) *Handler {
 func (h *Handler) Register(c *gin.Context) {
 	var input RegisterInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
@@ -28,7 +30,7 @@ func (h *Handler) Register(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "user_exists", "message": "Email already registered"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error"})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -38,7 +40,7 @@ func (h *Handler) Register(c *gin.Context) {
 func (h *Handler) RegisterConsumer(c *gin.Context) {
 	var input ConsumerRegisterInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
@@ -48,7 +50,7 @@ func (h *Handler) RegisterConsumer(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "phone_exists", "message": "Phone number already registered"})
 			return
 		}
-		c.JSON(http.StatusBadRequest, gin.H{"error": "registration_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -62,7 +64,7 @@ func (h *Handler) LoginByPhone(c *gin.Context) {
 		Password string `json:"password" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
@@ -72,7 +74,7 @@ func (h *Handler) LoginByPhone(c *gin.Context) {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_credentials"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error"})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -82,7 +84,7 @@ func (h *Handler) LoginByPhone(c *gin.Context) {
 func (h *Handler) Login(c *gin.Context) {
 	var input LoginInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
@@ -92,7 +94,7 @@ func (h *Handler) Login(c *gin.Context) {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_credentials"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error"})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -102,7 +104,7 @@ func (h *Handler) Login(c *gin.Context) {
 func (h *Handler) RequestPasswordReset(c *gin.Context) {
 	var input PasswordResetRequestInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
@@ -112,7 +114,7 @@ func (h *Handler) RequestPasswordReset(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "user_not_found", "message": "ไม่พบบัญชีที่ตรงกับหมายเลขโทรศัพท์นี้"})
 			return
 		}
-		c.JSON(http.StatusBadRequest, gin.H{"error": "password_reset_request_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -122,7 +124,7 @@ func (h *Handler) RequestPasswordReset(c *gin.Context) {
 func (h *Handler) ResetPassword(c *gin.Context) {
 	var input PasswordResetInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
@@ -131,7 +133,7 @@ func (h *Handler) ResetPassword(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "user_not_found", "message": "ไม่พบบัญชีที่ต้องการเปลี่ยนรหัสผ่าน"})
 			return
 		}
-		c.JSON(http.StatusBadRequest, gin.H{"error": "password_reset_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -143,7 +145,7 @@ func (h *Handler) Refresh(c *gin.Context) {
 		RefreshToken string `json:"refresh_token" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
@@ -167,7 +169,7 @@ func (h *Handler) CompleteProfile(c *gin.Context) {
 
 	var input CompleteProfileInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
@@ -180,7 +182,7 @@ func (h *Handler) CompleteProfile(c *gin.Context) {
 			})
 			return
 		}
-		c.JSON(http.StatusBadRequest, gin.H{"error": "registration_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -197,7 +199,7 @@ func (h *Handler) GetPDPA(c *gin.Context) {
 
 	consents, err := h.svc.GetPDPAConsents(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error"})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -213,7 +215,7 @@ func (h *Handler) WithdrawPDPA(c *gin.Context) {
 	}
 
 	if err := h.svc.WithdrawPDPAConsent(c.Request.Context(), userID, c.ClientIP()); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error"})
+		apperror.Respond(c, err)
 		return
 	}
 

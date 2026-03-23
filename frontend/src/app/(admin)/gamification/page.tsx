@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import { api } from "@/lib/api";
 import { ImageUpload } from "@/components/ui/image-upload";
 
@@ -55,6 +56,7 @@ export default function GamificationPage() {
   const [missionForm, setMissionForm] = useState({
     title: "",
     description: "",
+    image_url: "",
     type: "count",
     condition: "{}",
     reward_type: "points",
@@ -111,6 +113,7 @@ export default function GamificationPage() {
       await api.post("/api/v1/missions", {
         title: missionForm.title,
         description: missionForm.description || null,
+        image_url: missionForm.image_url || null,
         type: missionForm.type,
         condition: missionForm.condition || "{}",
         reward_type: missionForm.reward_type,
@@ -123,6 +126,7 @@ export default function GamificationPage() {
       setMissionForm({
         title: "",
         description: "",
+        image_url: "",
         type: "count",
         condition: "{}",
         reward_type: "points",
@@ -133,7 +137,7 @@ export default function GamificationPage() {
       });
       fetchMissions();
     } catch {
-      alert("Failed to create mission");
+      toast.error("Failed to create mission");
     } finally {
       setSubmittingMission(false);
     }
@@ -145,7 +149,7 @@ export default function GamificationPage() {
       await api.patch(`/api/v1/missions/${id}`, { active: !active });
       fetchMissions();
     } catch {
-      alert("Failed to update mission");
+      toast.error("Failed to update mission");
     } finally {
       setActionId(null);
     }
@@ -158,7 +162,7 @@ export default function GamificationPage() {
       await api.delete(`/api/v1/missions/${id}`);
       fetchMissions();
     } catch {
-      alert("Failed to delete mission");
+      toast.error("Failed to delete mission");
     } finally {
       setActionId(null);
     }
@@ -179,7 +183,7 @@ export default function GamificationPage() {
       setBadgeForm({ code: "", name: "", description: "", icon_url: "", rarity: "common" });
       fetchBadges();
     } catch {
-      alert("Failed to create badge");
+      toast.error("Failed to create badge");
     } finally {
       setSubmittingBadge(false);
     }
@@ -192,7 +196,7 @@ export default function GamificationPage() {
       await api.delete(`/api/v1/badges/${id}`);
       fetchBadges();
     } catch {
-      alert("Failed to delete badge");
+      toast.error("Failed to delete badge");
     } finally {
       setActionId(null);
     }
@@ -303,6 +307,13 @@ export default function GamificationPage() {
                       value={missionForm.description}
                       onChange={(e) => setMissionForm({ ...missionForm, description: e.target.value })}
                       className={fieldClass}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <ImageUpload
+                      value={missionForm.image_url}
+                      onChange={(url) => setMissionForm({ ...missionForm, image_url: url })}
+                      label="รูปภาพ Mission"
                     />
                   </div>
                   <div className="md:col-span-2">

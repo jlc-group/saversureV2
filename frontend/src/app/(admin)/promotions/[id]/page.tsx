@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import toast from "react-hot-toast";
 
 interface BonusRule {
   id?: string;
@@ -95,7 +96,7 @@ export default function PromotionDetailPage() {
       await api.post(`/api/v1/promotions/${promo.id}/${action}`, body || {});
       const updated = await api.get<Promotion>(`/api/v1/promotions/${promo.id}`);
       setPromo(updated);
-    } catch (err) { alert(err instanceof Error ? err.message : `Failed to ${action}`); }
+    } catch (err) { toast.error(err instanceof Error ? err.message : `Failed to ${action}`); }
   };
 
   if (loading) {

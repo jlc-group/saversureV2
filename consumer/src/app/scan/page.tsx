@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
+import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
 import { api, ApiError } from "@/lib/api";
 import { isLoggedIn, setToken } from "@/lib/auth";
@@ -268,6 +269,7 @@ function ScanPageInner() {
 
   return (
     <div className="pb-24 min-h-screen bg-background">
+      <Navbar />
       {/* Header */}
       <div className="bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-green-dark)_100%)] px-5 pt-10 pb-14 text-white relative overflow-hidden">
         <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/10" />
@@ -304,7 +306,7 @@ function ScanPageInner() {
           <CardContent className="p-5">
             <button
               onClick={openQrScanner}
-              className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl bg-[var(--jh-green)] text-[15px] font-semibold text-white transition active:scale-[0.98]"
+              className="flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-teal)_100%)] text-[16px] font-bold text-white shadow-lg transition active:scale-[0.96] animate-pulse-glow"
             >
               <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
                 <path d="M9.5 6.5v3h-3v-3h3M11 5H5v6h6V5zm-1.5 9.5v3h-3v-3h3M11 13H5v6h6v-6zm6.5-6.5v3h-3v-3h3M19 5h-6v6h6V5zm-6 8h1.5v1.5H13V13zm1.5 1.5H16V16h-1.5v-1.5zM16 13h1.5v1.5H16V13zm-3 3h1.5v1.5H13V16zm1.5 1.5H16V19h-1.5v-1.5zM16 16h1.5v1.5H16V16zm1.5-1.5H19V16h-1.5v-1.5zm0 3H19V19h-1.5v-1.5zM22 7h-2V4h-3V2h5v5zm0 15v-5h-2v3h-3v2h5zM2 22h5v-2H4v-3H2v5zM2 2v5h2V4h3V2H2z" />
@@ -332,7 +334,7 @@ function ScanPageInner() {
                 placeholder="กรอกรหัสที่นี่"
                 type="text"
                 spellCheck="false"
-                className="h-12 w-full rounded-xl border border-input bg-muted px-4 text-center text-[15px] font-bold tracking-[0.15em] outline-none transition focus:border-[var(--jh-green)] focus:bg-white focus:ring-2 focus:ring-[var(--jh-green)]/20"
+                className="h-12 w-full rounded-xl border border-input bg-muted px-4 text-center text-[15px] font-bold tracking-[0.15em] outline-none transition focus:border-[var(--jh-teal)] focus:bg-white focus:ring-2 focus:ring-[var(--jh-teal)]/30 focus:shadow-[0_0_15px_rgba(0,184,148,0.2)]"
               />
               <button
                 type="submit"
@@ -350,21 +352,38 @@ function ScanPageInner() {
       {(result || error) && (
         <div className="px-4 mt-3 space-y-2">
           {result && (
-            <Card className="border-green-200 bg-green-50 shadow-sm">
-              <CardContent className="p-4">
+            <Card className="border-0 shadow-lg overflow-hidden relative">
+              {/* Confetti */}
+              <div className="confetti-container">
+                {[
+                  { left: '10%', bg: 'var(--jh-orange)', delay: '0s', dur: '1.2s' },
+                  { left: '25%', bg: 'var(--jh-purple)', delay: '0.15s', dur: '1s' },
+                  { left: '40%', bg: 'var(--jh-pink)', delay: '0.3s', dur: '1.4s' },
+                  { left: '55%', bg: 'var(--jh-yellow)', delay: '0.1s', dur: '1.1s' },
+                  { left: '70%', bg: 'var(--jh-teal)', delay: '0.25s', dur: '1.3s' },
+                  { left: '85%', bg: 'var(--jh-green)', delay: '0.05s', dur: '1s' },
+                  { left: '15%', bg: 'var(--jh-gold)', delay: '0.35s', dur: '1.5s' },
+                  { left: '50%', bg: 'var(--jh-pink)', delay: '0.2s', dur: '1.2s' },
+                  { left: '65%', bg: 'var(--jh-orange)', delay: '0.4s', dur: '1.1s' },
+                  { left: '30%', bg: 'var(--jh-purple)', delay: '0.08s', dur: '1.3s' },
+                ].map((c, i) => (
+                  <div key={i} className="confetti-piece" style={{ left: c.left, background: c.bg, animationDelay: c.delay, animationDuration: c.dur }} />
+                ))}
+              </div>
+              <CardContent className="p-4 bg-[linear-gradient(135deg,#e8f5e9_0%,#f1f8e9_40%,#fffde7_100%)] relative z-10">
                 <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--jh-green)]">
-                    <svg viewBox="0 0 24 24" fill="white" className="w-5 h-5"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" /></svg>
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-teal)_100%)] shadow-md animate-scale-in">
+                    <svg viewBox="0 0 24 24" fill="white" className="w-6 h-6"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" /></svg>
                   </div>
                   <div className="flex-1 min-w-0">
                     {result.bonus_currency_amount != null && result.bonus_currency_amount > 0 && (
-                      <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700">
+                      <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700 animate-bounce-in">
                         <span>{result.bonus_currency_icon || getCurrencyIcon(result.bonus_currency, null)}</span>
                         <span>โบนัสพิเศษ</span>
                       </div>
                     )}
 
-                    <p className="text-lg font-bold text-[var(--jh-green)]">
+                    <p className="text-xl font-extrabold text-[var(--jh-green)] animate-count-up">
                       {result.total_points != null && result.total_points > 0
                         ? `+${result.total_points.toLocaleString()} แต้ม`
                         : result.points_earned != null && result.points_earned > 0
@@ -373,7 +392,7 @@ function ScanPageInner() {
                     </p>
 
                     {result.bonus_currency_amount != null && result.bonus_currency_amount > 0 ? (
-                      <p className="mt-1 text-sm font-semibold text-amber-700">
+                      <p className="mt-1 text-sm font-semibold text-amber-700 animate-bounce-in">
                         รับเพิ่ม {result.bonus_currency_icon || getCurrencyIcon(result.bonus_currency, null)}{" "}
                         {result.bonus_currency_amount.toLocaleString()}{" "}
                         {result.bonus_currency_name || result.bonus_currency}
@@ -382,10 +401,10 @@ function ScanPageInner() {
 
                     {result.bonus_points != null && result.bonus_points > 0 ? (
                       <div className="mt-2 flex flex-wrap gap-1.5">
-                        <span className="inline-flex items-center rounded-full bg-white px-2 py-1 text-[11px] font-medium text-[var(--jh-green)] ring-1 ring-green-100">
+                        <span className="inline-flex items-center rounded-full bg-white px-2 py-1 text-[11px] font-medium text-[var(--jh-green)] ring-1 ring-green-100 animate-bounce-in">
                           แต้มพื้นฐาน {result.points_earned?.toLocaleString() || 0}
                         </span>
-                        <span className="inline-flex items-center rounded-full bg-white px-2 py-1 text-[11px] font-medium text-emerald-700 ring-1 ring-emerald-100">
+                        <span className="inline-flex items-center rounded-full bg-white px-2 py-1 text-[11px] font-medium text-emerald-700 ring-1 ring-emerald-100 animate-bounce-in" style={{ animationDelay: '0.1s' }}>
                           โบนัสเพิ่ม {result.bonus_points.toLocaleString()}
                         </span>
                       </div>
@@ -429,7 +448,7 @@ function ScanPageInner() {
           )}
 
           {error && (
-            <Card className="border-red-200 bg-red-50 shadow-sm">
+            <Card className="border-red-200 bg-red-50 shadow-sm animate-shake">
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive">
@@ -481,14 +500,14 @@ function ScanPageInner() {
         <div className="px-4 mt-6">
           <p className="text-xs font-semibold text-muted-foreground mb-2 px-1">วิธีการสะสมแต้ม</p>
           <Card className="border-0 shadow-sm">
-            <CardContent className="p-4 space-y-3">
+            <CardContent className="p-4 space-y-3 stagger-children">
               {[
-                { num: "1", text: "หาคิวอาร์โค้ดบนฝาผลิตภัณฑ์ หรือในบรรจุภัณฑ์" },
-                { num: "2", text: "กดปุ่ม \"สแกนคิวอาร์โค้ด\" หรือพิมพ์รหัสด้วยตนเอง" },
-                { num: "3", text: "รับแต้มสะสมทันที! นำไปแลกของรางวัลได้" },
+                { num: "1", text: "หาคิวอาร์โค้ดบนฝาผลิตภัณฑ์ หรือในบรรจุภัณฑ์", color: "var(--jh-orange)" },
+                { num: "2", text: "กดปุ่ม \"สแกนคิวอาร์โค้ด\" หรือพิมพ์รหัสด้วยตนเอง", color: "var(--jh-purple)" },
+                { num: "3", text: "รับแต้มสะสมทันที! นำไปแลกของรางวัลได้", color: "var(--jh-teal)" },
               ].map((step) => (
-                <div key={step.num} className="flex items-start gap-3">
-                  <Badge className="mt-0.5 h-6 w-6 shrink-0 rounded-full bg-[var(--jh-green)] text-white flex items-center justify-center p-0 text-xs font-bold">
+                <div key={step.num} className="flex items-start gap-3 animate-slide-up">
+                  <Badge className="mt-0.5 h-6 w-6 shrink-0 rounded-full text-white flex items-center justify-center p-0 text-xs font-bold" style={{ backgroundColor: step.color }}>
                     {step.num}
                   </Badge>
                   <p className="text-[14px] text-foreground leading-relaxed">{step.text}</p>

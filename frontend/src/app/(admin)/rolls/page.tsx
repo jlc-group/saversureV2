@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
+import toast from "react-hot-toast";
 
 interface Roll {
   id: string;
@@ -262,14 +263,14 @@ function RollsPage() {
   const refresh = () => { fetchRolls(); fetchStats(); setSelectedIds(new Set()); setSelectedRollDetails([]); };
 
   const handlePrepareBatchExport = async () => {
-    if (!filterBatchId) return alert("กรุณาเลือก batch ก่อน");
+    if (!filterBatchId) { toast.error("กรุณาเลือก batch ก่อน"); return; }
     setSelectingAll(true);
     try {
       const params = buildRollParams({ limit: 5000, offset: 0 });
       const data = await api.get<{ data: Roll[]; total: number }>(`/api/v1/rolls?${params}`);
       const ids = new Set((data.data || []).map((r) => r.id));
       if (ids.size === 0) {
-        alert("ไม่พบ rolls ใน batch นี้");
+        toast("ไม่พบ rolls ใน batch นี้");
         return;
       }
       setSelectedIds(ids);
@@ -277,7 +278,7 @@ function RollsPage() {
       setExportForm({ factory_id: "", format: "zip", note: "" });
       setExportDialog(true);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to prepare batch export");
+      toast.error(e instanceof Error ? e.message : "Failed to prepare batch export");
     } finally {
       setSelectingAll(false);
     }
@@ -291,7 +292,7 @@ function RollsPage() {
       setSelectedIds(new Set((data.data || []).map((r) => r.id)));
       setSelectedRollDetails(data.data || []);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to select all matching rolls");
+      toast.error(e instanceof Error ? e.message : "Failed to select all matching rolls");
     } finally {
       setSelectingAll(false);
     }
@@ -335,7 +336,7 @@ function RollsPage() {
     try {
       await api.post("/api/v1/rolls/bulk-status", { roll_ids: ids, status: "printed" });
       refresh();
-    } catch { alert("Failed to update status"); }
+    } catch { toast.error("Failed to update status"); }
   };
 
   const handleMarkDistributed = async (ids: string[]) => {
@@ -343,7 +344,7 @@ function RollsPage() {
     try {
       await api.post("/api/v1/rolls/bulk-status", { roll_ids: ids, status: "distributed" });
       refresh();
-    } catch { alert("Failed to update status"); }
+    } catch { toast.error("Failed to update status"); }
   };
 
   const handleOpenMapDialog = (ids: string[], mode: "single" | "bulk") => {
@@ -352,9 +353,9 @@ function RollsPage() {
   };
 
   const handleSubmitMap = async () => {
-    if (!mapForm.product_id) return alert("กรุณาเลือกสินค้า");
-    if (!mapForm.factory_id) return alert("กรุณาเลือกโรงงานแปะสติ๊กเกอร์");
-    if (mapForm.evidence_urls.length === 0) return alert("กรุณาแนบรูปถ่ายอย่างน้อย 1 รูป");
+    if (!mapForm.product_id) { toast.error("กรุณาเลือกสินค้า"); return; }
+    if (!mapForm.factory_id) { toast.error("กรุณาเลือกโรงงานแปะสติ๊กเกอร์"); return; }
+    if (mapForm.evidence_urls.length === 0) { toast.error("กรุณาแนบรูปถ่ายอย่างน้อย 1 รูป"); return; }
     setSubmitting(true);
     try {
       const payload = {
@@ -374,7 +375,7 @@ function RollsPage() {
       setMapDialog(null);
       refresh();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to map product");
+      toast.error(e instanceof Error ? e.message : "Failed to map product");
     } finally { setSubmitting(false); }
   };
 
@@ -384,7 +385,7 @@ function RollsPage() {
       const result = await api.upload("/api/v1/upload/image", file, "file");
       setMapForm((prev) => ({ ...prev, evidence_urls: [...prev.evidence_urls, result.url] }));
     } catch {
-      alert("Failed to upload file");
+      toast.error("Failed to upload file");
     } finally { setUploading(false); }
   };
 
@@ -393,7 +394,7 @@ function RollsPage() {
     try {
       await api.post(`/api/v1/rolls/${id}/unmap`, {});
       refresh();
-    } catch { alert("Failed to unmap"); }
+    } catch { toast.error("Failed to unmap"); }
   };
 
   const handleOpenQcDialog = (roll: Roll) => {
@@ -407,7 +408,7 @@ function RollsPage() {
       const result = await api.upload("/api/v1/upload/image", file, "file");
       setQcForm((prev) => ({ ...prev, evidence_urls: [...prev.evidence_urls, result.url] }));
     } catch {
-      alert("Failed to upload file");
+      toast.error("Failed to upload file");
     } finally { setUploading(false); }
   };
 
@@ -422,7 +423,7 @@ function RollsPage() {
       setQcDialog(null);
       refresh();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "QC review failed");
+      toast.error(e instanceof Error ? e.message : "QC review failed");
     } finally { setSubmitting(false); }
   };
 
@@ -438,8 +439,8 @@ function RollsPage() {
     if (!ref2Dialog) return;
     const start = parseInt(ref2Form.actual_ref2_start);
     const end = parseInt(ref2Form.actual_ref2_end);
-    if (isNaN(start) || isNaN(end)) return alert("กรุณากรอกเลข ref2 ให้ครบ");
-    if (end < start) return alert("ref2 ท้ายม้วนต้อง >= ref2 ต้นม้วน");
+    if (isNaN(start) || isNaN(end)) { toast.error("กรุณากรอกเลข ref2 ให้ครบ"); return; }
+    if (end < start) { toast.error("ref2 ท้ายม้วนต้อง >= ref2 ต้นม้วน"); return; }
     setSubmitting(true);
     try {
       await api.post(`/api/v1/rolls/${ref2Dialog.id}/report-ref2`, {
@@ -449,14 +450,14 @@ function RollsPage() {
       setRef2Dialog(null);
       refresh();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Report ref2 failed");
+      toast.error(e instanceof Error ? e.message : "Report ref2 failed");
     } finally { setSubmitting(false); }
   };
 
   const handleExportToFactory = async () => {
     if (selectedIds.size === 0) return;
     if (!isSingleBatchSelection) {
-      alert("ไม่อนุญาตให้ export ข้าม batch กรุณาเลือกเฉพาะ rolls ที่อยู่ใน batch เดียวกัน");
+      toast.error("ไม่อนุญาตให้ export ข้าม batch กรุณาเลือกเฉพาะ rolls ที่อยู่ใน batch เดียวกัน");
       return;
     }
     setSubmitting(true);
@@ -474,7 +475,7 @@ function RollsPage() {
       fetchExportHistory();
       refresh();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Export failed");
+      toast.error(e instanceof Error ? e.message : "Export failed");
     } finally {
       setSubmitting(false);
     }
@@ -497,7 +498,7 @@ function RollsPage() {
       const data = await api.get<{ codes: { serial_number: number; code: string; ref1: string; ref2: string; url: string; lot_number: string }[] }>(`/api/v1/rolls/${roll.id}/sample-codes?count=10`);
       setQrPreview({ roll, codes: data.codes || [] });
     } catch {
-      alert("Failed to load QR codes");
+      toast.error("Failed to load QR codes");
       setQrPreview(null);
     } finally {
       setQrLoading(false);
@@ -505,7 +506,7 @@ function RollsPage() {
   };
 
   const handleAssignFactory = async () => {
-    if (!assignFactoryId) return alert("กรุณาเลือกโรงงาน");
+    if (!assignFactoryId) { toast.error("กรุณาเลือกโรงงาน"); return; }
     setSubmitting(true);
     try {
       if (assignDialog!.rollIds.length === 1) {
@@ -517,13 +518,13 @@ function RollsPage() {
       setAssignFactoryId("");
       refresh();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to assign");
+      toast.error(e instanceof Error ? e.message : "Failed to assign");
     } finally { setSubmitting(false); }
   };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    alert("Copied to clipboard!");
+    toast.success("Copied to clipboard!");
   };
 
   const toggleSelect = (id: string) => {

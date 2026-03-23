@@ -242,7 +242,7 @@ type DetailResult struct {
 func (s *Service) GetDetail(ctx context.Context, tenantID, customerID string) (*DetailResult, error) {
 	var profile DetailProfile
 	err := s.db.QueryRow(ctx,
-		`SELECT id, email, phone, COALESCE(display_name, ''), first_name, last_name,
+		`SELECT id, COALESCE(email, ''), phone, COALESCE(display_name, ''), first_name, last_name,
 		        birth_date::text, gender, avatar_url,
 		        province, occupation, COALESCE(customer_flag, 'green'),
 		        COALESCE(phone_verified, false), status,

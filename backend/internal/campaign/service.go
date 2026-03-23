@@ -23,6 +23,7 @@ type Campaign struct {
 	Name            string         `json:"name"`
 	Description     *string        `json:"description"`
 	Type            string         `json:"type"`
+	ImageURL        *string        `json:"image_url"`
 	StartDate       *time.Time     `json:"start_date"`
 	EndDate         *time.Time     `json:"end_date"`
 	TermsConditions *string        `json:"terms_conditions"`
@@ -36,6 +37,7 @@ type CreateInput struct {
 	Name            string         `json:"name" binding:"required"`
 	Description     string         `json:"description"`
 	Type            string         `json:"type" binding:"required"`
+	ImageURL        string         `json:"image_url"`
 	StartDate       *time.Time     `json:"start_date"`
 	EndDate         *time.Time     `json:"end_date"`
 	TermsConditions string         `json:"terms_conditions"`
@@ -45,6 +47,7 @@ type CreateInput struct {
 type UpdateInput struct {
 	Name            *string         `json:"name"`
 	Description     *string         `json:"description"`
+	ImageURL        *string         `json:"image_url"`
 	StartDate       *time.Time      `json:"start_date"`
 	EndDate         *time.Time      `json:"end_date"`
 	TermsConditions *string         `json:"terms_conditions"`
@@ -55,13 +58,13 @@ func (s *Service) Create(ctx context.Context, tenantID, userID string, input Cre
 	var c Campaign
 	var rawSettings string
 	err := s.db.QueryRow(ctx,
-		`INSERT INTO campaigns (tenant_id, name, description, type, start_date, end_date, terms_conditions, status, settings, created_by)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, 'draft', COALESCE($8::jsonb, '{}'::jsonb), $9)
-		 RETURNING id, tenant_id, name, description, type, start_date, end_date, terms_conditions, status,
+		`INSERT INTO campaigns (tenant_id, name, description, type, image_url, start_date, end_date, terms_conditions, status, settings, created_by)
+		 VALUES ($1, $2, $3, $4, NULLIF($5, ''), $6, $7, $8, 'draft', COALESCE($9::jsonb, '{}'::jsonb), $10)
+		 RETURNING id, tenant_id, name, description, type, image_url, start_date, end_date, terms_conditions, status,
 		           COALESCE(settings, '{}'::jsonb)::text, created_by, created_at::text`,
-		tenantID, input.Name, input.Description, input.Type, input.StartDate, input.EndDate,
+		tenantID, input.Name, input.Description, input.Type, input.ImageURL, input.StartDate, input.EndDate,
 		input.TermsConditions, input.Settings, userID,
-	).Scan(&c.ID, &c.TenantID, &c.Name, &c.Description, &c.Type, &c.StartDate, &c.EndDate,
+	).Scan(&c.ID, &c.TenantID, &c.Name, &c.Description, &c.Type, &c.ImageURL, &c.StartDate, &c.EndDate,
 		&c.TermsConditions, &c.Status, &rawSettings, &c.CreatedBy, &c.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("create campaign: %w", err)
@@ -72,13 +75,31 @@ func (s *Service) Create(ctx context.Context, tenantID, userID string, input Cre
 	return &c, nil
 }
 
-func (s *Service) List(ctx context.Context, tenantID string) ([]Campaign, error) {
-	rows, err := s.db.Query(ctx,
-		`SELECT id, tenant_id, name, description, type, start_date, end_date, terms_conditions, status,
-		        COALESCE(settings, '{}'::jsonb)::text, created_by, created_at::text
-		 FROM campaigns WHERE tenant_id = $1 ORDER BY created_at DESC`, tenantID)
+func (s *Service) List(ctx context.Context, tenantID string, limit, offset int) ([]Campaign, int64, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	var total int64
+	err := s.db.QueryRow(ctx,
+		`SELECT count(*) FROM campaigns WHERE tenant_id = $1`, tenantID,
+	).Scan(&total)
 	if err != nil {
-		return nil, fmt.Errorf("list campaigns: %w", err)
+		return nil, 0, fmt.Errorf("count campaigns: %w", err)
+	}
+
+	rows, err := s.db.Query(ctx,
+		`SELECT id, tenant_id, name, description, type, image_url, start_date, end_date, terms_conditions, status,
+		        COALESCE(settings, '{}'::jsonb)::text, created_by, created_at::text
+		 FROM campaigns WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`, tenantID, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list campaigns: %w", err)
 	}
 	defer rows.Close()
 
@@ -86,26 +107,26 @@ func (s *Service) List(ctx context.Context, tenantID string) ([]Campaign, error)
 	for rows.Next() {
 		var c Campaign
 		var rawSettings string
-		if err := rows.Scan(&c.ID, &c.TenantID, &c.Name, &c.Description, &c.Type, &c.StartDate, &c.EndDate,
+		if err := rows.Scan(&c.ID, &c.TenantID, &c.Name, &c.Description, &c.Type, &c.ImageURL, &c.StartDate, &c.EndDate,
 			&c.TermsConditions, &c.Status, &rawSettings, &c.CreatedBy, &c.CreatedAt); err != nil {
-			return nil, fmt.Errorf("scan campaign: %w", err)
+			return nil, 0, fmt.Errorf("scan campaign: %w", err)
 		}
 		if rawSettings != "" {
 			_ = json.Unmarshal([]byte(rawSettings), &c.Settings)
 		}
 		campaigns = append(campaigns, c)
 	}
-	return campaigns, nil
+	return campaigns, total, nil
 }
 
 func (s *Service) GetByID(ctx context.Context, tenantID, id string) (*Campaign, error) {
 	var c Campaign
 	var rawSettings string
 	err := s.db.QueryRow(ctx,
-		`SELECT id, tenant_id, name, description, type, start_date, end_date, terms_conditions, status,
+		`SELECT id, tenant_id, name, description, type, image_url, start_date, end_date, terms_conditions, status,
 		        COALESCE(settings, '{}'::jsonb)::text, created_by, created_at::text
 		 FROM campaigns WHERE id = $1 AND tenant_id = $2`, id, tenantID,
-	).Scan(&c.ID, &c.TenantID, &c.Name, &c.Description, &c.Type, &c.StartDate, &c.EndDate,
+	).Scan(&c.ID, &c.TenantID, &c.Name, &c.Description, &c.Type, &c.ImageURL, &c.StartDate, &c.EndDate,
 		&c.TermsConditions, &c.Status, &rawSettings, &c.CreatedBy, &c.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get campaign: %w", err)
@@ -123,17 +144,18 @@ func (s *Service) Update(ctx context.Context, tenantID, id string, input UpdateI
 		`UPDATE campaigns SET
 			name = COALESCE($3, name),
 			description = COALESCE($4, description),
-			start_date = COALESCE($5, start_date),
-			end_date = COALESCE($6, end_date),
-			terms_conditions = COALESCE($7, terms_conditions),
-			settings = COALESCE($8::jsonb, settings),
+			image_url = COALESCE($5, image_url),
+			start_date = COALESCE($6, start_date),
+			end_date = COALESCE($7, end_date),
+			terms_conditions = COALESCE($8, terms_conditions),
+			settings = COALESCE($9::jsonb, settings),
 			updated_at = NOW()
 		 WHERE id = $1 AND tenant_id = $2
-		 RETURNING id, tenant_id, name, description, type, start_date, end_date, terms_conditions, status,
+		 RETURNING id, tenant_id, name, description, type, image_url, start_date, end_date, terms_conditions, status,
 		           COALESCE(settings, '{}'::jsonb)::text, created_by, created_at::text`,
-		id, tenantID, input.Name, input.Description, input.StartDate, input.EndDate,
+		id, tenantID, input.Name, input.Description, input.ImageURL, input.StartDate, input.EndDate,
 		input.TermsConditions, input.Settings,
-	).Scan(&c.ID, &c.TenantID, &c.Name, &c.Description, &c.Type, &c.StartDate, &c.EndDate,
+	).Scan(&c.ID, &c.TenantID, &c.Name, &c.Description, &c.Type, &c.ImageURL, &c.StartDate, &c.EndDate,
 		&c.TermsConditions, &c.Status, &rawSettings, &c.CreatedBy, &c.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("update campaign: %w", err)
@@ -150,10 +172,10 @@ func (s *Service) Publish(ctx context.Context, tenantID, id string) (*Campaign, 
 	err := s.db.QueryRow(ctx,
 		`UPDATE campaigns SET status = 'active', updated_at = NOW()
 		 WHERE id = $1 AND tenant_id = $2 AND status = 'draft'
-		 RETURNING id, tenant_id, name, description, type, start_date, end_date, terms_conditions, status,
+		 RETURNING id, tenant_id, name, description, type, image_url, start_date, end_date, terms_conditions, status,
 		           COALESCE(settings, '{}'::jsonb)::text, created_by, created_at::text`,
 		id, tenantID,
-	).Scan(&c.ID, &c.TenantID, &c.Name, &c.Description, &c.Type, &c.StartDate, &c.EndDate,
+	).Scan(&c.ID, &c.TenantID, &c.Name, &c.Description, &c.Type, &c.ImageURL, &c.StartDate, &c.EndDate,
 		&c.TermsConditions, &c.Status, &rawSettings, &c.CreatedBy, &c.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("publish campaign: %w", err)

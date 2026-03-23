@@ -107,18 +107,22 @@ export default function RewardsPage() {
       <Navbar />
 
       <div className="pt-16">
-        {/* Header */}
-        <div className="bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-green-dark)_100%)] px-5 pt-8 pb-14 text-white relative overflow-hidden">
-          <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/10" />
-          <h1 className="text-xl font-bold relative">แลกรางวัล</h1>
-          <p className="text-[13px] text-white/70 mt-1 relative">แลกของรางวัลและสิทธิพิเศษ</p>
+        {/* Header with animated gradient */}
+        <div className="bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-teal)_50%,var(--jh-green-dark)_100%)] bg-[length:200%_200%] animate-gradient px-5 pt-8 pb-14 text-white relative overflow-hidden">
+          {/* Floating decorative shapes */}
+          <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/10 animate-float" />
+          <div className="absolute right-16 top-12 h-8 w-8 rounded-full bg-white/10 animate-float-delay-1" />
+          <div className="absolute left-8 -bottom-4 h-16 w-16 rounded-full bg-white/5 animate-float-delay-2" />
+
+          <h1 className="text-xl font-bold relative animate-slide-up">🎁 แลกรางวัล</h1>
+          <p className="text-[13px] text-white/70 mt-1 relative animate-slide-up" style={{ animationDelay: "60ms" }}>แลกของรางวัลและสิทธิพิเศษ</p>
 
           {isLoggedIn() && Object.keys(userBalance).length > 0 && (
-            <div className="flex items-center gap-3 mt-4 relative flex-wrap">
+            <div className="flex items-center gap-3 mt-4 relative flex-wrap stagger-children">
               {Object.entries(userBalance).map(([currency, balance]) => (
                 <div
                   key={currency}
-                  className="bg-white/20 backdrop-blur-sm rounded-full px-4 py-1.5 text-sm font-bold relative group cursor-default"
+                  className="bg-white/20 backdrop-blur-sm rounded-full px-4 py-1.5 text-sm font-bold relative group cursor-default transition-all hover:bg-white/30 hover:scale-105"
                 >
                   <span>{getIcon(currency)}</span>{" "}
                   {balance.toLocaleString()} {getName(currency)}
@@ -146,9 +150,9 @@ export default function RewardsPage() {
               ))}
             </div>
           ) : rewards.length === 0 ? (
-            <Card className="border-0 shadow-md">
+            <Card className="border-0 shadow-md animate-slide-up">
               <CardContent className="flex flex-col items-center py-16 px-6">
-                <div className="w-20 h-20 mb-4 rounded-full bg-secondary flex items-center justify-center">
+                <div className="w-20 h-20 mb-4 rounded-full bg-secondary flex items-center justify-center animate-float">
                   <svg viewBox="0 0 24 24" fill="none" stroke="var(--jh-green)" strokeWidth="1.5" className="w-10 h-10">
                     <path d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
                   </svg>
@@ -158,7 +162,7 @@ export default function RewardsPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 stagger-children">
               {rewards.map((r) => {
                 const imgSrc = mediaUrl(r.image_url);
                 const affordable = isLoggedIn() && canAfford(r.point_cost, r.cost_currency);
@@ -167,18 +171,18 @@ export default function RewardsPage() {
 
                 return (
                   <Link key={r.id} href={`/rewards/${r.id}`}>
-                    <Card className="border-0 shadow-sm overflow-hidden hover:shadow-md transition-shadow active:scale-[0.98]">
+                    <Card className="border-0 shadow-sm overflow-hidden card-playful">
                       <div className="aspect-square bg-secondary relative overflow-hidden">
                         {imgSrc ? (
                           <Image
                             src={imgSrc}
                             alt={r.name}
                             fill
-                            className="object-cover"
+                            className="object-cover transition-transform duration-300 hover:scale-110"
                             sizes="50vw"
                           />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center">
+                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-secondary to-[var(--jh-green-light)]/10">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="w-12 h-12 text-muted-foreground/30">
                               <path d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21" />
                             </svg>
@@ -186,19 +190,19 @@ export default function RewardsPage() {
                         )}
 
                         {r.is_flash && (
-                          <Badge className="absolute top-2 left-2 bg-red-500 text-white text-[10px] px-1.5 py-0 font-bold animate-pulse">
+                          <Badge className="absolute top-2 left-2 bg-[var(--jh-pink)] text-white text-[10px] px-1.5 py-0 font-bold animate-pulse shadow-lg shadow-pink-500/30">
                             ⚡ FLASH
                           </Badge>
                         )}
 
                         {r.available_qty <= 10 && r.available_qty > 0 && (
-                          <Badge className="absolute top-2 right-2 bg-amber-500 text-white text-[10px] px-1.5 py-0">
+                          <Badge className="absolute top-2 right-2 bg-[var(--jh-orange)] text-white text-[10px] px-1.5 py-0 shadow-md">
                             เหลือ {r.available_qty}
                           </Badge>
                         )}
                         {r.available_qty === 0 && (
-                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                            <span className="text-white font-bold text-sm">หมดแล้ว</span>
+                          <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] flex items-center justify-center">
+                            <span className="text-white font-bold text-sm bg-black/30 rounded-full px-4 py-1">หมดแล้ว</span>
                           </div>
                         )}
                       </div>
@@ -224,8 +228,8 @@ export default function RewardsPage() {
                             </span>
                           </span>
                           {r.tier_name && (
-                            <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-amber-300 text-amber-600">
-                              {r.tier_name}
+                            <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-[var(--jh-gold)] text-[var(--jh-gold)] bg-[var(--jh-gold-light)]">
+                              👑 {r.tier_name}
                             </Badge>
                           )}
                         </div>
@@ -240,13 +244,13 @@ export default function RewardsPage() {
 
         {/* History link */}
         {isLoggedIn() && (
-          <div className="px-4 mt-6">
+          <div className="px-4 mt-6 animate-slide-up" style={{ animationDelay: "300ms" }}>
             <Link href="/history/redeems" className="block">
-              <Card className="border-0 shadow-sm">
+              <Card className="border-0 shadow-sm card-playful">
                 <CardContent className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="var(--jh-green)" strokeWidth="2" className="w-5 h-5">
+                    <div className="w-10 h-10 rounded-full bg-[var(--jh-purple-light)] flex items-center justify-center">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="var(--jh-purple)" strokeWidth="2" className="w-5 h-5">
                         <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     </div>

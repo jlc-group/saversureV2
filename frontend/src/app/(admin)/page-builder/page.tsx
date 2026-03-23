@@ -18,6 +18,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import toast from "react-hot-toast";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -666,7 +667,7 @@ export default function PageBuilderPage() {
     const slug = newSlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-");
     if (!slug) return;
     if (BUILT_IN_SLUGS.has(slug) || customPages.some((p) => p.value === slug)) {
-      alert("ชื่อหน้านี้มีอยู่แล้ว");
+      toast.error("ชื่อหน้านี้มีอยู่แล้ว");
       return;
     }
     try {
@@ -681,7 +682,7 @@ export default function PageBuilderPage() {
       setShowNewPage(false);
       setPageSlug(slug);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "สร้างหน้าไม่สำเร็จ");
+      toast.error(err instanceof Error ? err.message : "สร้างหน้าไม่สำเร็จ");
     }
   };
 
@@ -693,7 +694,7 @@ export default function PageBuilderPage() {
       setCustomPages((prev) => prev.filter((p) => p.value !== slug));
       if (pageSlug === slug) setPageSlug("home");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "ลบไม่สำเร็จ");
+      toast.error(err instanceof Error ? err.message : "ลบไม่สำเร็จ");
     }
   };
 
@@ -718,7 +719,7 @@ export default function PageBuilderPage() {
       setShowHistory(false);
       setDirty(false);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Restore failed");
+      toast.error(err instanceof Error ? err.message : "Restore failed");
     }
   };
 
@@ -729,11 +730,11 @@ export default function PageBuilderPage() {
         from_slug: pageSlug,
         to_slug: dupTarget,
       });
-      alert(`Duplicated to "${dupTarget}" (as draft)`);
+      toast.success(`Duplicated to "${dupTarget}" (as draft)`);
       setShowDuplicate(false);
       setDupTarget("");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Duplicate failed");
+      toast.error(err instanceof Error ? err.message : "Duplicate failed");
     }
   };
 
@@ -752,7 +753,7 @@ export default function PageBuilderPage() {
       setDirty(false);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Save failed");
+      toast.error(err instanceof Error ? err.message : "Save failed");
     } finally {
       setSaving(false);
     }

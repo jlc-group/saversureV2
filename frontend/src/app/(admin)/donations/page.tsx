@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import { api } from "@/lib/api";
 import { ImageUpload } from "@/components/ui/image-upload";
 
@@ -84,7 +85,7 @@ export default function DonationsPage() {
       fetchData();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed";
-      alert(msg);
+      toast.error(msg);
     }
   };
 
@@ -107,7 +108,7 @@ export default function DonationsPage() {
       await api.patch(`/api/v1/donations/${d.id}`, { status: "ended" });
       fetchData();
     } catch {
-      alert("Failed");
+      toast.error("Failed");
     } finally {
       setActionId(null);
     }
@@ -120,7 +121,7 @@ export default function DonationsPage() {
       await api.patch(`/api/v1/donations/${d.id}`, { status: "cancelled" });
       fetchData();
     } catch {
-      alert("Failed");
+      toast.error("Failed");
     } finally {
       setActionId(null);
     }

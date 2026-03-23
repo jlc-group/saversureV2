@@ -4,6 +4,7 @@ import path from "path";
 const nextConfig: NextConfig = {
   outputFileTracingRoot: path.resolve(__dirname),
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: "https",
@@ -24,6 +25,10 @@ const nextConfig: NextConfig = {
       {
         protocol: "http",
         hostname: "192.168.0.41",
+      },
+      {
+        protocol: "https",
+        hostname: "placehold.co",
       },
     ],
   },

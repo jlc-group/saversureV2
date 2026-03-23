@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import { api } from "@/lib/api";
 import {
   AreaChart,
@@ -92,7 +93,7 @@ export default function DashboardPage() {
     try {
       await api.download("/api/v1/redeem-transactions/export", "transactions.csv");
     } catch {
-      alert("Export failed");
+      toast.error("Export failed");
     } finally {
       setExporting(false);
     }
@@ -115,16 +116,16 @@ export default function DashboardPage() {
       label: "Campaigns",
       value: summary.campaigns,
       sub: `${summary.campaign_stats?.active || 0} active`,
-      color: "#1a73e8",
-      bgColor: "#e8f0fe",
+      color: "var(--md-primary)",
+      bgColor: "var(--md-primary-light)",
       icon: <path d="M18 11v2h4v-2h-4zm-2 6.61c.96.71 2.21 1.65 3.2 2.39.4-.53.8-1.07 1.2-1.6-.99-.74-2.24-1.68-3.2-2.4-.4.54-.8 1.08-1.2 1.61zM20.4 5.6c-.4-.53-.8-1.07-1.2-1.6-.99.74-2.24 1.68-3.2 2.4.4.53.8 1.07 1.2 1.6.96-.72 2.21-1.65 3.2-2.4zM4 9c-1.1 0-2 .9-2 2v2c0 1.1.9 2 2 2h1l5 3V6L5 9H4zm11.5 3c0-1.33-.58-2.53-1.5-3.35v6.69c.92-.81 1.5-2.01 1.5-3.34z" />,
     },
     {
       label: "Batches",
       value: summary.batches,
       sub: `${summary.total_codes.toLocaleString()} codes`,
-      color: "#188038",
-      bgColor: "#e6f4ea",
+      color: "var(--md-success)",
+      bgColor: "var(--md-success-light)",
       icon: <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z" />,
     },
     {
@@ -139,16 +140,16 @@ export default function DashboardPage() {
       label: "Rewards",
       value: summary.rewards,
       sub: `${summary.points_issued.toLocaleString()} pts issued`,
-      color: "#e37400",
-      bgColor: "#fef7e0",
+      color: "var(--md-warning)",
+      bgColor: "var(--md-warning-light)",
       icon: <path d="M20 6h-2.18c.11-.31.18-.65.18-1 0-1.66-1.34-3-3-3-1.05 0-1.96.54-2.5 1.35l-.5.67-.5-.68A2.99 2.99 0 009 2C7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-2 .89-2 2v11c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2z" />,
     },
     {
       label: "Users",
       value: summary.users_total,
       sub: `${summary.points_redeemed.toLocaleString()} pts redeemed`,
-      color: "#c62828",
-      bgColor: "#ffebee",
+      color: "var(--md-error)",
+      bgColor: "var(--md-error-light)",
       icon: <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />,
     },
     {
@@ -325,27 +326,27 @@ export default function DashboardPage() {
             Conversion Funnel
           </h2>
           <div className="flex items-stretch gap-2">
-            <div className="flex-1 min-w-0 rounded-[var(--md-radius-md)] bg-[#e8f0fe] p-4 text-center border border-[#1a73e8]/30">
+            <div className="flex-1 min-w-0 rounded-[var(--md-radius-md)] bg-[var(--md-primary-light)] p-4 text-center border border-[var(--md-primary)]/30">
               <p className="text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase">Generated</p>
-              <p className="text-[24px] font-bold text-[#1a73e8] mt-1">{(funnel.total_generated ?? 0).toLocaleString()}</p>
+              <p className="text-[24px] font-bold text-[var(--md-primary)] mt-1">{(funnel.total_generated ?? 0).toLocaleString()}</p>
             </div>
             <div className="flex items-center">
               <span className="text-[12px] text-[var(--md-on-surface-variant)]">
                 {funnel.scan_rate != null ? `${funnel.scan_rate.toFixed(1)}%` : "→"}
               </span>
             </div>
-            <div className="flex-1 min-w-0 rounded-[var(--md-radius-md)] bg-[#e6f4ea] p-4 text-center border border-[#188038]/30">
+            <div className="flex-1 min-w-0 rounded-[var(--md-radius-md)] bg-[var(--md-success-light)] p-4 text-center border border-[var(--md-success)]/30">
               <p className="text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase">Scanned</p>
-              <p className="text-[24px] font-bold text-[#188038] mt-1">{(funnel.total_scanned ?? 0).toLocaleString()}</p>
+              <p className="text-[24px] font-bold text-[var(--md-success)] mt-1">{(funnel.total_scanned ?? 0).toLocaleString()}</p>
             </div>
             <div className="flex items-center">
               <span className="text-[12px] text-[var(--md-on-surface-variant)]">
                 {funnel.redeem_rate != null ? `${funnel.redeem_rate.toFixed(1)}%` : "→"}
               </span>
             </div>
-            <div className="flex-1 min-w-0 rounded-[var(--md-radius-md)] bg-[#fef7e0] p-4 text-center border border-[#e37400]/30">
+            <div className="flex-1 min-w-0 rounded-[var(--md-radius-md)] bg-[var(--md-warning-light)] p-4 text-center border border-[var(--md-warning)]/30">
               <p className="text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase">Redeemed</p>
-              <p className="text-[24px] font-bold text-[#e37400] mt-1">{(funnel.total_redeemed ?? 0).toLocaleString()}</p>
+              <p className="text-[24px] font-bold text-[var(--md-warning)] mt-1">{(funnel.total_redeemed ?? 0).toLocaleString()}</p>
             </div>
           </div>
         </div>
@@ -365,7 +366,7 @@ export default function DashboardPage() {
               >
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                    item.type === "scan" ? "bg-[#e8f0fe] text-[#1a73e8]" : "bg-[#fef7e0] text-[#e37400]"
+                    item.type === "scan" ? "bg-[var(--md-primary-light)] text-[var(--md-primary)]" : "bg-[var(--md-warning-light)] text-[var(--md-warning)]"
                   }`}
                 >
                   {item.type === "scan" ? (
@@ -403,11 +404,11 @@ export default function DashboardPage() {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {[
-            { href: "/campaigns", label: "Create Campaign", color: "#1a73e8", bg: "#e8f0fe",
+            { href: "/campaigns", label: "Create Campaign", color: "var(--md-primary)", bg: "var(--md-primary-light)",
               icon: <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" /> },
-            { href: "/batches", label: "Generate Batch", color: "#188038", bg: "#e6f4ea",
+            { href: "/batches", label: "Generate Batch", color: "var(--md-success)", bg: "var(--md-success-light)",
               icon: <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z" /> },
-            { href: "/rewards", label: "Add Reward", color: "#e37400", bg: "#fef7e0",
+            { href: "/rewards", label: "Add Reward", color: "var(--md-warning)", bg: "var(--md-warning-light)",
               icon: <path d="M20 6h-2.18c.11-.31.18-.65.18-1 0-1.66-1.34-3-3-3-1.05 0-1.96.54-2.5 1.35l-.5.67-.5-.68A2.99 2.99 0 009 2C7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-2 .89-2 2v11c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2z" /> },
           ].map((action) => (
             <a

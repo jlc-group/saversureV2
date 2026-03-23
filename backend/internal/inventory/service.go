@@ -118,15 +118,34 @@ func (s *Service) CreateReward(ctx context.Context, tenantID string, input Creat
 	return scanReward(row)
 }
 
-func (s *Service) List(ctx context.Context, tenantID string) ([]Reward, error) {
+func (s *Service) List(ctx context.Context, tenantID string, limit, offset int) ([]Reward, int64, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	var total int64
+	err := s.db.QueryRow(ctx,
+		`SELECT count(*) FROM rewards WHERE tenant_id = $1`, tenantID,
+	).Scan(&total)
+	if err != nil {
+		return nil, 0, fmt.Errorf("count rewards: %w", err)
+	}
+
 	rows, err := s.db.Query(ctx,
 		`SELECT `+rewardSelectCols+`
 		 FROM rewards r
 		 JOIN reward_inventory ri ON ri.reward_id = r.id
 		 WHERE r.tenant_id = $1
-		 ORDER BY r.created_at DESC`, tenantID)
+		 ORDER BY r.created_at DESC
+		 LIMIT $2 OFFSET $3`, tenantID, limit, offset)
 	if err != nil {
-		return nil, fmt.Errorf("list rewards: %w", err)
+		return nil, 0, fmt.Errorf("list rewards: %w", err)
 	}
 	defer rows.Close()
 
@@ -134,11 +153,11 @@ func (s *Service) List(ctx context.Context, tenantID string) ([]Reward, error) {
 	for rows.Next() {
 		r, err := scanReward(rows)
 		if err != nil {
-			return nil, fmt.Errorf("scan reward: %w", err)
+			return nil, 0, fmt.Errorf("scan reward: %w", err)
 		}
 		rewards = append(rewards, *r)
 	}
-	return rewards, nil
+	return rewards, total, nil
 }
 
 func (s *Service) UpdateReward(ctx context.Context, tenantID, rewardID string, input UpdateRewardInput) (*Reward, error) {

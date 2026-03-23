@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"saversure/internal/apperror"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -27,7 +29,7 @@ func (h *Handler) List(c *gin.Context) {
 		Offset: offset,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -40,18 +42,18 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 
 	var input UpdateStatusInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
 	valid := map[string]bool{"pending": true, "preparing": true, "shipped": true, "delivered": true}
 	if !valid[input.FulfillmentStatus] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": "status must be: pending, preparing, shipped, delivered"})
+		apperror.RespondValidation(c, "status must be: pending, preparing, shipped, delivered")
 		return
 	}
 
 	if err := h.svc.UpdateStatus(c.Request.Context(), tenantID, id, input); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "not_found", "message": err.Error()})
+		apperror.RespondNotFound(c, "not_found")
 		return
 	}
 
@@ -69,7 +71,7 @@ func (h *Handler) BulkUpdate(c *gin.Context) {
 
 	var input BulkUpdateInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
@@ -78,7 +80,7 @@ func (h *Handler) BulkUpdate(c *gin.Context) {
 		TrackingNumber:    input.TrackingNumber,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 

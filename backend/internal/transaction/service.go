@@ -22,6 +22,7 @@ type Transaction struct {
 	UserID            string  `json:"user_id"`
 	RewardID          string  `json:"reward_id"`
 	RewardName        *string `json:"reward_name"`
+	RewardImageURL    *string `json:"reward_image_url"`
 	UserName          *string `json:"user_name"`
 	UserPhone         *string `json:"user_phone"`
 	Status            string  `json:"status"`
@@ -69,7 +70,7 @@ func (s *Service) ListMine(ctx context.Context, tenantID, userID string, f ListF
 	return s.list(ctx, tenantID, userID, f)
 }
 
-const txnSelectCols = `rr.id, rr.tenant_id, rr.user_id, rr.reward_id, r.name,
+const txnSelectCols = `rr.id, rr.tenant_id, rr.user_id, rr.reward_id, r.name, r.image_url,
 		COALESCE(
 		  NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''),
 		  NULLIF(u.display_name, ''),
@@ -108,7 +109,7 @@ const txnFromJoins = `FROM reward_reservations rr
 func scanTransaction(scanner interface{ Scan(dest ...any) error }) (Transaction, error) {
 	var t Transaction
 	err := scanner.Scan(
-		&t.ID, &t.TenantID, &t.UserID, &t.RewardID, &t.RewardName,
+		&t.ID, &t.TenantID, &t.UserID, &t.RewardID, &t.RewardName, &t.RewardImageURL,
 		&t.UserName, &t.UserPhone,
 		&t.Status, &t.Tracking, &t.DeliveryType, &t.CouponCode,
 		&t.AddressID, &t.RecipientName, &t.RecipientPhone,

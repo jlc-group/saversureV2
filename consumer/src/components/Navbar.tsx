@@ -20,6 +20,7 @@ export default function Navbar() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [hasUser, setHasUser] = useState(false);
   const [headerItems, setHeaderItems] = useState<HeaderMenuItem[]>([]);
+  const [scrolled, setScrolled] = useState(false);
   const router = useRouter();
   const { brandName, branding } = useTenant();
 
@@ -37,14 +38,27 @@ export default function Navbar() {
       .catch(() => {});
   }, []);
 
+  // Track scroll position for dynamic shadow
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 10);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   return (
     <>
-      <header className="app-fixed-bar fixed top-0 z-[999] border-b border-border bg-white/95 backdrop-blur-md">
+      <header
+        className={`app-fixed-bar fixed top-0 z-[999] border-b border-border bg-white/95 backdrop-blur-md transition-shadow duration-300 ${
+          scrolled ? "shadow-md" : "shadow-none"
+        }`}
+      >
         <div className="flex h-14 items-center justify-between px-4">
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-all hover:bg-secondary hover:text-[var(--jh-green)] active:scale-90"
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round">
               <path d="M4 6h16M4 12h16M4 18h16" />
@@ -52,7 +66,7 @@ export default function Navbar() {
           </button>
 
           <div
-            className="flex min-w-0 cursor-pointer items-center gap-2"
+            className="flex min-w-0 cursor-pointer items-center gap-2 animate-bounce-in"
             onClick={() => router.push("/")}
           >
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary">
@@ -98,6 +112,8 @@ export default function Navbar() {
             </div>
           </div>
         </div>
+        {/* Green accent strip at bottom */}
+        <div className="h-[2px] bg-[linear-gradient(90deg,var(--jh-green)_0%,var(--jh-lime)_50%,var(--jh-teal)_100%)]" />
       </header>
 
       <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />

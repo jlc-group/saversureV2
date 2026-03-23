@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { api } from "@/lib/api";
 import { FileUpload } from "@/components/ui/file-upload";
+import toast from "react-hot-toast";
 
 interface Product {
   id: string;
@@ -68,7 +69,7 @@ export default function ProductsPage() {
       fetchData();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed";
-      alert(msg);
+      toast.error(msg);
     }
   };
 
@@ -91,7 +92,7 @@ export default function ProductsPage() {
       await api.patch(`/api/v1/products/${p.id}`, { status: newStatus });
       fetchData();
     } catch {
-      alert("Failed");
+      toast.error("Failed");
     } finally {
       setActionId(null);
     }
@@ -104,7 +105,7 @@ export default function ProductsPage() {
       await api.delete(`/api/v1/products/${id}`);
       fetchData();
     } catch {
-      alert("Failed to delete");
+      toast.error("Failed to delete");
     } finally {
       setActionId(null);
     }
@@ -239,7 +240,7 @@ export default function ProductsPage() {
                     const file = e.target.files?.[0];
                     if (!file) return;
                     if (file.size > 10 * 1024 * 1024) {
-                      alert("ไฟล์ต้องไม่เกิน 10MB");
+                      toast.error("ไฟล์ต้องไม่เกิน 10MB");
                       return;
                     }
                     setUploadingImage(true);
@@ -249,7 +250,7 @@ export default function ProductsPage() {
                       const result = await api.uploadForm<{ url: string }>("/api/v1/upload/image", fd);
                       setForm((prev) => ({ ...prev, image_url: result.url }));
                     } catch {
-                      alert("อัปโหลดรูปล้มเหลว");
+                      toast.error("อัปโหลดรูปล้มเหลว");
                     } finally {
                       setUploadingImage(false);
                       e.target.value = "";

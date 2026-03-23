@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { ImageUpload } from "@/components/ui/image-upload";
+import toast from "react-hot-toast";
 
 interface LDCampaign {
   id: string;
@@ -77,7 +78,7 @@ export default function LuckyDrawPage() {
     draw_date: "",
   };
 
-  const prizeFormInit = { name: "", description: "", quantity: 1, prize_order: 0 };
+  const prizeFormInit = { name: "", description: "", image_url: "", quantity: 1, prize_order: 0 };
   const [campaignForm, setCampaignForm] = useState(campaignFormInit);
   const [prizeForm, setPrizeForm] = useState(prizeFormInit);
 
@@ -144,7 +145,7 @@ export default function LuckyDrawPage() {
       fetchCampaigns();
       if (editingId === selectedId) fetchDetail(selectedId!);
     } catch {
-      alert("Failed to save campaign");
+      toast.error("Failed to save campaign");
     } finally {
       setSubmitting(false);
     }
@@ -155,12 +156,15 @@ export default function LuckyDrawPage() {
     if (!selectedId) return;
     setSubmitting(true);
     try {
-      await api.post(`/api/v1/lucky-draw/${selectedId}/prizes`, prizeForm);
+      await api.post(`/api/v1/lucky-draw/${selectedId}/prizes`, {
+        ...prizeForm,
+        image_url: prizeForm.image_url || null,
+      });
       setShowPrizeForm(false);
       setPrizeForm(prizeFormInit);
       fetchDetail(selectedId);
     } catch {
-      alert("Failed to add prize");
+      toast.error("Failed to add prize");
     } finally {
       setSubmitting(false);
     }
@@ -173,7 +177,7 @@ export default function LuckyDrawPage() {
       await api.delete(`/api/v1/lucky-draw/${selectedId}/prizes/${prizeId}`);
       fetchDetail(selectedId);
     } catch {
-      alert("Failed to delete prize");
+      toast.error("Failed to delete prize");
     } finally {
       setActionId(null);
     }
@@ -188,7 +192,7 @@ export default function LuckyDrawPage() {
       fetchDetail(selectedId);
       fetchCampaigns();
     } catch {
-      alert("Failed to draw winners");
+      toast.error("Failed to draw winners");
     } finally {
       setDrawing(false);
     }
@@ -202,7 +206,7 @@ export default function LuckyDrawPage() {
       fetchCampaigns();
       if (selectedId === id) fetchDetail(id);
     } catch {
-      alert("Failed to activate");
+      toast.error("Failed to activate");
     } finally {
       setActionId(null);
     }
@@ -216,7 +220,7 @@ export default function LuckyDrawPage() {
       fetchCampaigns();
       if (selectedId === id) fetchDetail(id);
     } catch {
-      alert("Failed to end campaign");
+      toast.error("Failed to end campaign");
     } finally {
       setActionId(null);
     }
@@ -385,6 +389,13 @@ export default function LuckyDrawPage() {
                     <div>
                       <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5 tracking-[0.4px] uppercase">Order</label>
                       <input type="number" value={prizeForm.prize_order} onChange={(e) => setPrizeForm({ ...prizeForm, prize_order: parseInt(e.target.value) || 0 })} className={fieldClass} />
+                    </div>
+                    <div className="md:col-span-2">
+                      <ImageUpload
+                        value={prizeForm.image_url}
+                        onChange={(url) => setPrizeForm({ ...prizeForm, image_url: url })}
+                        label="รูปภาพรางวัล"
+                      />
                     </div>
                   </div>
                   <button type="submit" disabled={submitting} className="h-[40px] px-6 bg-[var(--md-primary)] text-white rounded-[var(--md-radius-xl)] text-[14px] font-medium hover:bg-[var(--md-primary-dark)] disabled:opacity-60 transition-all duration-200">

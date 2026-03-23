@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import toast from "react-hot-toast";
 
 interface SupportCase {
   id: string;
@@ -109,7 +110,7 @@ export default function SupportPage() {
       await api.patch(`/api/v1/support/cases/${id}`, { status });
       if (selectedId === id) fetchDetail(id);
       fetchCases();
-    } catch { alert("Failed to update"); } finally { setActionId(null); }
+    } catch { toast.error("Failed to update"); } finally { setActionId(null); }
   };
 
   const handleUpdatePriority = async (id: string, priority: string) => {
@@ -118,7 +119,7 @@ export default function SupportPage() {
       await api.patch(`/api/v1/support/cases/${id}`, { priority });
       if (selectedId === id) fetchDetail(id);
       fetchCases();
-    } catch { alert("Failed to update"); } finally { setActionId(null); }
+    } catch { toast.error("Failed to update"); } finally { setActionId(null); }
   };
 
   const handleReply = async (e: React.FormEvent) => {
@@ -130,7 +131,7 @@ export default function SupportPage() {
       setReplyText("");
       fetchDetail(selectedId);
       fetchCases();
-    } catch { alert("Failed to send reply"); } finally { setReplySubmitting(false); }
+    } catch { toast.error("Failed to send reply"); } finally { setReplySubmitting(false); }
   };
 
   if (selectedId) {

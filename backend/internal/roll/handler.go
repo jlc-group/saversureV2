@@ -5,6 +5,8 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+
+	"saversure/internal/apperror"
 )
 
 type Handler struct {
@@ -41,7 +43,7 @@ func (h *Handler) List(c *gin.Context) {
 		Offset:    offset,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -64,7 +66,7 @@ func (h *Handler) GetStats(c *gin.Context) {
 	}
 	stats, err := h.svc.GetStats(c.Request.Context(), c.GetString("tenant_id"), factoryID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, stats)
@@ -73,7 +75,7 @@ func (h *Handler) GetStats(c *gin.Context) {
 func (h *Handler) MapProduct(c *gin.Context) {
 	var input MapInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
@@ -90,14 +92,15 @@ func (h *Handler) MapProduct(c *gin.Context) {
 
 	r, err := h.svc.MapProduct(c.Request.Context(), c.GetString("tenant_id"), c.Param("id"), c.GetString("user_id"), input, role)
 	if err != nil {
-		status := http.StatusBadRequest
 		if err == ErrRollNotFound {
-			status = http.StatusNotFound
+			apperror.RespondNotFound(c, "not_found")
+			return
 		}
 		if err == ErrFactoryMismatch {
-			status = http.StatusForbidden
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			return
 		}
-		c.JSON(status, gin.H{"error": "map_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -107,7 +110,7 @@ func (h *Handler) MapProduct(c *gin.Context) {
 func (h *Handler) Unmap(c *gin.Context) {
 	r, err := h.svc.Unmap(c.Request.Context(), c.GetString("tenant_id"), c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "unmap_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, r)
@@ -116,13 +119,13 @@ func (h *Handler) Unmap(c *gin.Context) {
 func (h *Handler) QCReview(c *gin.Context) {
 	var input QCInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
 	r, err := h.svc.QCReview(c.Request.Context(), c.GetString("tenant_id"), c.Param("id"), c.GetString("user_id"), input)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "qc_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -132,13 +135,13 @@ func (h *Handler) QCReview(c *gin.Context) {
 func (h *Handler) ReportRef2(c *gin.Context) {
 	var input ReportRef2Input
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
 	r, err := h.svc.ReportRef2(c.Request.Context(), c.GetString("tenant_id"), c.Param("id"), c.GetString("user_id"), input)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "report_ref2_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -150,13 +153,13 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 		Status string `json:"status" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
 	r, err := h.svc.UpdateStatus(c.Request.Context(), c.GetString("tenant_id"), c.Param("id"), input.Status)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "status_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -172,14 +175,14 @@ func (h *Handler) BulkMap(c *gin.Context) {
 		Note         string   `json:"note"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
 	count, err := h.svc.BulkMap(c.Request.Context(), c.GetString("tenant_id"), c.GetString("user_id"),
 		input.RollIDs, MapInput{ProductID: input.ProductID, FactoryID: input.FactoryID, EvidenceURLs: input.EvidenceURLs, Note: input.Note})
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "bulk_map_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -189,7 +192,7 @@ func (h *Handler) BulkMap(c *gin.Context) {
 func (h *Handler) Assign(c *gin.Context) {
 	var input AssignInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 	r, err := h.svc.Assign(c.Request.Context(), c.GetString("tenant_id"), c.Param("id"), input)
@@ -198,7 +201,7 @@ func (h *Handler) Assign(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not_found"})
 			return
 		}
-		c.JSON(http.StatusBadRequest, gin.H{"error": "assign_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, r)
@@ -210,12 +213,12 @@ func (h *Handler) BulkAssign(c *gin.Context) {
 		FactoryID string   `json:"factory_id" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 	count, err := h.svc.BulkAssign(c.Request.Context(), c.GetString("tenant_id"), input.RollIDs, input.FactoryID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "bulk_assign_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"updated": count})
@@ -227,13 +230,13 @@ func (h *Handler) BulkUpdateStatus(c *gin.Context) {
 		Status  string   `json:"status" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
 	count, err := h.svc.BulkUpdateStatus(c.Request.Context(), c.GetString("tenant_id"), input.RollIDs, input.Status)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "bulk_status_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 

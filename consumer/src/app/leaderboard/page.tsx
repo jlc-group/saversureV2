@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import BottomNav from "@/components/BottomNav";
+import Navbar from "@/components/Navbar";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { isLoggedIn, getUser } from "@/lib/auth";
@@ -77,6 +78,7 @@ export default function LeaderboardPage() {
 
   return (
     <div className="pb-20">
+      <Navbar />
       <div className="bg-gradient-to-br from-[var(--primary)] to-[#1557b0] text-white px-5 pt-12 pb-6 rounded-b-[24px]">
         <h1 className="text-[22px] font-semibold">อันดับ</h1>
         <p className="text-[13px] opacity-80 mt-1">ดูอันดับการสแกน</p>

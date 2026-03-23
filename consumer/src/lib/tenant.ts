@@ -59,18 +59,13 @@ export async function resolveTenant(): Promise<BrandingData | null> {
   if (ENV_TENANT_ID) {
     resolvedTenantId = ENV_TENANT_ID;
     try {
-      const res = await fetch(`${API_BASE}/api/v1/public/branding-by-slug?slug=`, {
+      const brandRes = await fetch(`${API_BASE}/api/v1/public/branding`, {
         headers: { "X-Tenant-ID": ENV_TENANT_ID },
       });
-      if (!res.ok) {
-        const brandRes = await fetch(`${API_BASE}/api/v1/public/branding`, {
-          headers: { "X-Tenant-ID": ENV_TENANT_ID },
-        });
-        if (brandRes.ok) {
-          const data = await brandRes.json();
-          resolvedBranding = { ...data, tenant_id: ENV_TENANT_ID };
-          return resolvedBranding;
-        }
+      if (brandRes.ok) {
+        const data = await brandRes.json();
+        resolvedBranding = { ...data, tenant_id: ENV_TENANT_ID };
+        return resolvedBranding;
       }
     } catch {
       // branding unavailable, use defaults

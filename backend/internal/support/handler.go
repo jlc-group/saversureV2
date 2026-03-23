@@ -6,6 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"saversure/internal/apperror"
 )
 
 type Handler struct {
@@ -29,7 +31,7 @@ func (h *Handler) ListCases(c *gin.Context) {
 		Offset:   offset,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": cases, "total": total})
@@ -41,7 +43,7 @@ func (h *Handler) ListUserCases(c *gin.Context) {
 
 	cases, err := h.svc.ListUserCases(c.Request.Context(), tenantID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": cases})
@@ -53,7 +55,7 @@ func (h *Handler) GetCase(c *gin.Context) {
 
 	sc, messages, err := h.svc.GetCaseWithMessages(c.Request.Context(), tenantID, caseID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		apperror.RespondNotFound(c, "not_found")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"case": sc, "messages": messages})
@@ -65,7 +67,7 @@ func (h *Handler) CreateCase(c *gin.Context) {
 
 	var input CreateCaseInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 	input.TenantID = tenantID
@@ -73,7 +75,7 @@ func (h *Handler) CreateCase(c *gin.Context) {
 
 	sc, err := h.svc.CreateCase(c.Request.Context(), input)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, sc)
@@ -87,7 +89,7 @@ func (h *Handler) Reply(c *gin.Context) {
 
 	var input ReplyInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 	input.SenderID = userID
@@ -99,7 +101,7 @@ func (h *Handler) Reply(c *gin.Context) {
 
 	msg, err := h.svc.Reply(c.Request.Context(), tenantID, caseID, input)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, msg)
@@ -111,13 +113,13 @@ func (h *Handler) UpdateCase(c *gin.Context) {
 
 	var input UpdateCaseInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
 	sc, err := h.svc.UpdateCase(c.Request.Context(), tenantID, caseID, input)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, sc)

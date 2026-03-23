@@ -48,6 +48,25 @@ services:
       timeout: 3s
       retries: 3
 
+  minio:
+    image: minio/minio:latest
+    container_name: saversure-minio
+    ports:
+      - "59300:9000"
+      - "59301:9001"
+    environment:
+      MINIO_ROOT_USER: saversure-admin
+      MINIO_ROOT_PASSWORD: julaherb789minio
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
   api:
     build:
       context: ./backend
@@ -70,8 +89,6 @@ services:
       NATS_URL: nats://nats:4222
       JWT_SECRET: saversure-dev-jwt-secret-change-in-prod-2026
       HMAC_SECRET: saversure-dev-hmac-2026
-    env_file:
-      - ../../run/saversureV2/.env.dev
     depends_on:
       postgres:
         condition: service_healthy
@@ -85,3 +102,4 @@ volumes:
   pg-data:
   redis-data:
   nats-data:
+  minio-data:

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
+import Navbar from "@/components/Navbar";
 import { api } from "@/lib/api";
 import { isLoggedIn } from "@/lib/auth";
 
@@ -106,6 +107,7 @@ export default function LuckyDrawPage() {
 
     return (
       <div className="pb-20">
+        <Navbar />
         <div className="bg-white sticky top-0 z-10 border-b border-[var(--outline-variant)]">
           <div className="max-w-[480px] mx-auto flex items-center h-14 px-4 gap-3">
             <button onClick={() => { setSelected(null); setPrizes([]); setTickets([]); setWinners([]); }} className="text-[var(--on-surface)]">
@@ -227,6 +229,7 @@ export default function LuckyDrawPage() {
 
   return (
     <div className="pb-20">
+      <Navbar />
       <div className="bg-white sticky top-0 z-10 border-b border-[var(--outline-variant)]">
         <div className="max-w-[480px] mx-auto flex items-center h-14 px-4 gap-3">
           <Link href="/" className="text-[var(--on-surface)]">

@@ -60,7 +60,7 @@ function ScanCard({ entry }: { entry: ScanEntry }) {
   const bonusIcon = hasBonusCurrency ? getCurrencyIcon(entry.bonus_currency) : "";
 
   return (
-    <div className="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-50 last:border-0 active:bg-gray-50 transition-colors">
+    <div className="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-50 last:border-0 active:bg-gray-50 transition-all hover:bg-gray-50/50">
       {/* Product image */}
       <div className="relative w-12 h-12 shrink-0 rounded-xl overflow-hidden bg-gray-50 ring-1 ring-gray-100">
         {entry.product_image_url ? (
@@ -95,7 +95,7 @@ function ScanCard({ entry }: { entry: ScanEntry }) {
       {/* Right: badges */}
       <div className="shrink-0 flex flex-col items-end gap-1">
         {isSuccess && entry.points_earned > 0 ? (
-          <span className="inline-flex items-center gap-0.5 px-2 py-1 rounded-lg bg-green-50 text-green-600 text-[12px] font-bold leading-none">
+          <span className="inline-flex items-center gap-0.5 px-2 py-1 rounded-lg bg-green-50 text-green-600 text-[12px] font-bold leading-none animate-scale-in">
             +{entry.points_earned.toLocaleString()}
           </span>
         ) : isDuplicate ? (
@@ -103,12 +103,12 @@ function ScanCard({ entry }: { entry: ScanEntry }) {
             สแกนซ้ำ
           </span>
         ) : (
-          <span className="inline-flex items-center gap-0.5 px-2 py-1 rounded-lg bg-green-50 text-green-600 text-[12px] font-bold leading-none">
+          <span className="inline-flex items-center gap-0.5 px-2 py-1 rounded-lg bg-green-50 text-green-600 text-[12px] font-bold leading-none animate-scale-in">
             ✓ สำเร็จ
           </span>
         )}
         {hasBonusCurrency && (
-          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-600 text-[10px] font-semibold leading-none">
+          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-600 text-[10px] font-semibold leading-none animate-scale-in">
             {bonusIcon} +{entry.bonus_currency_amount}
           </span>
         )}
@@ -206,10 +206,11 @@ export default function HistoryPage() {
       <Navbar />
 
       <div className="pt-16">
-        {/* Header */}
-        <div className="bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-green-dark)_100%)] px-5 pt-6 pb-14 text-white relative overflow-hidden">
-          <div className="absolute -right-5 -top-5 h-24 w-24 rounded-full bg-white/10" />
-          <div className="absolute right-8 bottom-3 h-16 w-16 rounded-full bg-white/5" />
+        {/* Header with animated gradient and floating circles */}
+        <div className="bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-teal)_50%,var(--jh-green-dark)_100%)] bg-[length:200%_200%] animate-gradient px-5 pt-6 pb-14 text-white relative overflow-hidden">
+          <div className="absolute -right-5 -top-5 h-24 w-24 rounded-full bg-white/10 animate-float" />
+          <div className="absolute right-8 bottom-3 h-16 w-16 rounded-full bg-white/5 animate-float-delay-1" />
+          <div className="absolute left-10 bottom-0 h-10 w-10 rounded-full bg-white/8 animate-float-delay-2" />
           <h1 className="text-[17px] font-bold relative">ประวัติการสะสมแต้ม</h1>
           {loggedIn && total > 0 && (
             <p className="text-[11px] text-white/70 mt-0.5 relative">สแกน {total} ครั้ง</p>
@@ -219,21 +220,24 @@ export default function HistoryPage() {
         <div className="px-4 -mt-7 relative z-10 space-y-3">
           {/* Stat card */}
           {loggedIn && !loading && scans.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100/80 px-5 py-3">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100/80 px-5 py-3 animate-slide-up">
               <div className="flex">
-                <div className="flex-1 text-center">
+                <div className="flex-1 text-center animate-count-up">
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide">สแกนสำเร็จ</p>
                   <p className="text-[22px] font-bold text-[var(--jh-green)] leading-tight">{successCount.toLocaleString()}</p>
+                  <div className="mx-auto mt-1.5 h-[3px] w-10 rounded-full bg-[var(--jh-green)]" />
                 </div>
                 <div className="w-px bg-gray-100 my-1" />
-                <div className="flex-1 text-center">
+                <div className="flex-1 text-center animate-count-up" style={{ animationDelay: "0.1s" }}>
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide">แต้มสะสม</p>
-                  <p className="text-[22px] font-bold text-gray-800 leading-tight">{totalPoints.toLocaleString()}</p>
+                  <p className="text-[22px] font-bold text-amber-500 leading-tight">{totalPoints.toLocaleString()}</p>
+                  <div className="mx-auto mt-1.5 h-[3px] w-10 rounded-full bg-amber-400" />
                 </div>
                 <div className="w-px bg-gray-100 my-1" />
-                <div className="flex-1 text-center">
+                <div className="flex-1 text-center animate-count-up" style={{ animationDelay: "0.2s" }}>
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide">ทั้งหมด</p>
-                  <p className="text-[22px] font-bold text-gray-800 leading-tight">{total.toLocaleString()}</p>
+                  <p className="text-[22px] font-bold text-blue-500 leading-tight">{total.toLocaleString()}</p>
+                  <div className="mx-auto mt-1.5 h-[3px] w-10 rounded-full bg-blue-400" />
                 </div>
               </div>
               {(primaryBalance || secondaryBalances.length > 0) && (
@@ -263,14 +267,20 @@ export default function HistoryPage() {
             </div>
           )}
 
-          {/* Tab row */}
+          {/* Tab row - gamified pill style */}
           {loggedIn && (
-            <div className="flex gap-2">
-              <div className="flex-1 rounded-full bg-[var(--jh-green)] py-2 text-center text-[13px] font-semibold text-white shadow-sm">
-                แต้มสะสม
+            <div className="flex gap-2 bg-white/80 backdrop-blur-sm rounded-full p-1 shadow-sm border border-gray-100">
+              <div className="flex-1 rounded-full bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-teal)_100%)] py-2.5 text-center text-[13px] font-bold text-white shadow-md shadow-green-200/50 transition-all">
+                <span className="flex items-center justify-center gap-1.5">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5"><path d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                  แต้มสะสม
+                </span>
               </div>
-              <Link href="/history/redeems" className="flex-1 rounded-full bg-white py-2 text-center text-[13px] font-semibold text-gray-500 border border-gray-200">
-                แลกรางวัล
+              <Link href="/history/redeems" className="flex-1 rounded-full bg-transparent py-2.5 text-center text-[13px] font-semibold text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-all">
+                <span className="flex items-center justify-center gap-1.5">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5"><path d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25" /></svg>
+                  แลกรางวัล
+                </span>
               </Link>
             </div>
           )}
@@ -280,15 +290,15 @@ export default function HistoryPage() {
         <div className="mt-3 px-4">
           {/* Not logged in */}
           {!loggedIn && (
-            <div className="bg-white rounded-2xl shadow-sm p-10 flex flex-col items-center">
-              <div className="w-14 h-14 mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+            <div className="bg-white rounded-2xl shadow-sm p-10 flex flex-col items-center animate-slide-up">
+              <div className="w-14 h-14 mb-4 rounded-full bg-gray-100 flex items-center justify-center animate-float">
                 <svg viewBox="0 0 24 24" fill="none" stroke="var(--jh-green)" strokeWidth="1.5" className="w-7 h-7">
                   <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
               </div>
               <h3 className="text-[15px] font-bold text-gray-800">กรุณาเข้าสู่ระบบ</h3>
               <p className="text-[12px] text-gray-400 mt-1 mb-5 text-center">เข้าสู่ระบบเพื่อดูประวัติสะสมแต้มของคุณ</p>
-              <Link href="/login" className="rounded-full bg-[var(--jh-green)] px-7 py-2 text-[13px] font-bold text-white">
+              <Link href="/login" className="rounded-full bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-teal)_100%)] px-7 py-2 text-[13px] font-bold text-white shadow-md shadow-green-200/50">
                 เข้าสู่ระบบ
               </Link>
             </div>
@@ -303,8 +313,8 @@ export default function HistoryPage() {
 
           {/* Empty */}
           {loggedIn && !loading && scans.length === 0 && (
-            <div className="bg-white rounded-2xl shadow-sm p-10 flex flex-col items-center">
-              <div className="w-14 h-14 mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+            <div className="bg-white rounded-2xl shadow-sm p-10 flex flex-col items-center animate-slide-up">
+              <div className="w-14 h-14 mb-4 rounded-full bg-gray-100 flex items-center justify-center animate-float">
                 <svg viewBox="0 0 24 24" fill="none" stroke="var(--jh-green)" strokeWidth="1.5" className="w-7 h-7">
                   <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
                   <rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 14l2 2 4-4" />
@@ -312,7 +322,7 @@ export default function HistoryPage() {
               </div>
               <h3 className="text-[15px] font-bold text-gray-800">ยังไม่มีประวัติ</h3>
               <p className="text-[12px] text-gray-400 mt-1 mb-5 text-center">สแกนคิวอาร์โค้ดบนผลิตภัณฑ์เพื่อเริ่มสะสมแต้ม</p>
-              <Link href="/scan" className="rounded-full bg-[var(--jh-green)] px-7 py-2 text-[13px] font-bold text-white">
+              <Link href="/scan" className="rounded-full bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-teal)_100%)] px-7 py-2 text-[13px] font-bold text-white shadow-md shadow-green-200/50">
                 สแกนสะสมแต้ม
               </Link>
             </div>
@@ -322,14 +332,14 @@ export default function HistoryPage() {
           {loggedIn && !loading && groups.length > 0 && (
             <div className="space-y-3">
               {groups.map((group, gi) => (
-                <div key={gi} className="bg-white rounded-2xl overflow-hidden shadow-sm">
+                <div key={gi} className="bg-white rounded-2xl overflow-hidden shadow-sm stagger-children animate-slide-up" style={{ animationDelay: `${gi * 0.05}s` }}>
                   {/* Date header */}
                   <div className="flex items-center gap-2 px-4 py-2 bg-gray-50/80 border-b border-gray-100">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-3.5 h-3.5 text-gray-400 shrink-0">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-3.5 h-3.5 text-[var(--jh-green)] shrink-0">
                       <path d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                     </svg>
                     <p className="text-[11px] font-bold text-gray-500 tracking-wide">{group.label}</p>
-                    <span className="text-[10px] text-gray-300 ml-auto">{group.items.length} รายการ</span>
+                    <span className="text-[10px] text-gray-300 ml-auto bg-gray-100 px-2 py-0.5 rounded-full">{group.items.length} รายการ</span>
                   </div>
                   {group.items.map((entry) => (
                     <ScanCard key={entry.id} entry={entry} />

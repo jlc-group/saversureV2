@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"saversure/internal/apperror"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -23,7 +25,7 @@ func (h *Handler) ListCampaigns(c *gin.Context) {
 
 	campaigns, total, err := h.svc.ListCampaigns(c.Request.Context(), tenantID, limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": campaigns, "total": total})
@@ -34,7 +36,7 @@ func (h *Handler) ListActiveCampaigns(c *gin.Context) {
 
 	campaigns, err := h.svc.ListActiveCampaigns(c.Request.Context(), tenantID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": campaigns})
@@ -46,7 +48,7 @@ func (h *Handler) GetCampaign(c *gin.Context) {
 
 	campaign, prizes, err := h.svc.GetCampaign(c.Request.Context(), tenantID, id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		apperror.RespondNotFound(c, "not_found")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"campaign": campaign, "prizes": prizes})
@@ -56,14 +58,14 @@ func (h *Handler) CreateCampaign(c *gin.Context) {
 	tenantID := c.GetString("tenant_id")
 	var input CreateCampaignInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	input.TenantID = tenantID
 
 	campaign, err := h.svc.CreateCampaign(c.Request.Context(), input)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, campaign)
@@ -75,13 +77,13 @@ func (h *Handler) UpdateCampaign(c *gin.Context) {
 
 	var input UpdateCampaignInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
 	campaign, err := h.svc.UpdateCampaign(c.Request.Context(), tenantID, id, input)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, campaign)
@@ -93,13 +95,13 @@ func (h *Handler) AddPrize(c *gin.Context) {
 
 	var input CreatePrizeInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
 	prize, err := h.svc.AddPrize(c.Request.Context(), tenantID, campaignID, input)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, prize)
@@ -110,7 +112,7 @@ func (h *Handler) DeletePrize(c *gin.Context) {
 	prizeID := c.Param("prizeId")
 
 	if err := h.svc.DeletePrize(c.Request.Context(), tenantID, prizeID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
@@ -123,7 +125,7 @@ func (h *Handler) Register(c *gin.Context) {
 
 	ticket, err := h.svc.Register(c.Request.Context(), tenantID, campaignID, userID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, ticket)
@@ -135,7 +137,7 @@ func (h *Handler) GetUserTickets(c *gin.Context) {
 
 	tickets, err := h.svc.GetUserTickets(c.Request.Context(), campaignID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": tickets})
@@ -147,7 +149,7 @@ func (h *Handler) DrawWinners(c *gin.Context) {
 
 	winners, err := h.svc.DrawWinners(c.Request.Context(), tenantID, campaignID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": winners})
@@ -158,7 +160,7 @@ func (h *Handler) GetWinners(c *gin.Context) {
 
 	winners, err := h.svc.GetWinners(c.Request.Context(), campaignID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": winners})

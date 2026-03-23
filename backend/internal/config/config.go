@@ -104,6 +104,8 @@ type RateLimitConfig struct {
 	Scan     int
 	Redeem   int
 	Transfer int
+	Upload   int
+	Export   int
 }
 
 func Load() (*Config, error) {
@@ -168,6 +170,8 @@ func Load() (*Config, error) {
 			Scan:     getEnvInt("RATE_LIMIT_SCAN", 10),
 			Redeem:   getEnvInt("RATE_LIMIT_REDEEM", 5),
 			Transfer: getEnvInt("RATE_LIMIT_TRANSFER", 3),
+			Upload:   getEnvInt("RATE_LIMIT_UPLOAD", 20),
+			Export:   getEnvInt("RATE_LIMIT_EXPORT", 10),
 		},
 		LINE: LINEConfig{
 			ChannelID:     getEnv("LINE_CHANNEL_ID", ""),

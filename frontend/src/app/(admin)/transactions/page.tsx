@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import toast from "react-hot-toast";
 
 /* ─── Types ─── */
 interface Transaction {
@@ -168,7 +169,7 @@ export default function TransactionsPage() {
     try {
       await api.patch(`/api/v1/redeem-transactions/${id}`, { status, tracking });
       fetchData();
-    } catch { alert("Failed to update"); } finally { setActionId(null); }
+    } catch { toast.error("Failed to update"); } finally { setActionId(null); }
   };
 
   const toggleSelect = (id: string) => {
@@ -186,7 +187,7 @@ export default function TransactionsPage() {
 
   const batchPrint = () => {
     const items = txns.filter((t) => selectedIds.has(t.id) && t.delivery_type === "shipping" && t.address_line1);
-    if (items.length === 0) { alert("ไม่มีรายการ shipping ที่เลือก หรือไม่มีข้อมูลที่อยู่"); return; }
+    if (items.length === 0) { toast("ไม่มีรายการ shipping ที่เลือก หรือไม่มีข้อมูลที่อยู่"); return; }
     const popup = window.open("", "_blank", "width=900,height=700");
     if (!popup) return;
     popup.document.write(buildLabelHTML(items));

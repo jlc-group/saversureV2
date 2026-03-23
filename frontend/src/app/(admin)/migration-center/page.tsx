@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
+import toast from "react-hot-toast";
 
 type ModuleKey = "customer" | "product" | "rewards" | "scan_history" | "redeem_history";
 
@@ -194,7 +195,7 @@ export default function MigrationCenterPage() {
 
   const handleCreateJob = async () => {
     if (resolvedModules.length === 0) {
-      alert("กรุณาเลือกอย่างน้อย 1 module");
+      toast.error("กรุณาเลือกอย่างน้อย 1 module");
       return;
     }
     if (mode === "execute") {
@@ -213,7 +214,7 @@ export default function MigrationCenterPage() {
       await fetchJobs();
       await fetchDetail(created.id);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "สร้าง migration job ไม่สำเร็จ");
+      toast.error(err instanceof Error ? err.message : "สร้าง migration job ไม่สำเร็จ");
     } finally {
       setSubmitting(false);
     }
