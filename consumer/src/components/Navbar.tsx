@@ -66,19 +66,10 @@ export default function Navbar() {
           </button>
 
           <div
-            className="flex min-w-0 cursor-pointer items-center gap-2 animate-bounce-in"
+            className="absolute left-1/2 -translate-x-1/2 flex cursor-pointer items-center justify-center animate-bounce-in"
             onClick={() => router.push("/")}
           >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary">
-              {branding?.logo_url ? (
-                <img src={branding.logo_url} alt={brandName} className="h-5 w-5 object-contain" />
-              ) : (
-                <span className="text-xs font-bold text-[var(--jh-green)]">{brandName.slice(0, 2)}</span>
-              )}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-bold text-foreground leading-tight">{brandName}</p>
-            </div>
+            <img src="/logo.png" alt="Jula's Herb Logo" className="h-[36px] mt-1 object-contain drop-shadow-[0_1px_2px_rgba(0,0,0,0.1)]" />
           </div>
 
           <div className="flex items-center gap-1">

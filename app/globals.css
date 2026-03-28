@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+@theme {
+  --color-foreground: #000;
+  --color-background: #f2f4f7;
+  --font-sans: var(--font-noto-sans-thai), "sans-serif";
+}
+
+body {
+  background-color: var(--color-background);
+}
