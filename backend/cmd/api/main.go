@@ -822,6 +822,9 @@ func main() {
 		}
 	}
 
+	// Popups — cosmetic, no tenant required (graceful fallback in handler)
+	api.GET("/public/popups", popupHandler.ListActive)
+
 	// Public APIs (consumer-facing — no auth, tenant from header)
 	publicRoutes := api.Group("/public")
 	publicRoutes.Use(mw.TenantFromHeader())
@@ -840,7 +843,6 @@ func main() {
 		publicRoutes.GET("/tiers", tierHandler.List)
 		publicRoutes.GET("/branding", brandingHandler.GetPublic)
 		publicRoutes.GET("/page-config/:slug", pageConfigHandler.GetPublic)
-		publicRoutes.GET("/popups", popupHandler.ListActive)
 		publicRoutes.GET("/nav-menu/:type", navMenuHandler.GetPublic)
 		publicRoutes.GET("/currencies", currencyHandler.ListPublic)
 	}
