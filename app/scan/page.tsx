@@ -1,10 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function ScanPage() {
+  const router = useRouter();
   const [code, setCode] = useState("");
   const [showPermissionModal, setShowPermissionModal] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanSuccess, setScanSuccess] = useState(false);
+
+  const startScan = () => {
+    setShowPermissionModal(false);
+    setIsScanning(true);
+    // Simulate finding a QR code after 2.5 seconds
+    setTimeout(() => {
+       setIsScanning(false);
+       setScanSuccess(true);
+    }, 2500);
+  };
 
   return (
     <div className="w-full flex flex-col min-h-[100dvh] items-center bg-[#F5F7F6] font-sans pb-24 relative overflow-hidden">
@@ -111,7 +125,7 @@ export default function ScanPage() {
                      ไม่อนุญาต
                    </button>
                    <button 
-                     onClick={() => setShowPermissionModal(false)}
+                     onClick={startScan}
                      className="flex-1 py-3 text-[13px] font-bold text-white bg-[#4CAF50] rounded-[14px] shadow-[0_4px_12px_rgba(76,175,80,0.3)] hover:bg-[#388E3C] transition-colors"
                    >
                      อนุญาตกล้อง
@@ -122,16 +136,96 @@ export default function ScanPage() {
         </div>
       )}
       
+      {/* Fullscreen Fake Scanner Overlay */}
+      {isScanning && (
+        <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center animate-fade-in">
+           {/* Header */}
+           <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent z-10 pt-10">
+              <button onClick={() => setIsScanning(false)} className="w-10 h-10 flex items-center justify-center text-white bg-white/20 rounded-full backdrop-blur-sm shadow-sm active:bg-white/30">
+                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+              </button>
+              <div className="text-white font-black tracking-widest text-[13px] drop-shadow-md bg-black/40 px-4 py-1.5 rounded-full border border-white/20">SCAN TO EARN</div>
+              <div className="w-10"></div>
+           </div>
+
+           {/* Camera View Box */}
+           <div className="relative w-[280px] h-[280px] border-2 border-white/20 rounded-[32px] overflow-hidden shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] backdrop-blur-sm mix-blend-screen bg-gray-900/40">
+              
+              {/* Corner markers */}
+              <div className="absolute top-0 left-0 w-10 h-10 border-t-[5px] border-l-[5px] border-[#4CAF50] rounded-tl-[24px]"></div>
+              <div className="absolute top-0 right-0 w-10 h-10 border-t-[5px] border-r-[5px] border-[#4CAF50] rounded-tr-[24px]"></div>
+              <div className="absolute bottom-0 left-0 w-10 h-10 border-b-[5px] border-l-[5px] border-[#4CAF50] rounded-bl-[24px]"></div>
+              <div className="absolute bottom-0 right-0 w-10 h-10 border-b-[5px] border-r-[5px] border-[#4CAF50] rounded-br-[24px]"></div>
+              
+              {/* Scanning laser line */}
+              <div className="absolute left-0 right-0 h-[3px] bg-[#4CAF50] shadow-[0_0_18px_6px_rgba(76,175,80,0.6)] animate-[scan_2.5s_ease-in-out_infinite]"></div>
+           </div>
+           
+           <p className="text-white mt-10 font-bold tracking-wide text-[14.5px] animate-pulse drop-shadow-md">กำลังสแกนโค้ด...</p>
+           <p className="text-gray-400 mt-2 text-[12px] font-medium text-center px-8 leading-relaxed">ขยับกล้องให้ QR Code หรือ Barcode <br/> มาอยู่ตรงกลางกรอบ</p>
+        </div>
+      )}
+
+      {/* Scan Success Overlay */}
+      {scanSuccess && (
+        <div className="fixed inset-0 z-[100] bg-[#4CAF50] flex flex-col items-center justify-center animate-fade-in p-6 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMjAiIGZpbGw9IiMzODhFM0MiIG9wYWNpdHk9IjAuMDUiLz48L3N2Zz4=')]">
+           <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mb-6 shadow-2xl animate-[popScale_0.6s_cubic-bezier(0.175,0.885,0.32,1.275)_forwards]">
+              <svg className="w-12 h-12 text-[#4CAF50]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+           </div>
+           
+           <div className="bg-white rounded-[24px] w-full max-w-[320px] p-6 text-center shadow-[0_20px_40px_rgba(0,0,0,0.2)] animate-[dropIn_0.4s_0.1s_cubic-bezier(0.175,0.885,0.32,1.275)_both] border border-gray-100">
+              <div className="text-[12px] font-black text-[#4CAF50] mb-1.5 tracking-widest uppercase bg-green-50 inline-block px-3 py-1 rounded-full">สแกนสำเร็จเก่งมาก!</div>
+              <h2 className="text-[19px] font-black text-gray-900 leading-tight mb-2">โค้ดถูกต้อง รับแต้มทันที</h2>
+              <div className="text-[11.5px] font-bold text-gray-500 bg-gray-50 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg border border-gray-100 mb-5 mx-auto w-fit">
+                 <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" /></svg>
+                 SVS-88123490
+              </div>
+              
+              <div className="bg-gradient-to-br from-[#E8F5E9] to-[#F1F8E9] border border-[#A5D6A7] rounded-[20px] py-4.5 mb-6 relative overflow-hidden shadow-inner flex flex-col items-center justify-center">
+                 <div className="absolute -right-4 -top-4 text-[70px] opacity-10 blur-[2px] pointer-events-none">✨</div>
+                 <div className="text-[11.5px] font-bold text-[#2E7D32] mb-0.5">คุณได้รับคะแนนสะสม</div>
+                 <div className="text-[40px] font-black text-[#4CAF50] tracking-tighter leading-none mt-1 drop-shadow-sm">+50 <span className="text-[16px]">P</span></div>
+              </div>
+              
+              <button 
+                 onClick={() => { setScanSuccess(false); router.push('/history?tab=earn'); }}
+                 className="w-full bg-gradient-to-r from-[#1b5e20] to-[#2E7D32] text-white py-4 rounded-[16px] font-black text-[14.5px] active:scale-[0.98] transition-all shadow-[0_8px_20px_rgba(46,125,50,0.4)] hover:shadow-[0_4px_12px_rgba(46,125,50,0.3)] tracking-wide"
+              >
+                 ดูคะแนนของฉัน
+              </button>
+           </div>
+        </div>
+      )}
+      
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes ping {
           75%, 100% {
-            transform: scale(2);
+            transform: scale(2.5);
             opacity: 0;
           }
         }
         .animate-ping {
           animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
         }
+        @keyframes scan {
+          0%, 100% { top: 5%; opacity: 0; }
+          10%, 90% { opacity: 1; }
+          50% { top: 95%; }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes popScale {
+          0% { transform: scale(0); }
+          65% { transform: scale(1.15); }
+          100% { transform: scale(1); }
+        }
+        @keyframes dropIn {
+          0% { transform: translateY(40px) scale(0.9); opacity: 0; }
+          100% { transform: translateY(0) scale(1); opacity: 1; }
+        }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
       `}} />
     </div>
   );

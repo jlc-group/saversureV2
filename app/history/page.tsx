@@ -11,6 +11,10 @@ function HistoryDashboard() {
   const initialTab = searchParams.get('tab') || 'all';
   const [activeFilter, setActiveFilter] = useState(initialTab);
 
+  // Coupon Viewer Modal State
+  const [selectedCoupon, setSelectedCoupon] = useState<any>(null);
+  const [codeType, setCodeType] = useState<'qr' | 'barcode' | 'text'>('barcode');
+
   // Sync state if URL search param changes directly via Next.js Link
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -29,7 +33,8 @@ function HistoryDashboard() {
     { id: "all", label: "ทั้งหมด" },
     { id: "earn", label: "สะสมแต้ม" },
     { id: "redeem", label: "แลกแต้ม" },
-    { id: "lucky", label: "ลุ้นโชค" },
+    { id: "lucky", label: "ลุ้นรางวัล" },
+    { id: "reward", label: "ของรางวัล" },
   ];
 
   const mockData = [
@@ -59,10 +64,23 @@ function HistoryDashboard() {
       bg: "#F9FBE7"
     },
     {
+      id: 6,
+      type: "reward",
+      title: "คูปองส่วนลด 100 บาท (VIP)",
+      refCode: "ได้จากภารกิจพิเศษ",
+      points: "เปิดดู",
+      dateGroup: "เมื่อวาน",
+      dateStr: "หมดอายุ 31 ธ.ค. 69",
+      status: "ready",
+      statusText: "พร้อมใช้",
+      icon: "🎫",
+      bg: "#FFF3E0"
+    },
+    {
       id: 3,
       type: "lucky",
       title: "JDent Challenge โชคหล่นทับ",
-      refCode: "รับ 3 สิทธิ์ลุ้นโชค",
+      refCode: "รับ 3 สิทธิ์ลุ้นรางวัล",
       points: "-30 P",
       dateGroup: "เมื่อวาน",
       dateStr: "09:00 น.",
@@ -180,12 +198,15 @@ function HistoryDashboard() {
                            {item.type === 'lucky' && <div className="text-gray-600 font-black text-[15px] tracking-tight">{item.points}</div>}
                            {item.type === 'donate' && <div className="text-gray-600 font-black text-[15px] tracking-tight">{item.points}</div>}
                            {item.type === 'reward' && (
-                              <div className="text-yellow-700 font-black text-[11px] bg-yellow-100 px-2.5 py-0.5 rounded-md border border-yellow-200 shadow-sm">Free 🎉</div>
+                              <button onClick={(e) => { e.stopPropagation(); setSelectedCoupon(item); setCodeType('barcode'); }} className="bg-gradient-to-r from-[#FFD700] to-[#FFA000] text-[#5D4037] text-[11px] font-black px-3.5 py-1.5 rounded-full shadow-sm active:scale-95 transition-transform">{item.points}</button>
                            )}
                            
                            {/* Status Badges */}
                            {item.statusText && item.status === 'success' && (
                               <div className="text-[9.5px] font-bold text-green-600 mt-1">{item.statusText}</div>
+                           )}
+                           {item.statusText && item.status === 'ready' && (
+                              <div className="text-[10.5px] font-black text-[#E65100] mt-1">{item.statusText}</div>
                            )}
                            {item.statusText && item.status === 'pending' && (
                               <div className="text-[9.5px] font-bold text-orange-500 mt-1 flex items-center gap-1">
@@ -210,7 +231,84 @@ function HistoryDashboard() {
       </div>
       
       {/* Bottom padding to prevent FAB overlay issues */}
-      <div className="h-10"></div>
+      <div className="h-[90px] shrink-0"></div>
+
+      {/* Code Viewer Modal */}
+      {selectedCoupon && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-10" style={{animation: 'fadeIn 0.3s ease-out forwards', opacity: 0}}>
+           <div className="bg-white w-full max-w-[340px] rounded-[24px] shadow-2xl relative overflow-hidden flex flex-col border border-white/20">
+              
+              {/* Header */}
+              <div className="bg-gradient-to-r from-[#FFD700] to-[#FFA000] p-5 pb-6 text-center relative border-b border-yellow-500/30">
+                 <button onClick={() => setSelectedCoupon(null)} className="absolute right-3.5 top-3.5 w-8 h-8 flex items-center justify-center bg-black/10 rounded-full text-yellow-900 font-bold hover:bg-black/20 transition-colors">✕</button>
+                 <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center text-3xl mx-auto mb-2 shadow-[0_4px_16px_rgba(0,0,0,0.1)] border-2 border-yellow-50">{selectedCoupon.icon}</div>
+                 <h2 className="text-[17px] font-black text-[#5D4037] px-2 drop-shadow-sm leading-tight">{selectedCoupon.title}</h2>
+                 <p className="text-[11.5px] text-yellow-900 font-bold opacity-90 mt-1 tracking-tight">{selectedCoupon.dateStr}</p>
+                 
+                 {/* Top Cutouts */}
+                 <div className="absolute -bottom-3 -left-3 w-6 h-6 rounded-full bg-white z-20"></div>
+                 <div className="absolute -bottom-3 -right-3 w-6 h-6 rounded-full bg-white z-20"></div>
+              </div>
+              
+              <div className="relative w-full border-t-[2px] border-dashed border-gray-200"></div>
+
+              {/* Display Area */}
+              <div className="px-6 pt-5 pb-7 flex flex-col items-center bg-white relative">
+                 <p className="text-[10px] text-green-700 font-bold mb-6 flex items-center gap-1.5 bg-[#E8F5E9] px-3 py-1.5 rounded-full border border-[#A5D6A7]">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                    ระบบเร่งแสงหน้าจออัตโนมัติ
+                 </p>
+
+                 <div className="w-full flex-1 flex items-center justify-center min-h-[160px] mb-6">
+                    {codeType === 'qr' && (
+                       <div className="p-3 border border-gray-100 rounded-[20px] shadow-[0_8px_30px_rgba(0,0,0,0.06)] bg-white" style={{animation: 'fadeIn 0.4s ease-out forwards', opacity: 0}}>
+                          <img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(selectedCoupon.refCode)}-${selectedCoupon.id}`} alt="QR Code" className="w-[180px] h-[180px] opacity-[0.95]" />
+                       </div>
+                    )}
+                    {codeType === 'barcode' && (
+                       <div className="w-full px-1 flex flex-col items-center" style={{animation: 'fadeIn 0.4s ease-out forwards', opacity: 0}}>
+                          <img src={`https://barcode.tec-it.com/barcode.ashx?data=${encodeURIComponent(selectedCoupon.refCode)}&code=Code128&translate-esc=on`} alt="Barcode" className="w-full h-[95px] object-cover mix-blend-multiply opacity-[0.95]" />
+                          <div className="text-[14px] font-black text-gray-700 tracking-[0.25em] mt-4 bg-gray-50 px-4 py-1.5 rounded-lg border border-gray-100 shadow-inner">
+                             {selectedCoupon.refCode}
+                          </div>
+                       </div>
+                    )}
+                    {codeType === 'text' && (
+                       <div className="w-full flex" style={{animation: 'fadeIn 0.4s ease-out forwards', opacity: 0}}>
+                          <div className="w-full border-2 border-dashed border-[#4CAF50] bg-[#F1F8E9] rounded-[22px] p-6 py-8 text-center relative group active:scale-[0.98] transition-all shadow-[0_4px_16px_rgba(76,175,80,0.1)]">
+                             <div className="text-[11px] text-[#2E7D32] font-black uppercase tracking-widest mb-1">PROMO CODE</div>
+                             <div className="text-[26px] font-black text-gray-900 tracking-wider mb-3 leading-none">{selectedCoupon.refCode}</div>
+                             <button onClick={() => alert('คัดลอกโค้ดสำเร็จ!')} className="mt-2 bg-white text-[#4CAF50] border border-[#A5D6A7] text-[12px] font-black px-5 py-2.5 rounded-full inline-flex items-center gap-1.5 shadow-sm active:bg-green-50 transition-colors">
+                                📋 คัดลอกโค้ด
+                             </button>
+                          </div>
+                       </div>
+                    )}
+                 </div>
+
+                 {/* Segmented Tabs for Selection */}
+                 <div className="w-full bg-[#F5F7F6] p-1.5 rounded-[16px] flex border border-gray-200/60 mt-2 shadow-inner">
+                    <button onClick={() => setCodeType('barcode')} className={`flex-1 py-2.5 text-[11.5px] font-bold rounded-[12px] transition-all flex flex-col items-center justify-center gap-1.5 ${codeType === 'barcode' ? 'bg-white text-gray-900 shadow-[0_4px_12px_rgba(0,0,0,0.06)] border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}>
+                       <svg className="w-6 h-6 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4m16-4v8m-16-8v8m4-8v8m8-8v8" /></svg>
+                       บาร์โค้ด
+                    </button>
+                    <button onClick={() => setCodeType('qr')} className={`flex-1 py-2.5 text-[11.5px] font-bold rounded-[12px] transition-all flex flex-col items-center justify-center gap-1.5 ${codeType === 'qr' ? 'bg-white text-gray-900 shadow-[0_4px_12px_rgba(0,0,0,0.06)] border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}>
+                       <svg className="w-6 h-6 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm13 3h3v3h-3v-3z" /></svg>
+                       คิวอาร์โค้ด
+                    </button>
+                    <button onClick={() => setCodeType('text')} className={`flex-1 py-2.5 text-[11.5px] font-bold rounded-[12px] transition-all flex flex-col items-center justify-center gap-1.5 ${codeType === 'text' ? 'bg-white text-gray-900 shadow-[0_4px_12px_rgba(0,0,0,0.06)] border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}>
+                       <svg className="w-6 h-6 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
+                       เลขโค้ด
+                    </button>
+                 </div>
+                 
+                 <div className="w-full mt-6 text-center">
+                    <p className="text-[10px] text-gray-400 font-bold leading-relaxed px-2">กรุณาแสดงหน้าจอนี้ให้พนักงาน 7-11 สแกน<br/>หรือใช้เลขโค้ดเพื่อรับสิทธิ์หน้าตะกร้าสินค้าออนไลน์</p>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
 
       <style dangerouslySetInnerHTML={{__html: `
         .scrollbar-none::-webkit-scrollbar { display: none; }

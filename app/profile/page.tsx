@@ -76,11 +76,12 @@ export default function ProfilePage() {
            <div className="bg-white rounded-[22px] p-4 shadow-[0_4px_24px_rgba(0,0,0,0.03)] border border-gray-100">
               <h2 className="text-[14px] font-black text-gray-800 mb-3 border-b border-gray-50 pb-2.5 px-1">กิจกรรมสะสมแต้ม</h2>
               
-              <div className="grid grid-cols-3 gap-2 pt-2 pb-1">
+              <div className="grid grid-cols-4 gap-2 pt-2 pb-1">
                  {[
                    { id: 'earn', label: "สะสมแต้ม", color: "text-[#4CAF50]", bg: "bg-green-50", link: "/history?tab=earn", icon: <svg className="w-[24px] h-[24px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" /></svg> },
                    { id: 'redeem', label: "แลกแต้ม", color: "text-orange-500", bg: "bg-orange-50", link: "/history?tab=redeem", icon: <svg className="w-[24px] h-[24px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg> },
-                   { id: 'lucky', label: "ลุ้นโชค", color: "text-blue-500", bg: "bg-blue-50", link: "/history?tab=lucky", icon: <svg className="w-[24px] h-[24px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.91 11.672a.375.375 0 010 .656l-5.603 3.113a.375.375 0 01-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112z" /></svg> },
+                   { id: 'lucky', label: "ลุ้นรางวัล", color: "text-blue-500", bg: "bg-blue-50", link: "/history?tab=lucky", icon: <svg className="w-[24px] h-[24px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.91 11.672a.375.375 0 010 .656l-5.603 3.113a.375.375 0 01-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112z" /></svg> },
+                   { id: 'rewards', label: "ของรางวัล", color: "text-purple-600", bg: "bg-purple-50", link: "/history?tab=reward", icon: <svg className="w-[24px] h-[24px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg> },
                  ].map(item => (
                    <Link href={item.link} key={item.id} className="flex flex-col items-center gap-1.5 group active:scale-95 transition-transform">
                       <div className={`w-[52px] h-[52px] rounded-[16px] ${item.bg} ${item.color} flex items-center justify-center shadow-[inset_0_2px_4px_rgba(255,255,255,0.7)] border border-black/5`}>
