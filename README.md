@@ -1,133 +1,36 @@
-# Saversure V2
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-Multi-Tenant Loyalty & Reward Platform with zero-oversell guarantee.
+## Getting Started
 
-## Architecture
-
-| Component | Technology | Port | Domain |
-|-----------|-----------|------|--------|
-| Backend API | Go + Gin | 30400 | `api.svsu.me` |
-| Admin Portal | Next.js + TypeScript | 30401 | `admin.svsu.me` |
-| Factory Portal | Next.js + TypeScript | 30402 | — (internal) |
-| Consumer Frontend | Next.js + TypeScript | 30403 | `{brand}.svsu.me` |
-| QR Redirect | Go (same backend) | 30400 | `qr.svsu.me` |
-| Database | PostgreSQL 17 | 5432 | — |
-| Cache | Redis 7 (Docker) | 6379 | — |
-| Queue | NATS JetStream (Docker) | 4222 | — |
-| Storage | MinIO (shared) | 59300 | — |
-
-### Domain Structure (svsu.me)
-
-```
-svsu.me (V2 Platform — via Cloudflare Tunnel)
-├── api.svsu.me          → Backend API (shared, multi-tenant)
-├── admin.svsu.me        → Admin Panel (shared, tenant selector)
-├── qr.svsu.me           → QR Scan → resolve brand → redirect
-├── *.svsu.me            → Consumer Frontend (wildcard, detect brand from hostname)
-│   ├── julasherb.svsu.me   → Jula'sHerb consumer
-│   ├── brand2.svsu.me      → Brand 2 consumer
-│   └── brand3.svsu.me      → Brand 3 consumer
-```
-
-## Quick Start
+First, run the development server:
 
 ```bash
-# 1. Start infrastructure (PostgreSQL, Redis, NATS)
-docker compose up -d
-
-# 2. Run database migrations
-cd backend
-cp ../../run/saversureV2/.env.dev .env
-go run ./cmd/migrate up
-
-# 3. Start API server
-go run ./cmd/api
-
-# 4. Start admin portal (separate terminal)
-cd frontend && npm install && npm run dev
-
-# 5. Start consumer frontend (separate terminal)
-cd consumer && npm install && npm run dev
-
-# 6. Start Cloudflare tunnel (optional, for public access)
-cloudflared tunnel run saversure
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
-## Dev Migration Reset
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-For repeated V1 -> V2 migration testing in development, prefer resetting the whole V2 database to a clean baseline instead of deleting destination rows module by module.
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-Recommended baseline:
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-- V1 source database: `saversure_v1_backup`
-- V2 target database: `saversure`
-- Baseline dump file: `backup/v2_dev_baseline.dump`
+## Learn More
 
-Useful commands:
+To learn more about Next.js, take a look at the following resources:
 
-```bash
-# Create/update a clean V2 baseline snapshot
-make baseline-snapshot
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-# Reset V2 from the saved baseline before rerunning migration tests
-make baseline-reset
-```
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-PowerShell equivalents:
+## Deploy on Vercel
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/create-v2-baseline-snapshot.ps1
-powershell -ExecutionPolicy Bypass -File scripts/reset-v2-from-baseline.ps1 -Force
-```
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-Why this is preferred in dev:
-
-- `customer` migration depends on `users.v1_user_id`, mapping state, and the immutable `point_ledger`
-- `redeem_history` writes into `reward_reservations`, which is also a live V2 table
-- resetting the full V2 baseline avoids stale mapping rows and partial cleanup bugs
-
-See [docs/dev-migration-reset.md](docs/dev-migration-reset.md) for the recommended workflow.
-
-## Project Structure
-
-```
-saversureV2/
-├── backend/              Go API
-│   ├── cmd/api/          Entry point
-│   ├── cmd/migrate/      Migration runner
-│   ├── internal/         Business logic
-│   │   ├── auth/         JWT + RBAC + LINE Login (per-tenant)
-│   │   ├── tenant/       Multi-tenant management
-│   │   ├── branding/     Tenant-specific theming (public API)
-│   │   ├── campaign/     Campaign CRUD
-│   │   ├── batch/        QR batch generation
-│   │   ├── code/         QR scan + redirect (qr.svsu.me)
-│   │   ├── roll/         Roll lifecycle management
-│   │   ├── qc/           QC verification (ref2)
-│   │   ├── redemption/   2-phase reservation
-│   │   ├── inventory/    Reward stock management
-│   │   ├── ledger/       Immutable point ledger
-│   │   ├── audit/        Audit trail
-│   │   └── middleware/   Auth, CORS, rate limit, idempotency
-│   ├── pkg/codegen/      QR code generation, ref1/ref2, HMAC
-│   └── migrations/       SQL migrations
-├── frontend/             Next.js Admin Portal (port 30401)
-├── consumer/             Next.js Consumer Frontend (port 30403)
-│   └── src/
-│       ├── lib/tenant.ts       Hostname-based tenant detection
-│       ├── components/TenantProvider.tsx  Dynamic branding
-│       └── app/                Pages (scan, login, rewards, etc.)
-├── factory-portal/       Next.js Factory Portal (port 30402)
-├── docker-compose.yml    PostgreSQL + Redis + NATS
-└── BACKLOG.md            Development backlog & roadmap
-```
-
-## Core Design Principles
-
-- **Zero Oversell**: Atomic 2-phase reservation with row-level locks
-- **Immutable Ledger**: Point transactions cannot be edited or deleted
-- **Multi-Tenant / Multi-Brand**: 1 backend, N brands via subdomain detection
-- **Dynamic Branding**: Each brand gets custom theme/logo via branding API
-- **Per-Tenant LINE Login**: LINE credentials stored in tenant settings (not global env)
-- **Idempotent APIs**: Duplicate requests return same result
-- **QR Redirect**: `qr.svsu.me/s/{code}` → resolve brand → redirect to `{brand}.svsu.me/s/{code}`
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

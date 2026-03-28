@@ -34,11 +34,11 @@ function normalizeNavItems(raw: RawNavItem[]): NavMenuItem[] {
 }
 
 const FALLBACK_TABS: NavMenuItem[] = [
-  { icon: "home", label: "หน้าหลัก", link: "/", visible: true },
-  { icon: "scan", label: "สแกน", link: "/scan", visible: true },
-  { icon: "gift", label: "รางวัล", link: "/rewards", visible: true },
-  { icon: "history", label: "ประวัติ", link: "/history", visible: true },
-  { icon: "user", label: "บัญชี", link: "/profile", visible: true },
+  { icon: "gift", label: "สิทธิพิเศษ", link: "/rewards", visible: true },
+  { icon: "news", label: "กิจกรรม", link: "/news", visible: true },
+  { icon: "scan", label: "สะสมแต้ม", link: "/scan", visible: true },
+  { icon: "cart", label: "ช้อปออนไลน์", link: "/shop", visible: true },
+  { icon: "info", label: "แจ้งปัญหา", link: "/support", visible: true },
 ];
 
 const PRIMARY_LINKS = ["/scan"];
