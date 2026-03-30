@@ -18,7 +18,11 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="th">
-      <head />
+      <head>
+        <link rel="preload" href="/assets/fonts/DBHeavent.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+        <link rel="preload" href="/assets/fonts/DBHeavent-Bold.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+        <link rel="preload" href="/assets/fonts/DBHeaventt-Light.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+      </head>
       <body>
         <TenantProvider>
           {children}

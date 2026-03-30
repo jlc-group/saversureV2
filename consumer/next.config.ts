@@ -31,6 +31,14 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "placehold.co",
       },
+      {
+        protocol: "https",
+        hostname: "s3.konvy.com",
+      },
+      {
+        protocol: "https",
+        hostname: "media.allonline.7eleven.co.th",
+      },
     ],
   },
 };

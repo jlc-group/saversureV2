@@ -1,130 +1,268 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Image from "next/image";
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
+import { api } from "@/lib/api";
+import { isLoggedIn } from "@/lib/auth";
+import { useTenant } from "@/components/TenantProvider";
+import {
+  type MultiBalance,
+  getPrimaryBalance,
+  getSecondaryBalances,
+} from "@/lib/currency";
 
+/* ───────── Types ───────── */
+interface RewardItem {
+  id: string;
+  name: string;
+  description: string;
+  type: string;
+  point_cost: number;
+  cost_currency: string;
+  image_url?: string;
+  delivery_type: string;
+  available_qty: number;
+  is_flash: boolean;
+  price?: number;
+  diamond_point?: number;
+  tier_name?: string;
+}
+
+interface NewsItem {
+  id: string;
+  title: string;
+  summary?: string;
+  image_url?: string;
+  banner_image?: string;
+  type: string;
+}
+
+interface UserProfile {
+  display_name?: string;
+  first_name?: string;
+  last_name?: string;
+}
+
+/* ───────── Helpers ───────── */
+const mediaUrl = (url?: string) => {
+  if (!url) return null;
+  if (url.startsWith("http")) return url;
+  const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:30400";
+  return `${base}/media/${url}`;
+};
+
+/* ═══════════════════════════════════
+   ListItemCard — ตาม mockup จริงที่ run
+   (ไม่ใช่ fallback จาก source code)
+   ═══════════════════════════════════ */
+function RewardCard({ reward, idx }: { reward: RewardItem; idx: number }) {
+  const imgSrc = mediaUrl(reward.image_url);
+  const price = reward.price || Math.round(reward.point_cost * 0.65);
+
+  // สีพื้นหลังรูป (สลับ pastel)
+  const bgClasses = ["jh-bg-green", "jh-bg-pink", "jh-bg-blue", "jh-bg-yellow", "jh-bg-purple", "jh-bg-teal"];
+  const bgClass = bgClasses[idx % bgClasses.length];
+
+  return (
+    <Link href={`/rewards/${reward.id}`}>
+      <div className="jh-card">
+        <div className="jh-card-inner">
+          {/* ═══ รูป ═══ */}
+          <div className={`jh-card-img ${bgClass}`}>
+            {reward.is_flash && (
+              <div className="jh-flash-badge">⚡ FLASH</div>
+            )}
+            {imgSrc ? (
+              <Image
+                src={imgSrc}
+                alt={reward.name}
+                width={180}
+                height={180}
+                className="jh-card-product-img"
+              />
+            ) : (
+              <div className="jh-card-emoji">🎁</div>
+            )}
+            {/* ป้ายใต้รูป */}
+            <div className="jh-card-img-label">
+              {reward.description
+                ? reward.description.length > 40
+                  ? reward.description.slice(0, 40) + "..."
+                  : reward.description
+                : reward.name}
+            </div>
+          </div>
+
+          {/* ═══ ข้อมูล ═══ */}
+          <div className="jh-card-detail">
+            <div className="jh-card-detail-top">
+              <div className="jh-card-free-label">แลกรับฟรี !</div>
+              <div className="jh-card-name">{reward.name}</div>
+              <div className="jh-card-price">{price} <span>บาท</span></div>
+            </div>
+
+            <div className="jh-card-detail-bottom">
+              <div className="jh-card-discount">
+                <strong>พิเศษ! ลดแลกแต้มสินค้า</strong><br />
+                เพียง <span className="jh-pts">{reward.point_cost.toLocaleString()}</span> แต้ม{" "}
+                <span className="jh-pts-old">
+                  (ปกติ <s>{Math.round(reward.point_cost * 1.4).toLocaleString()}</s> แต้ม)
+                </span>
+              </div>
+
+              {/* จัดส่ง */}
+              {reward.delivery_type === "shipping" && (
+                <div className="jh-card-shipping">จัดส่งฟรีทั่วประเทศ</div>
+              )}
+
+              {/* Point button */}
+              <div className="jh-card-point-btn">
+                ใช้ {reward.point_cost.toLocaleString()} <span>🪙</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+/* ═══════════════════════════════════
+   Home Page
+   ═══════════════════════════════════ */
 function JulaHerbHome() {
+  const { brandName } = useTenant();
   const [activeTab, setActiveTab] = useState("julaherb");
+  const [rewards, setRewards] = useState<RewardItem[]>([]);
+  const [newsList, setNewsList] = useState<NewsItem[]>([]);
+  const [balances, setBalances] = useState<MultiBalance[]>([]);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const loggedIn = isLoggedIn();
+
+  const primaryBal = getPrimaryBalance(balances);
+  const secondaryBals = getSecondaryBalances(balances);
+
+  useEffect(() => {
+    api.get<{ data: RewardItem[] }>("/api/v1/public/rewards?limit=20")
+      .then((d) => setRewards(d.data || [])).catch(() => {});
+    api.get<{ data: NewsItem[] }>("/api/v1/public/news?limit=5")
+      .then((d) => setNewsList(d.data || [])).catch(() => {});
+    if (loggedIn) {
+      api.get<{ data: MultiBalance[] }>("/api/v1/my/balances")
+        .then((d) => setBalances(d.data ?? [])).catch(() => {});
+      api.get<UserProfile>("/api/v1/profile")
+        .then((d) => setProfile(d)).catch(() => {});
+    }
+  }, [loggedIn]);
+
+  const displayName =
+    profile?.display_name ||
+    [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
+    brandName;
+
+  const tabs = [
+    { id: "julaherb", label: "สินค้าจุฬาเฮิร์บ" },
+    { id: "premium", label: "สินค้าพรีเมียม" },
+    { id: "lifestyle", label: "ไลฟ์สไตล์" },
+    { id: "donate", label: "ร่วมบริจาค" },
+  ];
+
+  const filteredRewards =
+    activeTab === "julaherb"
+      ? rewards.filter((r) => r.delivery_type === "shipping" || r.delivery_type === "pickup")
+      : activeTab === "premium"
+      ? rewards.filter((r) => r.tier_name || r.point_cost >= 200)
+      : activeTab === "lifestyle"
+      ? rewards.filter((r) => r.delivery_type === "coupon" || r.delivery_type === "digital")
+      : activeTab === "donate"
+      ? rewards.filter((r) => r.delivery_type === "none" || r.type === "donation")
+      : rewards;
+
+  const banners = newsList.length > 0 ? newsList : null;
+  const [bannerIdx, setBannerIdx] = useState(0);
+  useEffect(() => {
+    if (!banners || banners.length <= 1) return;
+    const t = setInterval(() => setBannerIdx((p) => (p + 1) % banners.length), 3000);
+    return () => clearInterval(t);
+  }, [banners]);
 
   return (
     <>
-      <div className="bg-[#8ac43f] text-white px-4 py-2 flex items-center justify-between text-sm sticky top-14 z-40 shadow-sm">
-        <div className="font-bold">ฉัตรธิดา Points</div>
-        <div className="flex items-center gap-2 font-bold bg-[#7ab036] px-3 py-1 rounded-full text-xs box-border border-white/20 border">
-          <span className="flex items-center gap-1">แต้ม 125 <span className="text-yellow-300 text-sm">🪙</span></span>
-          <span className="text-white/50 px-1">|</span>
-          <span className="flex items-center gap-1">เพชร 0 <span className="text-cyan-200 text-sm">💎</span></span>
+      {/* ══════ Points Bar ══════ */}
+      <div className="jh-points-bar">
+        <span className="jh-points-name">
+          {loggedIn ? `${displayName} Points` : `${brandName} Points`}
+        </span>
+        <div className="jh-points-values">
+          <span>แต้ม {(primaryBal?.balance ?? 0).toLocaleString()}</span>
+          <span className="jh-coin">🪙</span>
+          <span className="jh-divider">|</span>
+          <span>เพชร {secondaryBals.length > 0 ? secondaryBals[0].balance.toLocaleString() : "0"}</span>
+          <span className="jh-diamond">💎</span>
         </div>
       </div>
 
-      <div className="bg-[#f8f9fa] min-h-screen pb-24">
-        <div className="p-4 pt-5">
-          <div className="flex gap-3 overflow-x-auto scrollbar-hide snap-x">
-            <div className="w-[88vw] shrink-0 snap-center rounded-[16px] bg-gradient-to-br from-[#8ac43f] to-[#71a62d] text-white p-5 relative overflow-hidden h-36 flex items-center box-border aspect-[21/9] shadow-md">
-              <div className="absolute -right-10 -top-10 w-32 h-32 bg-white/10 rounded-full blur-xl"></div>
-              <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-black/10 rounded-full blur-xl"></div>
-              <div className="relative z-10 w-full">
-                <h2 className="text-3xl font-bold mb-2 drop-shadow-md tracking-wide">คำถามที่พบบ่อย</h2>
-                <p className="text-[11px] opacity-90 drop-shadow-sm flex flex-wrap gap-1.5 font-medium">
-                  <span className="bg-black/10 px-2 py-0.5 rounded-full">การสแกนสะสมแต้ม</span>
-                  <span className="bg-black/10 px-2 py-0.5 rounded-full">การแลกของรางวัล</span>
-                  <span className="bg-black/10 px-2 py-0.5 rounded-full">วิธีเช็คของแท้</span>
-                </p>
-              </div>
-              <div className="absolute top-3 right-4 text-white/50 text-xs font-bold uppercase tracking-widest">JULA'S HERB</div>
-            </div>
-            
-            <div className="w-[88vw] shrink-0 snap-center rounded-[16px] bg-gradient-to-br from-[#1a9444] to-[#15783a] text-white p-5 relative overflow-hidden h-36 flex items-center box-border aspect-[21/9] shadow-md">
-               <div className="relative z-10 w-full">
-                <div className="bg-yellow-400 text-yellow-900 text-xs font-bold px-2.5 py-1 rounded-full inline-block mb-2 shadow-sm">กิจกรรม</div>
-                <h2 className="text-2xl font-bold mb-1 shadow-black">JDent Challenge</h2>
-                <p className="text-xs opacity-90 font-medium">ป้ายยาดี มีรางวัล เพียบ!</p>
-              </div>
-            </div>
-          </div>
-          <div className="flex justify-center gap-1.5 mt-4">
-            <div className="w-5 h-1.5 bg-[#8ac43f] rounded-full transition-all"></div>
-            <div className="w-1.5 h-1.5 bg-gray-300 rounded-full transition-all"></div>
-            <div className="w-1.5 h-1.5 bg-gray-300 rounded-full transition-all"></div>
-            <div className="w-1.5 h-1.5 bg-gray-300 rounded-full transition-all"></div>
-          </div>
-        </div>
-
-        <div className="px-4 mt-1">
-          <h2 className="text-[22px] font-bold text-gray-900 mb-4 tracking-tight">แลกสิทธิพิเศษสำหรับคุณ</h2>
-          
-          <div className="flex overflow-x-auto scrollbar-hide gap-6 border-b-2 border-gray-100 pb-0.5 mb-5 relative">
-            {[
-              { id: 'julaherb', label: 'สินค้าจุฬาเฮิร์บ' },
-              { id: 'premium', label: 'สินค้าพรีเมียม' },
-              { id: 'lifestyle', label: 'ไลฟ์สไตล์' },
-              { id: 'donate', label: 'ร่วมบริจาค' },
-            ].map(tab => (
-              <button 
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`whitespace-nowrap pb-2.5 text-[15px] transition-all relative ${activeTab === tab.id ? 'text-[#8ac43f] font-bold' : 'text-gray-400 font-medium hover:text-gray-600'}`}
-              >
-                {tab.label}
-                {activeTab === tab.id && (
-                  <div className="absolute -bottom-[2px] left-0 right-0 h-[3px] bg-[#8ac43f] rounded-t-full shadow-[0_-1px_4px_rgba(138,196,63,0.3)]"></div>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="px-4 space-y-4">
-          <div className="bg-white rounded-[16px] border border-gray-100 flex overflow-hidden shadow-[0_4px_12px_rgba(0,0,0,0.03)] h-44 hover:shadow-[0_6px_16px_rgba(0,0,0,0.06)] transition-shadow">
-            <div className="w-[45%] bg-[#fff0f4] relative flex flex-col items-center justify-center p-3 border-r border-gray-50">
-               <div className="absolute top-2.5 text-pink-300 text-[9px] uppercase font-bold tracking-[0.2em]">Jula's Herb</div>
-               <div className="text-7xl my-auto drop-shadow-xl transform -rotate-6 filter saturate-150">🦷</div>
-               <div className="mt-auto bg-white/95 px-2.5 py-1 rounded-full shadow-sm text-[9px] font-bold w-[95%] text-center truncate text-gray-700">เจเด้นท์ 3X เอ็กซ์ตร้า 70 กรัม</div>
-            </div>
-            <div className="w-[55%] p-3.5 flex flex-col justify-between">
-              <div>
-                <div className="text-[#8ac43f] font-black text-xl leading-tight tracking-wide">แลกรับฟรี !</div>
-                <div className="text-gray-800 text-sm font-bold leading-snug mt-1">ยาสีฟันเจเด้นท์ สูตรเสียวฟัน</div>
-                <div className="text-[#8ac43f] font-bold text-2xl mt-1.5 flex items-baseline gap-1">120 <span className="text-sm">บาท</span></div>
-                <div className="text-[10px] text-gray-500 mt-2 leading-tight bg-gray-50 p-1.5 rounded-md">
-                  <span className="font-bold text-gray-700">พิเศษ! ลดแลกแต้มสินค้า</span><br/>
-                  เพียง <span className="text-[#8ac43f] font-bold text-[11px]">168</span> แต้ม <span className="text-gray-400 text-[9px]">(ปกติ <span className="line-through">240</span> แต้ม)</span>
+      {/* ══════ Banner ══════ */}
+      <div className="jh-banner-section">
+        <div className="jh-banner-scroll">
+          {banners
+            ? banners.map((news) => {
+                const img = mediaUrl(news.banner_image || news.image_url);
+                return (
+                  <Link key={news.id} href={`/news/${news.id}`} className="jh-banner-slide">
+                    {img ? (
+                      <Image src={img} alt={news.title} width={240} height={112}
+                        className="jh-banner-img" />
+                    ) : (
+                      <div className="jh-banner-placeholder">{news.title}</div>
+                    )}
+                    <p className="jh-banner-caption">{news.title}</p>
+                  </Link>
+                );
+              })
+            : [
+                { title: "คำถามที่พบบ่อย เกี่ยวกับการสแกนสินค้าจุฬาเฮิร์บ" },
+                { title: "สะสมแต้มแลกรางวัล สแกน QR Code รับแต้มทันที!" },
+              ].map((b, i) => (
+                <div key={i} className="jh-banner-slide">
+                  <div className="jh-banner-placeholder">{b.title}</div>
                 </div>
-              </div>
-              <div className="flex items-center justify-between mt-2.5">
-                <span className="text-[9px] font-bold text-gray-400">จัดส่งฟรีทั่วประเทศ</span>
-                <button className="bg-[#8ac43f] hover:bg-[#7ab036] text-white rounded-lg py-1.5 px-3 text-xs font-bold shadow-[0_4px_10px_rgba(138,196,63,0.3)] active:scale-95 transition-all flex items-center gap-1">
-                  ใช้ 168 🪙
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-[16px] border border-gray-100 flex overflow-hidden shadow-[0_4px_12px_rgba(0,0,0,0.03)] h-44 hover:shadow-[0_6px_16px_rgba(0,0,0,0.06)] transition-shadow">
-            <div className="w-[45%] bg-[#fff0f0] relative flex flex-col items-center justify-center p-3 border-r border-gray-50">
-               <div className="absolute top-2.5 text-red-300 text-[9px] uppercase font-bold tracking-[0.2em]">Jula's Herb</div>
-               <div className="text-7xl my-auto drop-shadow-xl transform filter saturate-150">💄</div>
-               <div className="mt-auto bg-white/95 px-2.5 py-1 rounded-full shadow-sm text-[9px] font-bold w-[95%] text-center truncate text-gray-700">วอเตอร์เมลอน ลิปเซรั่ม 2.5g</div>
-            </div>
-            <div className="w-[55%] p-3.5 flex flex-col justify-between">
-              <div>
-                <div className="text-[#8ac43f] font-black text-xl leading-tight tracking-wide">แลกรับฟรี !</div>
-                <div className="text-gray-800 text-sm font-bold leading-snug mt-1">แทททูลิปเซรั่ม สีแดง #02</div>
-                <div className="text-gray-400 text-xs font-medium mt-0.5">Burgundy</div>
-                <div className="text-[#8ac43f] font-bold text-2xl mt-1 flex items-baseline gap-1">99 <span className="text-sm">บาท</span></div>
-              </div>
-              <div className="flex items-center justify-between mt-2.5">
-                <span className="text-[9px] font-bold text-gray-400">มีค่าจัดส่ง</span>
-                <button className="bg-[#8ac43f] hover:bg-[#7ab036] text-white rounded-lg py-1.5 px-3 text-xs font-bold shadow-[0_4px_10px_rgba(138,196,63,0.3)] active:scale-95 transition-all flex items-center gap-1">
-                  ใช้ 198 🪙
-                </button>
-              </div>
-            </div>
-          </div>
+              ))}
+          <div style={{ width: 16, flexShrink: 0 }}>&nbsp;</div>
         </div>
+        <div className="jh-banner-dots">
+          {(banners || [null, null]).map((_, i) => (
+            <div key={i} className={`jh-dot ${i === bannerIdx ? "active" : ""}`} />
+          ))}
+        </div>
+      </div>
+
+      <div className="jh-rewards-section">
+        <h2 className="jh-section-title">แลกสิทธิพิเศษสำหรับคุณ</h2>
+
+        <div className="jh-tabs">
+          {tabs.map((tab) => (
+            <span key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`jh-tab ${activeTab === tab.id ? "active" : ""}`}>
+              {tab.label}
+            </span>
+          ))}
+        </div>
+
+        {filteredRewards.length === 0 ? (
+          <div className="jh-empty">
+            <div className="jh-empty-icon">🎁</div>
+            <p>ยังไม่มีของรางวัลในหมวดนี้</p>
+          </div>
+        ) : (
+          filteredRewards.map((reward, idx) => (
+            <RewardCard key={reward.id} reward={reward} idx={idx} />
+          ))
+        )}
       </div>
     </>
   );
@@ -132,11 +270,7 @@ function JulaHerbHome() {
 
 export default function HomePage() {
   const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
+  useEffect(() => setMounted(true), []);
   if (!mounted) return null;
 
   return (
