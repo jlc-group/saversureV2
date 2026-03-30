@@ -167,13 +167,13 @@ function JulaHerbHome() {
 
   const filteredRewards =
     activeTab === "julaherb"
-      ? rewards.filter((r) => r.type === "physical" || r.type === "product")
+      ? rewards.filter((r) => String(r.type).toLowerCase() === "product")
       : activeTab === "premium"
-      ? rewards.filter((r) => r.type === "premium")
+      ? rewards.filter((r) => String(r.type).toLowerCase() === "premium")
       : activeTab === "lifestyle"
-      ? rewards.filter((r) => r.type === "coupon" || r.type === "digital" || r.type === "ticket")
+      ? rewards.filter((r) => ["coupon", "digital", "ticket"].includes(String(r.type).toLowerCase()) || ["coupon", "digital", "ticket"].includes(String(r.delivery_type).toLowerCase()))
       : activeTab === "donate"
-      ? rewards.filter((r) => r.delivery_type === "none" || r.type === "donation")
+      ? rewards.filter((r) => String(r.delivery_type).toLowerCase() === "none" || String(r.type).toLowerCase() === "donation")
       : rewards;
 
   const banners = newsList.length > 0 ? newsList : null;

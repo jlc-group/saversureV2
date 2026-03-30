@@ -25,16 +25,26 @@ interface RawNavItem {
 function normalizeNavItems(raw: RawNavItem[]): NavMenuItem[] {
   return raw
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-    .map((item) => ({
-      icon: item.icon,
-      label: item.label,
-      link: item.link || item.path || "/",
-      visible: item.visible !== false,
-    }));
+    .map((item) => {
+      let link = item.link || item.path || "/";
+      let label = item.label;
+
+      if (link === "/rewards" || label === "สิทธิพิเศษ") {
+        label = "หน้าหลัก";
+        link = "/";
+      }
+
+      return {
+        icon: item.icon,
+        label,
+        link,
+        visible: item.visible !== false,
+      };
+    });
 }
 
 const FALLBACK_TABS: NavMenuItem[] = [
-  { icon: "gift", label: "สิทธิพิเศษ", link: "/rewards", visible: true },
+  { icon: "gift", label: "หน้าหลัก", link: "/", visible: true },
   { icon: "news", label: "กิจกรรม", link: "/news", visible: true },
   { icon: "scan", label: "สะสมแต้ม", link: "/scan", visible: true },
   { icon: "cart", label: "ช้อปออนไลน์", link: "/shop", visible: true },

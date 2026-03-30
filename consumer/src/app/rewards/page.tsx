@@ -14,6 +14,7 @@ interface RewardItem {
   id: string;
   name: string;
   description: string;
+  type: string;
   point_cost: number;
   cost_currency: string;
   image_url?: string;
@@ -59,6 +60,14 @@ export default function RewardsPage() {
   const [loading, setLoading] = useState(true);
   const [userBalance, setUserBalance] = useState<Record<string, number>>({});
   const [currencyMap, setCurrencyMap] = useState<Record<string, CurrencyMaster>>({});
+  const [activeTab, setActiveTab] = useState<"julaherb" | "premium" | "lifestyle">("julaherb");
+
+  const filteredRewards = rewards.filter((r) => {
+    if (activeTab === "julaherb") return r.type === "product";
+    if (activeTab === "premium") return r.type === "premium";
+    if (activeTab === "lifestyle") return ["coupon", "digital", "ticket"].includes(r.delivery_type) || ["coupon", "digital", "ticket"].includes(r.type);
+    return true;
+  });
 
   const getIcon = (code: string) => {
     const c = currencyMap[code.toLowerCase()];
@@ -135,8 +144,32 @@ export default function RewardsPage() {
           )}
         </div>
 
+        {/* Categories Tabs */}
+        <div className="px-4 mt-4 relative z-20">
+          <div className="flex bg-white/60 backdrop-blur-md rounded-full p-1 shadow-sm overflow-x-auto hide-scrollbar border border-white justify-between">
+            {[
+              { id: "julaherb", label: "สินค้าจุฬาเฮิร์บ", icon: "🌱" },
+              { id: "premium", label: "สินค้าพรีเมียม", icon: "💎" },
+              { id: "lifestyle", label: "ไลฟสไตล์", icon: "🎟️" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex-1 min-w-max px-3 py-2 text-[12px] font-bold rounded-full transition-all whitespace-nowrap flex items-center justify-center gap-1.5 ${
+                  activeTab === tab.id
+                    ? "bg-[var(--jh-green)] text-white shadow-md shadow-green-500/20"
+                    : "text-muted-foreground hover:bg-black/5"
+                }`}
+              >
+                <span>{tab.icon}</span>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Rewards Grid */}
-        <div className="px-4 -mt-6 relative z-10">
+        <div className="px-4 mt-5 relative z-10">
           {loading ? (
             <div className="grid grid-cols-2 gap-3">
               {[1, 2, 3, 4].map((n) => (
@@ -149,7 +182,7 @@ export default function RewardsPage() {
                 </Card>
               ))}
             </div>
-          ) : rewards.length === 0 ? (
+          ) : filteredRewards.length === 0 ? (
             <Card className="border-0 shadow-md animate-slide-up">
               <CardContent className="flex flex-col items-center py-16 px-6">
                 <div className="w-20 h-20 mb-4 rounded-full bg-secondary flex items-center justify-center animate-float">
@@ -157,13 +190,13 @@ export default function RewardsPage() {
                     <path d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
                   </svg>
                 </div>
-                <h3 className="text-lg font-bold text-[var(--jh-green)]">ยังไม่มีของรางวัล</h3>
+                <h3 className="text-lg font-bold text-[var(--jh-green)]">ยังไม่มีของรางวัลในหมวดนี้</h3>
                 <p className="text-sm text-muted-foreground mt-1 text-center">สะสมแต้มรอไว้ก่อนนะ เร็วๆ นี้จะมีของรางวัลมากมาย</p>
               </CardContent>
             </Card>
           ) : (
             <div className="grid grid-cols-2 gap-3 stagger-children">
-              {rewards.map((r) => {
+              {filteredRewards.map((r) => {
                 const imgSrc = mediaUrl(r.image_url);
                 const affordable = isLoggedIn() && canAfford(r.point_cost, r.cost_currency);
                 const icon = getIcon(r.cost_currency);

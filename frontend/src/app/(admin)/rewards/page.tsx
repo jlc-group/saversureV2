@@ -36,7 +36,7 @@ interface CurrencyMaster {
 }
 
 const typeOptions = [
-  { value: "physical", label: "สินค้าจริง" },
+  { value: "product", label: "สินค้าจริง" },
   { value: "premium", label: "สินค้าพรีเมียม" },
   { value: "coupon", label: "คูปอง" },
   { value: "digital", label: "ดิจิทัล" },
@@ -88,7 +88,7 @@ type FormData = {
 };
 
 const emptyForm: FormData = {
-  campaign_id: "", name: "", description: "", type: "physical",
+  campaign_id: "", name: "", description: "", type: "product",
   point_cost: 100, normal_point_cost: 0, price: 0, cost_currency: "point", delivery_type: "none",
   status: "active", valid_from: "", expires_at: "", total_qty: 100, image_url: "",
 };
@@ -106,6 +106,7 @@ export default function RewardsPage() {
   const [updatingInv, setUpdatingInv] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive" | "draft">("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
 
   const getCurrencyIcon = (code: string) => {
     const c = currencies.find((x) => x.code.toLowerCase() === code.toLowerCase());
@@ -222,6 +223,7 @@ export default function RewardsPage() {
 
   const filtered = rewards.filter((r) => {
     if (statusFilter !== "all" && r.status !== statusFilter) return false;
+    if (typeFilter !== "all" && r.type !== typeFilter) return false;
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       if (!r.name.toLowerCase().includes(q) && !r.id.toLowerCase().includes(q) && !r.type.toLowerCase().includes(q)) return false;
@@ -260,6 +262,18 @@ export default function RewardsPage() {
           />
         </div>
         <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+          className="h-[40px] px-3 border border-[var(--md-outline)] rounded-[var(--md-radius-sm)] text-[13px] text-[var(--md-on-surface)] bg-transparent outline-none focus:border-[var(--md-primary)] focus:border-2 transition-all cursor-pointer"
+        >
+          <option value="all">ทุกหมวดหมู่ ({rewards.length})</option>
+          {typeOptions.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label} ({rewards.filter((r) => r.type === o.value).length})
+            </option>
+          ))}
+        </select>
+        <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
           className="h-[40px] px-3 border border-[var(--md-outline)] rounded-[var(--md-radius-sm)] text-[13px] text-[var(--md-on-surface)] bg-transparent outline-none focus:border-[var(--md-primary)] focus:border-2 transition-all cursor-pointer"
@@ -269,7 +283,7 @@ export default function RewardsPage() {
           <option value="inactive">Inactive ({rewards.filter((r) => r.status === "inactive").length})</option>
           <option value="draft">Draft ({rewards.filter((r) => r.status === "draft").length})</option>
         </select>
-        {(search || statusFilter !== "all") && (
+        {(search || statusFilter !== "all" || typeFilter !== "all") && (
           <span className="text-[12px] text-[var(--md-on-surface-variant)]">
             {filtered.length} รายการ
           </span>
@@ -351,7 +365,7 @@ export default function RewardsPage() {
                   <label className={labelClass}>ประเภทสินค้า</label>
                   <select value={form.type} onChange={(e) => {
                     const t = e.target.value;
-                    const autoDelivery: Record<string, string> = { physical: "shipping", premium: "shipping", coupon: "coupon", digital: "digital", ticket: "ticket" };
+                    const autoDelivery: Record<string, string> = { product: "shipping", premium: "shipping", coupon: "coupon", digital: "digital", ticket: "ticket" };
                     setForm({ ...form, type: t, delivery_type: autoDelivery[t] || form.delivery_type });
                   }} className={fieldClass}>
                     {typeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}

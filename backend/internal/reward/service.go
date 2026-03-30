@@ -53,6 +53,7 @@ type PublicItem struct {
 	CostCurrency    string  `json:"cost_currency"`
 	ImageURL        *string `json:"image_url,omitempty"`
 	DeliveryType    string  `json:"delivery_type"`
+	Type            string  `json:"type"`
 	AvailableQty    int     `json:"available_qty"`
 	IsFlash         bool    `json:"is_flash"`
 	FlashStart      *string `json:"flash_start,omitempty"`
@@ -124,7 +125,7 @@ func (s *Service) ListPublic(ctx context.Context, tenantID string, tierID *strin
 
 	query := fmt.Sprintf(
 		`SELECT r.id, r.name, COALESCE(r.description, ''), r.point_cost, COALESCE(r.normal_point_cost, 0), COALESCE(r.price, 0::numeric), COALESCE(r.cost_currency, 'point'), r.image_url,
-		        COALESCE(r.delivery_type, 'none'),
+		        COALESCE(r.delivery_type, 'none'), r.type,
 		        (ri.total_qty - ri.reserved_qty - ri.sold_qty) as available_qty,
 		        COALESCE(r.is_flash, false), r.flash_start::text, r.flash_end::text,
 		        r.tier_id, rt.name as tier_name, r.valid_from::text
@@ -148,7 +149,7 @@ func (s *Service) ListPublic(ctx context.Context, tenantID string, tierID *strin
 	for rows.Next() {
 		var p PublicItem
 		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.PointCost, &p.NormalPointCost, &p.Price, &p.CostCurrency, &p.ImageURL,
-			&p.DeliveryType, &p.AvailableQty,
+			&p.DeliveryType, &p.Type, &p.AvailableQty,
 			&p.IsFlash, &p.FlashStart, &p.FlashEnd,
 			&p.TierID, &p.TierName, &p.ValidFrom); err != nil {
 			return nil, 0, fmt.Errorf("scan reward: %w", err)
