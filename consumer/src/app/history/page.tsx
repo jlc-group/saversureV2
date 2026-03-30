@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
+import HistoryTabs from "@/components/HistoryTabs";
 import { isLoggedIn } from "@/lib/auth";
 import { api } from "@/lib/api";
 import {
@@ -211,9 +212,9 @@ export default function HistoryPage() {
           <div className="absolute -right-5 -top-5 h-24 w-24 rounded-full bg-white/10 animate-float" />
           <div className="absolute right-8 bottom-3 h-16 w-16 rounded-full bg-white/5 animate-float-delay-1" />
           <div className="absolute left-10 bottom-0 h-10 w-10 rounded-full bg-white/8 animate-float-delay-2" />
-          <h1 className="text-[17px] font-bold relative">ประวัติการสะสมแต้ม</h1>
+          <h1 className="text-[36px] sm:text-[42px] font-black tracking-tight leading-[1.1] mb-1 drop-shadow-md relative">ประวัติการสะสมแต้ม</h1>
           {loggedIn && total > 0 && (
-            <p className="text-[11px] text-white/70 mt-0.5 relative">สแกน {total} ครั้ง</p>
+            <p className="text-[15px] font-medium text-white/95 mt-0.5 relative">สแกน {total} ครั้ง</p>
           )}
         </div>
 
@@ -268,22 +269,7 @@ export default function HistoryPage() {
           )}
 
           {/* Tab row - gamified pill style */}
-          {loggedIn && (
-            <div className="flex gap-2 bg-white/80 backdrop-blur-sm rounded-full p-1 shadow-sm border border-gray-100">
-              <div className="flex-1 rounded-full bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-teal)_100%)] py-2.5 text-center text-[13px] font-bold text-white shadow-md shadow-green-200/50 transition-all">
-                <span className="flex items-center justify-center gap-1.5">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5"><path d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
-                  แต้มสะสม
-                </span>
-              </div>
-              <Link href="/history/redeems" className="flex-1 rounded-full bg-transparent py-2.5 text-center text-[13px] font-semibold text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-all">
-                <span className="flex items-center justify-center gap-1.5">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5"><path d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25" /></svg>
-                  แลกรางวัล
-                </span>
-              </Link>
-            </div>
-          )}
+          {loggedIn && <HistoryTabs />}
         </div>
 
         {/* List */}

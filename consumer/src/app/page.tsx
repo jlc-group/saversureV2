@@ -255,13 +255,22 @@ function JulaHerbHome() {
         <h2 className="jh-section-title">แลกสิทธิพิเศษสำหรับคุณ</h2>
 
         <div className="jh-tabs">
-          {tabs.map((tab) => (
-            <span key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`jh-tab ${activeTab === tab.id ? "active" : ""}`}>
-              {tab.label}
-            </span>
-          ))}
+          {tabs.map((tab) => {
+            if (tab.id === "julaherb") {
+              return (
+                <Link key={tab.id} href="/history/redeems" className={`jh-tab ${activeTab === tab.id ? "active" : ""}`}>
+                  {tab.label}
+                </Link>
+              );
+            }
+            return (
+              <span key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`jh-tab ${activeTab === tab.id ? "active" : ""}`}>
+                {tab.label}
+              </span>
+            );
+          })}
         </div>
 
         {filteredRewards.length === 0 ? (

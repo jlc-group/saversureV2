@@ -48,7 +48,7 @@ const FALLBACK_TABS: NavMenuItem[] = [
   { icon: "target", label: "ภารกิจ", link: "/missions", visible: true },
   { icon: "scan", label: "สะสมแต้ม", link: "/scan", visible: true },
   { icon: "cart", label: "ช้อปออนไลน์", link: "/shop", visible: true },
-  { icon: "info", label: "แจ้งปัญหา", link: "/support", visible: true },
+  { icon: "user", label: "โปรไฟล์", link: "/profile", visible: true },
 ];
 
 const PRIMARY_LINKS = ["/scan"];

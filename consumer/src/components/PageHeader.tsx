@@ -43,9 +43,9 @@ export default function PageHeader({
           </Link>
         )}
         <div className="flex-1">
-          <h1 className="text-xl font-bold">{title}</h1>
+          <h1 className="text-[36px] sm:text-[42px] font-black tracking-tight leading-[1.1] mb-1 drop-shadow-md">{title}</h1>
           {subtitle && (
-            <p className="text-[13px] text-white/70 mt-0.5">{subtitle}</p>
+            <p className="text-[15px] font-medium text-white/95 mt-0.5">{subtitle}</p>
           )}
           {children}
         </div>

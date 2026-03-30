@@ -10,6 +10,7 @@ import RedeemCard, { type RedeemEntry } from "@/components/RedeemCard";
 import { api } from "@/lib/api";
 import { isLoggedIn } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
+import HistoryTabs from "@/components/HistoryTabs";
 
 export default function RedeemHistoryPage() {
   const [entries, setEntries] = useState<RedeemEntry[]>([]);
@@ -37,23 +38,7 @@ export default function RedeemHistoryPage() {
           title="ประวัติการแลกแต้ม"
           subtitle={entries.length > 0 ? `${entries.length} รายการ` : undefined}
         />
-
-        {/* Tab links */}
-        <div className="px-4 -mt-8 relative z-10">
-          <Card className="border-0 shadow-md mb-3">
-            <CardContent className="p-3">
-              <div className="flex gap-2">
-                <Link href="/history" className="flex-1 rounded-full border border-border bg-white py-2 text-center text-sm font-semibold text-muted-foreground">
-                  แต้มสะสม
-                </Link>
-                <Link href="/history/redeems" className="flex-1 rounded-full bg-[var(--jh-green)] py-2 text-center text-sm font-semibold text-white">
-                  แลกรางวัล
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
+        <HistoryTabs />
         {/* Content */}
         <div className="px-4 mt-2">
           {loading ? (
