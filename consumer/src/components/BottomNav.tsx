@@ -45,7 +45,7 @@ function normalizeNavItems(raw: RawNavItem[]): NavMenuItem[] {
 
 const FALLBACK_TABS: NavMenuItem[] = [
   { icon: "gift", label: "หน้าหลัก", link: "/", visible: true },
-  { icon: "news", label: "กิจกรรม", link: "/news", visible: true },
+  { icon: "target", label: "ภารกิจ", link: "/missions", visible: true },
   { icon: "scan", label: "สะสมแต้ม", link: "/scan", visible: true },
   { icon: "cart", label: "ช้อปออนไลน์", link: "/shop", visible: true },
   { icon: "info", label: "แจ้งปัญหา", link: "/support", visible: true },

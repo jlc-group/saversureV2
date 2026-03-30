@@ -45,7 +45,7 @@ const FALLBACK_ITEMS: DrawerMenuItem[] = [
   { icon: "star", label: "กระเป๋าเงิน", link: "/wallet", visible: true },
   { icon: "history", label: "ประวัติสแกน", link: "/history", visible: true },
   { icon: "trophy", label: "ประวัติแลกรางวัล", link: "/history/redeems", visible: true },
-  { icon: "news", label: "ข่าวสาร", link: "/news", visible: true },
+  { icon: "target", label: "ภารกิจ", link: "/missions", visible: true },
   { icon: "user", label: "โปรไฟล์ของฉัน", link: "/profile", visible: true },
 ];
 

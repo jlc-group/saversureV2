@@ -75,6 +75,7 @@ export default function GamificationPage() {
   const [submittingMission, setSubmittingMission] = useState(false);
   const [submittingBadge, setSubmittingBadge] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
 
   const fetchMissions = async () => {
     try {
@@ -110,7 +111,7 @@ export default function GamificationPage() {
     e.preventDefault();
     setSubmittingMission(true);
     try {
-      await api.post("/api/v1/missions", {
+      const payload = {
         title: missionForm.title,
         description: missionForm.description || null,
         image_url: missionForm.image_url || null,
@@ -121,8 +122,16 @@ export default function GamificationPage() {
         reward_currency: missionForm.reward_currency,
         start_date: missionForm.start_date || null,
         end_date: missionForm.end_date || null,
-      });
+      };
+
+      if (editId) {
+        await api.patch(`/api/v1/missions/${editId}`, payload);
+      } else {
+        await api.post("/api/v1/missions", payload);
+      }
+
       setShowMissionForm(false);
+      setEditId(null);
       setMissionForm({
         title: "",
         description: "",
@@ -137,10 +146,27 @@ export default function GamificationPage() {
       });
       fetchMissions();
     } catch {
-      toast.error("Failed to create mission");
+      toast.error(editId ? "Failed to update mission" : "Failed to create mission");
     } finally {
       setSubmittingMission(false);
     }
+  };
+
+  const handleEditMission = (m: Mission) => {
+    setMissionForm({
+      title: m.title,
+      description: m.description || "",
+      image_url: m.image_url || "",
+      type: m.type,
+      condition: m.condition || "{}",
+      reward_type: m.reward_type,
+      reward_points: m.reward_points,
+      reward_currency: m.reward_currency,
+      start_date: m.start_date ? m.start_date.split("T")[0] : "",
+      end_date: m.end_date ? m.end_date.split("T")[0] : "",
+    });
+    setEditId(m.id);
+    setShowMissionForm(true);
   };
 
   const handleToggleMissionActive = async (id: string, active: boolean) => {
@@ -172,21 +198,41 @@ export default function GamificationPage() {
     e.preventDefault();
     setSubmittingBadge(true);
     try {
-      await api.post("/api/v1/badges", {
+      const payload = {
         code: badgeForm.code.toUpperCase(),
         name: badgeForm.name,
         description: badgeForm.description || null,
         icon_url: badgeForm.icon_url || null,
         rarity: badgeForm.rarity,
-      });
+      };
+
+      if (editId) {
+        await api.patch(`/api/v1/badges/${editId}`, payload);
+      } else {
+        await api.post("/api/v1/badges", payload);
+      }
+
       setShowBadgeForm(false);
+      setEditId(null);
       setBadgeForm({ code: "", name: "", description: "", icon_url: "", rarity: "common" });
       fetchBadges();
     } catch {
-      toast.error("Failed to create badge");
+      toast.error(editId ? "Failed to update badge" : "Failed to create badge");
     } finally {
       setSubmittingBadge(false);
     }
+  };
+
+  const handleEditBadge = (b: Badge) => {
+    setBadgeForm({
+      code: b.code,
+      name: b.name,
+      description: b.description || "",
+      icon_url: b.icon_url || "",
+      rarity: b.rarity,
+    });
+    setEditId(b.id);
+    setShowBadgeForm(true);
   };
 
   const handleDeleteBadge = async (id: string) => {
@@ -242,7 +288,26 @@ export default function GamificationPage() {
         <>
           <div className="flex justify-end mb-4">
             <button
-              onClick={() => setShowMissionForm(!showMissionForm)}
+              onClick={() => {
+                if (showMissionForm) {
+                  setShowMissionForm(false);
+                  setEditId(null);
+                  setMissionForm({
+                    title: "",
+                    description: "",
+                    image_url: "",
+                    type: "count",
+                    condition: "{}",
+                    reward_type: "points",
+                    reward_points: 0,
+                    reward_currency: "point",
+                    start_date: "",
+                    end_date: "",
+                  });
+                } else {
+                  setShowMissionForm(true);
+                }
+              }}
               className="inline-flex items-center gap-2 h-[40px] px-6 bg-[var(--md-primary)] text-white rounded-[var(--md-radius-xl)] text-[14px] font-medium tracking-[0.1px] hover:bg-[var(--md-primary-dark)] active:scale-[0.98] transition-all duration-200"
             >
               {showMissionForm ? (
@@ -266,7 +331,7 @@ export default function GamificationPage() {
           {showMissionForm && (
             <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 p-6 mb-6">
               <h2 className="text-[16px] font-medium text-[var(--md-on-surface)] mb-5 tracking-[0.1px]">
-                Add Mission
+                {editId ? "Edit Mission" : "Add Mission"}
               </h2>
               <form onSubmit={handleCreateMission} className="space-y-5">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -396,7 +461,7 @@ export default function GamificationPage() {
                   disabled={submittingMission}
                   className="h-[40px] px-6 bg-[var(--md-primary)] text-white rounded-[var(--md-radius-xl)] text-[14px] font-medium tracking-[0.1px] hover:bg-[var(--md-primary-dark)] disabled:opacity-60 active:scale-[0.98] transition-all duration-200"
                 >
-                  {submittingMission ? "Creating..." : "Create Mission"}
+                  {submittingMission ? "Saving..." : editId ? "Save Changes" : "Create Mission"}
                 </button>
               </form>
             </div>
@@ -511,13 +576,22 @@ export default function GamificationPage() {
                         </button>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <button
-                          onClick={() => handleDeleteMission(m.id)}
-                          disabled={actionId === m.id}
-                          className="h-[26px] px-3 text-[12px] font-medium text-[var(--md-error)] bg-[var(--md-error-light)] rounded-[var(--md-radius-sm)] hover:opacity-80 transition-all duration-200 disabled:opacity-50"
-                        >
-                          Delete
-                        </button>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => handleEditMission(m)}
+                            disabled={actionId === m.id}
+                            className="h-[26px] px-3 text-[12px] font-medium text-[var(--md-primary)] bg-[var(--md-primary-light)] rounded-[var(--md-radius-sm)] hover:opacity-80 transition-all duration-200 disabled:opacity-50"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteMission(m.id)}
+                            disabled={actionId === m.id}
+                            className="h-[26px] px-3 text-[12px] font-medium text-[var(--md-error)] bg-[var(--md-error-light)] rounded-[var(--md-radius-sm)] hover:opacity-80 transition-all duration-200 disabled:opacity-50"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -532,7 +606,15 @@ export default function GamificationPage() {
         <>
           <div className="flex justify-end mb-4">
             <button
-              onClick={() => setShowBadgeForm(!showBadgeForm)}
+              onClick={() => {
+                if (showBadgeForm) {
+                  setShowBadgeForm(false);
+                  setEditId(null);
+                  setBadgeForm({ code: "", name: "", description: "", icon_url: "", rarity: "common" });
+                } else {
+                  setShowBadgeForm(true);
+                }
+              }}
               className="inline-flex items-center gap-2 h-[40px] px-6 bg-[var(--md-primary)] text-white rounded-[var(--md-radius-xl)] text-[14px] font-medium tracking-[0.1px] hover:bg-[var(--md-primary-dark)] active:scale-[0.98] transition-all duration-200"
             >
               {showBadgeForm ? (
@@ -556,7 +638,7 @@ export default function GamificationPage() {
           {showBadgeForm && (
             <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 p-6 mb-6">
               <h2 className="text-[16px] font-medium text-[var(--md-on-surface)] mb-5 tracking-[0.1px]">
-                Add Badge
+                {editId ? "Edit Badge" : "Add Badge"}
               </h2>
               <form onSubmit={handleCreateBadge} className="space-y-5">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -636,7 +718,7 @@ export default function GamificationPage() {
                   disabled={submittingBadge}
                   className="h-[40px] px-6 bg-[var(--md-primary)] text-white rounded-[var(--md-radius-xl)] text-[14px] font-medium tracking-[0.1px] hover:bg-[var(--md-primary-dark)] disabled:opacity-60 active:scale-[0.98] transition-all duration-200"
                 >
-                  {submittingBadge ? "Creating..." : "Create Badge"}
+                  {submittingBadge ? "Saving..." : editId ? "Save Changes" : "Create Badge"}
                 </button>
               </form>
             </div>
@@ -748,13 +830,22 @@ export default function GamificationPage() {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <button
-                            onClick={() => handleDeleteBadge(b.id)}
-                            disabled={actionId === b.id}
-                            className="h-[26px] px-3 text-[12px] font-medium text-[var(--md-error)] bg-[var(--md-error-light)] rounded-[var(--md-radius-sm)] hover:opacity-80 transition-all duration-200 disabled:opacity-50"
-                          >
-                            Delete
-                          </button>
+                          <div className="flex justify-end gap-2">
+                            <button
+                              onClick={() => handleEditBadge(b)}
+                              disabled={actionId === b.id}
+                              className="h-[26px] px-3 text-[12px] font-medium text-[var(--md-primary)] bg-[var(--md-primary-light)] rounded-[var(--md-radius-sm)] hover:opacity-80 transition-all duration-200 disabled:opacity-50"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteBadge(b.id)}
+                              disabled={actionId === b.id}
+                              className="h-[26px] px-3 text-[12px] font-medium text-[var(--md-error)] bg-[var(--md-error-light)] rounded-[var(--md-radius-sm)] hover:opacity-80 transition-all duration-200 disabled:opacity-50"
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
