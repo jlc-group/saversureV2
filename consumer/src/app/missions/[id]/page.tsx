@@ -169,11 +169,11 @@ export default function MissionDetailPage({ params }: { params: Promise<{ id: st
 
         {/* Banner / Header */}
         {imgSrc ? (
-          <div className="aspect-video bg-secondary relative overflow-hidden rounded-b-3xl">
+          <div className="aspect-square bg-secondary relative overflow-hidden">
             <Image src={imgSrc} alt={mission.title} fill className="object-cover" sizes="100vw" priority />
           </div>
         ) : (
-          <div className="bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-teal)_100%)] px-5 pt-12 pb-10 text-white relative overflow-hidden rounded-b-3xl">
+          <div className="bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-teal)_100%)] px-5 pt-12 pb-10 text-white relative overflow-hidden">
             <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/10 animate-float" />
             <div className="absolute left-12 bottom-2 h-16 w-16 rounded-full bg-white/5 animate-float-delay-1" />
             <div className="flex items-center justify-center py-6">

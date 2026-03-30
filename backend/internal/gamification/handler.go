@@ -71,15 +71,13 @@ func (h *Handler) UpdateMission(c *gin.Context) {
 	tenantID := c.GetString("tenant_id")
 	id := c.Param("id")
 
-	var body struct {
-		Active *bool `json:"active"`
-	}
+	var body UpdateMissionInput
 	if err := c.ShouldBindJSON(&body); err != nil {
 		apperror.Respond(c, err)
 		return
 	}
 
-	if err := h.svc.UpdateMission(c.Request.Context(), tenantID, id, body.Active); err != nil {
+	if err := h.svc.UpdateMission(c.Request.Context(), tenantID, id, body); err != nil {
 		apperror.Respond(c, err)
 		return
 	}
@@ -145,6 +143,23 @@ func (h *Handler) DeleteBadge(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
+}
+
+func (h *Handler) UpdateBadge(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	id := c.Param("id")
+
+	var body UpdateBadgeInput
+	if err := c.ShouldBindJSON(&body); err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+
+	if err := h.svc.UpdateBadge(c.Request.Context(), tenantID, id, body); err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "updated"})
 }
 
 func (h *Handler) GetUserBadges(c *gin.Context) {

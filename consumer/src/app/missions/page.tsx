@@ -140,7 +140,7 @@ export default function MissionsPage() {
                     className="block bg-white rounded-2xl shadow-sm overflow-hidden card-playful"
                   >
                     <div className="flex gap-4 p-4">
-                      <div className="w-16 h-16 shrink-0 rounded-xl bg-secondary overflow-hidden">
+                      <div className="w-20 h-20 shrink-0 rounded-xl bg-secondary overflow-hidden">
                         {imgSrc ? (
                           <img src={imgSrc} alt={m.title} className="w-full h-full object-cover" />
                         ) : (
@@ -153,8 +153,8 @@ export default function MissionsPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
-                          <h3 className="text-[15px] font-semibold truncate">{m.title}</h3>
-                          <div className="flex items-center gap-1.5 shrink-0">
+                          <h3 className="text-[17px] font-bold truncate text-[var(--md-on-surface)]">{m.title}</h3>
+                          <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
                             {completed && (
                               <span className="w-5 h-5 rounded-full bg-[var(--jh-green)] flex items-center justify-center">
                                 <svg viewBox="0 0 24 24" fill="white" className="w-3 h-3">
@@ -168,22 +168,22 @@ export default function MissionsPage() {
                           </div>
                         </div>
                         {m.description && (
-                          <p className="text-[12px] text-muted-foreground mt-0.5 line-clamp-1">{m.description}</p>
+                          <p className="text-[13px] text-muted-foreground mt-0.5 line-clamp-1">{m.description}</p>
                         )}
                         {/* Progress bar */}
-                        <div className="mt-2">
-                          <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
+                        <div className="mt-3">
+                          <div className="flex justify-between text-[13px] font-medium text-muted-foreground mb-1">
                             <span>{progress} / {m.target}</span>
-                            {!completed && <span>{pct}%</span>}
+                            {!completed && <span className="text-[var(--jh-green)]">{pct}%</span>}
                           </div>
-                          <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                          <div className="h-2.5 bg-secondary rounded-full overflow-hidden">
                             <div
                               className={`h-full rounded-full transition-all ${completed ? "bg-[var(--jh-green)]" : "bg-[linear-gradient(90deg,var(--jh-green)_0%,var(--jh-lime)_100%)]"}`}
                               style={{ width: `${pct}%` }}
                             />
                           </div>
                         </div>
-                        <div className="mt-1.5 text-[11px]">
+                        <div className="mt-2 text-[13px] font-semibold">
                           <span className="text-muted-foreground">
                             {m.reward_type === "badge"
                               ? "🏅 ได้รับ Badge"

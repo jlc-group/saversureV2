@@ -773,6 +773,7 @@ func main() {
 	{
 		badgeRoutes.GET("", gamifyHandler.ListBadges)
 		badgeRoutes.POST("", gamifyHandler.CreateBadge)
+		badgeRoutes.PATCH("/:id", gamifyHandler.UpdateBadge)
 		badgeRoutes.DELETE("/:id", gamifyHandler.DeleteBadge)
 	}
 
