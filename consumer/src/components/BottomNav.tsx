@@ -92,7 +92,7 @@ export default function BottomNav() {
                   <span className="scale-110">{renderIcon(true)}</span>
                 </div>
                 <span
-                  className={`text-[10px] font-bold mt-0.5 ${
+                  className={`text-[14px] font-bold mt-0.5 ${
                     isActive ? "text-[var(--jh-green)]" : "text-muted-foreground"
                   }`}
                 >
@@ -112,7 +112,7 @@ export default function BottomNav() {
                 {renderIcon(isActive)}
               </span>
               <span
-                className={`text-[10px] font-semibold transition-colors ${
+                className={`text-[14px] font-semibold transition-colors ${
                   isActive ? "text-[var(--jh-green)]" : "text-muted-foreground"
                 }`}
               >

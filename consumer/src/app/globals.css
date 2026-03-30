@@ -119,7 +119,7 @@ body {
   margin: 0 auto;
   line-height: 1.5;
   word-spacing: 0.5px;
-  font-size: 16px;
+  font-size: 24px;
   min-height: 100vh;
   box-shadow: 0 0 0 1px rgba(0,0,0,0.04), 0 0 60px rgba(0,0,0,0.08);
   position: relative;
@@ -151,6 +151,17 @@ body {
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+
+  /* ===== Custom Tailwind Typography specifically scaled for DB Heavent ===== */
+  --text-xs: 18px;
+  --text-sm: 20px;
+  --text-base: 24px;
+  --text-lg: 28px;
+  --text-xl: 32px;
+  --text-2xl: 40px;
+  --text-3xl: 48px;
+  --text-4xl: 56px;
+
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -336,13 +347,13 @@ body {
   position: sticky;
   top: 56px;
   z-index: 40;
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 700;
 }
-.jh-points-name { font-size: 15px; }
-.jh-points-values { display: flex; align-items: center; gap: 4px; font-size: 15px; }
-.jh-coin { font-size: 12px; }
-.jh-diamond { font-size: 12px; }
+.jh-points-name { font-size: 18px; }
+.jh-points-values { display: flex; align-items: center; gap: 4px; font-size: 18px; }
+.jh-coin { font-size: 16px; }
+.jh-diamond { font-size: 16px; }
 .jh-divider { margin: 0 4px; opacity: 0.4; }
 
 /* Banner Section */
@@ -380,7 +391,7 @@ body {
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
   text-align: center;
   padding: 12px;
@@ -388,7 +399,7 @@ body {
 }
 .jh-banner-caption {
   color: rgba(255,255,255,0.7);
-  font-size: 11px;
+  font-size: 16px;
   margin-top: 4px;
   white-space: nowrap;
   overflow: hidden;
@@ -500,7 +511,7 @@ body {
   border: 1px solid rgba(0,0,0,0.05);
   border-radius: 6px;
   padding: 4px 6px;
-  font-size: 9px;
+  font-size: 14px;
   line-height: 1.3;
   color: #666;
   text-align: center;
@@ -513,7 +524,7 @@ body {
   left: 6px;
   background: #ef4444;
   color: #fff;
-  font-size: 8px;
+  font-size: 14px;
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 999px;
@@ -575,7 +586,7 @@ body {
 .jh-card-price {
   color: #888;
   font-weight: 600;
-  font-size: 16px;
+  font-size: 18px;
   line-height: 1;
   text-align: left;
   margin-bottom: 6px;
@@ -585,7 +596,7 @@ body {
   gap: 4px;
 }
 .jh-card-price span {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 500;
 }
 
@@ -593,7 +604,7 @@ body {
 .jh-card-discount {
   background: transparent;
   padding: 0;
-  font-size: 14px;
+  font-size: 16px;
   color: #555;
   line-height: 1.15;
   margin-top: 2px;
@@ -603,7 +614,7 @@ body {
 .jh-card-discount strong {
   color: #e65100;
   font-weight: 800;
-  font-size: 15px;
+  font-size: 18px;
   display: block;
   margin-bottom: 2px;
 }
@@ -627,7 +638,7 @@ body {
 .jh-card-shipping {
   text-align: left;
   color: var(--jh-green);
-  font-size: 12px;
+  font-size: 16px;
   margin-top: 4px;
   margin-bottom: 4px;
   font-weight: 700;
@@ -639,7 +650,7 @@ body {
   color: #fff;
   text-align: center;
   font-weight: 800;
-  font-size: 16px;
+  font-size: 18px;
   padding: 4px 0;
   width: 100%;
   border-radius: 6px;
@@ -656,7 +667,7 @@ body {
   transform: scale(0.96);
 }
 .jh-card-point-btn span {
-  font-size: 12px;
+  font-size: 16px;
 }
 
 /* Card image background colors */
