@@ -70,7 +70,7 @@ import (
 )
 
 func main() {
-	godotenv.Load()
+	_ = godotenv.Load(".env", "../.env", "../../.env", "../../../.env") // Try multiple depths
 
 	cfg, err := config.Load()
 	if err != nil {

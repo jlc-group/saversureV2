@@ -18,6 +18,22 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "placehold.co" },
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: "/api/:path*",
+        destination: "http://127.0.0.1:30400/api/:path*",
+      },
+      {
+        source: "/auth/:path*",
+        destination: "http://127.0.0.1:30400/auth/:path*",
+      },
+      {
+        source: "/media/:path*",
+        destination: "http://127.0.0.1:30400/media/:path*",
+      },
+    ];
+  },
 };
 
 export default nextConfig;

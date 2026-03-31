@@ -1,6 +1,6 @@
 import { getTenantId } from "@/lib/tenant";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:30400";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL !== undefined ? process.env.NEXT_PUBLIC_API_URL : "";
 
 interface RequestOptions {
   method?: string;
