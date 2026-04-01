@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isLoggedIn, logout } from "@/lib/auth";
 import { api } from "@/lib/api";
-import { type MultiBalance, getPrimaryBalance } from "@/lib/currency";
+import { type MultiBalance, getPrimaryBalance, getDiamondBalance } from "@/lib/currency";
 import { useTenant } from "./TenantProvider";
 
 interface DrawerMenuItem {
@@ -41,6 +41,7 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
   const [tier, setTier] = useState<Tier | null>(null);
   const { brandName, branding } = useTenant();
   const primaryBalance = getPrimaryBalance(balances);
+  const diamondBalance = getDiamondBalance(balances);
 
   useEffect(() => {
     const li = isLoggedIn();
@@ -61,7 +62,7 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
   const displayName =
     profile?.display_name ||
     [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
-    "สมาชิก";
+    "Future";
 
   const navigate = (href: string) => {
     router.push(href);
@@ -101,6 +102,15 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
       ),
       label: "ประวัติกิจกรรมทั้งหมด",
       link: "/history",
+    },
+    {
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+        </svg>
+      ),
+      label: "คูปองของฉัน",
+      link: "/coupons",
     },
   ];
 
@@ -193,10 +203,10 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
                   {loggedIn && (
                     <div className="flex items-center gap-2 mt-3">
                       <span className="text-black text-xs font-black px-2.5 py-1 rounded shadow-sm border border-black/10" style={{ background: tier?.color || "#FFC600" }}>
-                        {tier?.name || "MEMBER"}
+                        {tier?.name || "Bronze"}
                       </span>
                       <span className="bg-gray-100 text-gray-600 font-bold text-xs px-2.5 py-1 rounded">
-                        {(primaryBalance?.balance ?? 0).toLocaleString()} Point
+                        แต้ม {(primaryBalance?.balance ?? 0).toLocaleString()} 🪙 | เพชร {(diamondBalance?.balance ?? 0).toLocaleString()} 💎
                       </span>
                     </div>
                   )}

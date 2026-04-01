@@ -28,6 +28,12 @@ export function getPrimaryBalance(balances: MultiBalance[]) {
   return balances.find((item) => item.currency.toLowerCase() === "point") || balances[0];
 }
 
+export function getDiamondBalance(balances: MultiBalance[]) {
+  if (!balances.length) return null;
+  return balances.find((item) => item.currency.toLowerCase() === "diamond") || 
+         balances.find((item) => item.currency.toLowerCase() === "gem") || null;
+}
+
 export function getSecondaryBalances(balances: MultiBalance[]) {
   const primary = getPrimaryBalance(balances);
   return balances.filter((item) => item.currency !== primary?.currency);
