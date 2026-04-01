@@ -20,7 +20,12 @@ export default function RedeemHistoryPage() {
   useEffect(() => {
     if (!isLoggedIn()) { setLoading(false); return; }
     api.get<{ data: RedeemEntry[] }>("/api/v1/my/redeem-transactions")
-      .then((d) => setEntries(d.data || []))
+      .then((d) => {
+        const physical = (d.data || []).filter((e) =>
+          ["shipping", "pickup"].includes(e.delivery_type || "")
+        );
+        setEntries(physical);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -35,10 +40,10 @@ export default function RedeemHistoryPage() {
 
       <div className="pt-24">
         <PageHeader
-          title="ประวัติการแลกแต้ม"
-          subtitle={entries.length > 0 ? `${entries.length} รายการ` : undefined}
+          title="ประวัติแลกของรางวัล"
+          subtitle={entries.length > 0 ? `สินค้า ${entries.length} รายการ` : "สินค้าและของจัดส่ง"}
         />
-        <HistoryTabs />
+        <HistoryTabs overlap />
         {/* Content */}
         <div className="px-4 mt-2">
           {loading ? (

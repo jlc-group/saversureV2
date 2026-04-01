@@ -181,6 +181,11 @@ body {
   to { transform: translateY(0); opacity: 1; }
 }
 
+@keyframes slideUpSheet {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
 @keyframes scaleIn {
   0% { transform: scale(0); opacity: 0; }
   70% { transform: scale(1.1); }
@@ -247,6 +252,7 @@ body {
 .animate-float-delay-2 { animation: float 3s ease-in-out 1s infinite; }
 .animate-float-delay-3 { animation: float 3s ease-in-out 1.5s infinite; }
 .animate-slide-up { animation: slideUp 0.45s ease-out both; }
+.animate-slide-up-sheet { animation: slideUpSheet 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 .animate-scale-in { animation: scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
 .animate-shimmer {
   background: linear-gradient(90deg, transparent 30%, rgba(255,255,255,0.4) 50%, transparent 70%);

@@ -28,7 +28,7 @@ export default function LuckyDrawHistoryPage() {
           subtitle="ประวัติการร่วมสนุกกิจกรรมต่างๆ"
         />
 
-        <HistoryTabs />
+        <HistoryTabs overlap />
 
         {/* Content */}
         <div className="px-4 mt-2">

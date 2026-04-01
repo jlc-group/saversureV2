@@ -58,7 +58,7 @@ const MENU_GROUPS = [
       { href: "/profile/edit", label: "ข้อมูลส่วนตัว", icon: ICONS.user, color: "text-blue-500", bg: "bg-blue-50" },
       { href: "/profile/addresses", label: "สมุดที่อยู่จัดส่ง", icon: ICONS.list, color: "text-amber-500", bg: "bg-amber-50" },
       { href: "/history", label: "ประวัติแต้มและกิจกรรม", icon: ICONS.history, color: "text-[var(--jh-green)]", bg: "bg-green-50" },
-      { href: "/rewards/my-coupons", label: "คูปองและของรางวัลของฉัน", icon: ICONS.gift, color: "text-orange-500", bg: "bg-orange-50" },
+      { href: "/donations", label: "ประวัติการบริจาค", icon: ICONS.gift, color: "text-pink-500", bg: "bg-pink-50" },
     ]
   },
   {

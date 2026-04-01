@@ -19,6 +19,7 @@
     "next": "^15.2.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.0.0",
+    "react-barcode": "^1.6.1",
     "react-dom": "^19.0.0",
     "shadcn": "^4.0.2",
     "tailwind-merge": "^3.5.0",

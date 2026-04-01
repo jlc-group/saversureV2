@@ -110,7 +110,7 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
         </svg>
       ),
       label: "คูปองของฉัน",
-      link: "/coupons",
+      link: "/history/coupons",
     },
   ];
 

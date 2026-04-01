@@ -6,18 +6,18 @@ import { usePathname } from "next/navigation";
 const TABS = [
   { href: "/history", label: "สะสมแต้ม" },
   { href: "/history/redeems", label: "แลกแต้ม" },
+  { href: "/history/coupons", label: "คูปองของฉัน" },
   { href: "/history/lucky-draw", label: "ลุ้นโชค" },
-  { href: "/history/donations", label: "บริจาค" },
 ];
 
-export default function HistoryTabs() {
+export default function HistoryTabs({ overlap = false }: { overlap?: boolean }) {
   const pathname = usePathname();
 
   return (
-    <div className="px-4 -mt-8 relative z-10 animate-slide-up">
+    <div className={`px-4 relative z-10 animate-slide-up ${overlap ? "-mt-7" : ""}`}>
       <div className="bg-white rounded-[24px] shadow-[0_8px_24px_rgba(0,0,0,0.06)] mb-4 overflow-hidden border border-black/5 p-1.5">
         <div className="overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-          <div className="flex gap-1.5 w-max min-w-full">
+          <div className="flex gap-1.5 w-max min-w-full justify-center">
             {TABS.map((tab) => {
               const isActive = pathname === tab.href;
               return (

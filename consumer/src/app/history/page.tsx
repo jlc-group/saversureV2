@@ -219,54 +219,62 @@ export default function HistoryPage() {
         </div>
 
         <div className="px-4 -mt-6 relative z-10 space-y-3">
-          {/* Stat card */}
+          {/* Unified 4-column stat card */}
           {loggedIn && !loading && scans.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100/80 px-5 py-3 animate-slide-up">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100/80 px-4 py-3 animate-slide-up">
               <div className="flex">
-                <div className="flex-1 text-center animate-count-up">
-                  <p className="text-[10px] text-gray-400 uppercase tracking-wide">สแกนสำเร็จ</p>
-                  <p className="text-[22px] font-bold text-[var(--jh-green)] leading-tight">{successCount.toLocaleString()}</p>
-                  <div className="mx-auto mt-1.5 h-[3px] w-10 rounded-full bg-[var(--jh-green)]" />
+                {/* Col 1: สแกนสำเร็จ */}
+                <div className="flex-1 text-center animate-count-up px-1">
+                  <p className="text-[9px] text-gray-400 uppercase tracking-wide leading-tight">สแกนสำเร็จ</p>
+                  <p className="text-[20px] font-bold text-[var(--jh-green)] leading-tight mt-0.5">{successCount.toLocaleString()}</p>
+                  <div className="mx-auto mt-1.5 h-[3px] w-8 rounded-full bg-[var(--jh-green)]" />
                 </div>
+
                 <div className="w-px bg-gray-100 my-1" />
-                <div className="flex-1 text-center animate-count-up" style={{ animationDelay: "0.1s" }}>
-                  <p className="text-[10px] text-gray-400 uppercase tracking-wide">แต้มสะสม</p>
-                  <p className="text-[22px] font-bold text-amber-500 leading-tight">{totalPoints.toLocaleString()}</p>
-                  <div className="mx-auto mt-1.5 h-[3px] w-10 rounded-full bg-amber-400" />
+
+                {/* Col 2: แต้มสะสม */}
+                <div className="flex-1 text-center animate-count-up px-1" style={{ animationDelay: "0.1s" }}>
+                  <p className="text-[9px] text-gray-400 uppercase tracking-wide leading-tight">แต้มสะสม</p>
+                  <p className="text-[20px] font-bold text-amber-500 leading-tight mt-0.5">{totalPoints.toLocaleString()}</p>
+                  <div className="mx-auto mt-1.5 h-[3px] w-8 rounded-full bg-amber-400" />
                 </div>
+
                 <div className="w-px bg-gray-100 my-1" />
-                <div className="flex-1 text-center animate-count-up" style={{ animationDelay: "0.2s" }}>
-                  <p className="text-[10px] text-gray-400 uppercase tracking-wide">ทั้งหมด</p>
-                  <p className="text-[22px] font-bold text-blue-500 leading-tight">{total.toLocaleString()}</p>
-                  <div className="mx-auto mt-1.5 h-[3px] w-10 rounded-full bg-blue-400" />
+
+                {/* Col 3: ยอดคงเหลือ — กดไป /wallet */}
+                {primaryBalance && (
+                  <>
+                    <Link href="/wallet" className="flex-1 text-center animate-count-up px-1 group" style={{ animationDelay: "0.15s" }}>
+                      <p className="text-[9px] text-gray-400 uppercase tracking-wide leading-tight group-hover:text-[var(--jh-green)] transition-colors">ยอดคงเหลือ</p>
+                      <p className="text-[20px] font-bold text-[var(--jh-green)] leading-tight mt-0.5">{primaryBalance.balance.toLocaleString()}</p>
+                      <div className="mx-auto mt-1.5 h-[3px] w-8 rounded-full bg-[var(--jh-green)]/40 group-hover:bg-[var(--jh-green)] transition-colors" />
+                    </Link>
+                    <div className="w-px bg-gray-100 my-1" />
+                  </>
+                )}
+
+                {/* Col 4: ทั้งหมด */}
+                <div className="flex-1 text-center animate-count-up px-1" style={{ animationDelay: "0.2s" }}>
+                  <p className="text-[9px] text-gray-400 uppercase tracking-wide leading-tight">ทั้งหมด</p>
+                  <p className="text-[20px] font-bold text-blue-500 leading-tight mt-0.5">{total.toLocaleString()}</p>
+                  <div className="mx-auto mt-1.5 h-[3px] w-8 rounded-full bg-blue-400" />
                 </div>
               </div>
-              {(primaryBalance || secondaryBalances.length > 0) && (
-                <Link href="/wallet" className="block mt-3 border-t border-gray-100 pt-3 group">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">ยอดคงเหลือ</p>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5 text-gray-300 group-hover:text-[var(--jh-green)] transition">
-                      <path d="M9 18l6-6-6-6" />
-                    </svg>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {primaryBalance && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--jh-green)]/10 px-2 py-1 text-[11px] font-semibold text-[var(--jh-green)]">
-                        <span>{getCurrencyIcon(primaryBalance.currency, primaryBalance.icon)}</span>
-                        <span>{primaryBalance.balance.toLocaleString()} {primaryBalance.name}</span>
-                      </span>
-                    )}
-                    {secondaryBalances.map((item) => (
-                      <span key={item.currency} className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-[11px] font-semibold text-gray-700">
-                        <span>{getCurrencyIcon(item.currency, item.icon)}</span>
-                        <span>{item.balance.toLocaleString()} {item.name}</span>
-                      </span>
-                    ))}
-                  </div>
-                </Link>
+
+              {/* Secondary balances row (ถ้ามี เช่น เพชร) */}
+              {secondaryBalances.length > 0 && (
+                <div className="mt-2.5 pt-2.5 border-t border-gray-100 flex flex-wrap gap-1.5 justify-center">
+                  {secondaryBalances.map((item) => (
+                    <Link key={item.currency} href="/wallet" className="inline-flex items-center gap-1 rounded-full bg-gray-100 hover:bg-gray-200 px-2.5 py-1 text-[11px] font-bold text-gray-600 transition-colors">
+                      <span>{getCurrencyIcon(item.currency, item.icon)}</span>
+                      <span>{item.balance.toLocaleString()} {item.name}</span>
+                    </Link>
+                  ))}
+                </div>
               )}
             </div>
           )}
+
 
           {/* Tab row - gamified pill style */}
           {loggedIn && <HistoryTabs />}
