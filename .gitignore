@@ -24,6 +24,10 @@ node_modules/
 .DS_Store
 *.pem
 
+# Go binaries
+*.exe
+*.exe~
+
 # debug
 npm-debug.log*
 yarn-debug.log*
