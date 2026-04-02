@@ -296,21 +296,6 @@ function JulaHerbHome() {
     api.get<{ data: RewardItem[] }>("/api/v1/public/rewards?limit=20")
       .then((d) => {
         const items = d.data || [];
-        items.unshift({
-          id: "mock-0-point-test",
-          name: "[TEST] ไอเทมเทสระบบ 0 แต้ม",
-          description: "ทดสอบหน้าต่างกดแลกแจกฟรี ไม่มีหักแต้ม",
-          type: "product",
-          point_cost: 0,
-          normal_point_cost: 499,
-          price: 999,
-          cost_currency: "point",
-          image_url: "",
-          delivery_type: "shipping",
-          available_qty: 999,
-          is_flash: true,
-          tier_name: "Member"
-        });
         setRewards(items);
       }).catch(() => {});
     

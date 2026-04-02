@@ -82,49 +82,16 @@ export default function MissionDetailPage({ params }: { params: Promise<{ id: st
 
   useEffect(() => {
     const load = async () => {
-      if (id === "mock-1" || id === "mock-2") {
-        setMission({
-          id: id,
-          title: id === "mock-1" ? "[ทดสอบ] ภารกิจสำเร็จแล้ว" : "[ทดสอบ] ภารกิจรอรับรางวัล",
-          description: id === "mock-1" 
-            ? "นี่คือตัวอย่างภารกิจที่ทำสำเร็จเรียบร้อยและรับรางวัลแล้ว ในหน้านี้จะแสดงความสำเร็จของคุณ 100%!"
-            : "นี่คือตัวอย่างภารกิจที่ทำครบแล้วและกำลังรอให้คุณกดรับรางวัลผ่านหน้าลิสต์หลัก",
-          type: "count",
-          condition: `[{"description": "สแกน QR Code ครบตามจำนวนที่กำหนด"}]`,
-          reward_type: "points",
-          reward_points: id === "mock-1" ? 100 : 50,
-          reward_currency: "point",
-          active: true,
-        });
-
-        if (loggedIn) {
-          setUserProgress({
-            mission_id: id,
-            progress: id === "mock-1" ? 5 : 3,
-            target: id === "mock-1" ? 5 : 3,
-            completed: id === "mock-1" ? true : false,
-            completed_at: id === "mock-1" ? new Date().toISOString() : null,
-            rewarded: id === "mock-1" ? true : false,
-          });
-        }
-        setLoading(false);
-        return;
-      }
-
       try {
-        const m = await api.get<Mission>(`/api/v1/public/missions/${id}`);
-        setMission(m);
+        const missionRes = await api.get<Mission>(`/api/v1/public/missions/${id}`);
+        setMission(missionRes);
 
         if (loggedIn) {
-          const progressRes = await api.get<{ data?: UserMission[] } | UserMission[]>("/api/v1/my/missions").catch(() => null);
-          if (progressRes) {
-            const list = Array.isArray(progressRes) ? progressRes : progressRes.data ?? [];
-            const match = list.find((p) => p.mission_id === id);
-            if (match) setUserProgress(match);
-          }
+          const progressRes = await api.get<UserMission>(`/api/v1/my/missions/${id}`);
+          setUserProgress(progressRes);
         }
-      } catch {
-        setMission(null);
+      } catch (err) {
+        console.error('Failed to load mission:', err);
       } finally {
         setLoading(false);
       }

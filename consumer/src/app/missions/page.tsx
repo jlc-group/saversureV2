@@ -50,7 +50,12 @@ export default function MissionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [claimedMission, setClaimedMission] = useState<Mission | null>(null);
+  const [mounted, setMounted] = useState(false);
   const loggedIn = isLoggedIn();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleClaim = async (e: React.MouseEvent, mission: Mission) => {
     e.preventDefault();
@@ -63,7 +68,7 @@ export default function MissionsPage() {
       ...prev,
       [mission.id]: {
         ...prev[mission.id],
-        completed_at: new Date().toISOString()
+        completed_at: mounted ? new Date().toISOString() : null
       }
     }));
   };
@@ -77,27 +82,15 @@ export default function MissionsPage() {
         ]);
 
         const missionsList = Array.isArray(missionsRes) ? missionsRes : missionsRes.data ?? [];
-        
-        // --- MOCK TEST DATA ---
-        if (!missionsList.find((m: any) => m.id === "mock-1")) {
-          missionsList.unshift(
-            { id: "mock-1", title: "[ทดสอบ] ภารกิจสำเร็จแล้ว", description: "นี่คือตัวอย่างภารกิจที่ทำสำเร็จเรียบร้อยและรับรางวัลแล้ว", target: 5, reward_points: 100, reward_type: "points" },
-            { id: "mock-2", title: "[ทดสอบ] ภารกิจรอรับรางวัล", description: "นี่คือตัวอย่างภารกิจที่ทำครบแล้ว กรุณากดปุ่มเพื่อรับรางวัล", target: 3, reward_points: 50, reward_type: "points" }
-          );
-        }
 
         setMissions(missionsList);
 
-        if (progressRes || true) { // Force progress block for mock
+        if (progressRes) {
           const list = progressRes ? (Array.isArray(progressRes) ? progressRes : progressRes.data ?? []) : [];
           const map: Record<string, MissionProgress> = {};
           list.forEach((p: any) => {
             map[p.mission_id] = p;
           });
-          
-          // --- MOCK TEST PROGRESS ---
-          map["mock-1"] = { mission_id: "mock-1", progress: 5, completed_at: new Date().toISOString() };
-          map["mock-2"] = { mission_id: "mock-2", progress: 3, completed_at: null }; // reach target but not completed
 
           setProgressMap(map);
         }
@@ -226,7 +219,7 @@ export default function MissionsPage() {
                 const imgSrc = mediaUrl(m.image_url);
                 const badgeTheme = badgeColors[index % badgeColors.length];
                 
-                const daysLeft = m.end_date ? Math.ceil((new Date(m.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
+                const daysLeft = m.end_date && mounted ? Math.ceil((new Date(m.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
                 const timeText = daysLeft !== null ? (daysLeft > 0 ? `เหลืออีก ${daysLeft} วัน` : "หมดเวลา") : "ตลอดปี";
 
                 return (

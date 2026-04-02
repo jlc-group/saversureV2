@@ -142,34 +142,11 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
       .join(" ");
 
   useEffect(() => {
-    if (id === "mock-0-point-test") {
-      setReward({
-        id: "mock-0-point-test",
-        name: "[TEST] ไอเทมเทสระบบ 0 แต้ม ฟรี!",
-        description: "<h2 style='font-size:18px;font-weight:bold;margin-bottom:8px'>โหมดทดสอบพิเศษ 🎁</h2><p>สินค้านี้ถูก 'เสก' ขึ้นมาเฉพาะในฝั่งเว็บเพื่อให้คุณกดเทส Flow ของขวัญฟรี (0 แต้ม) ได้เลย <b>โดยไม่ลง Database</b> เพื่อรักษากฎ Read-only ของฐานข้อมูลเอาไว้ครับ!</p>",
-        point_cost: 0,
-        normal_point_cost: 499,
-        price: 999,
-        cost_currency: "point",
-        image_url: "",
-        delivery_type: "shipping",
-        type: "product",
-        total_qty: 1000,
-        reserved_qty: 0,
-        sold_qty: 1,
-        available_qty: 999,
-        is_flash: true,
-        tier_name: "Member",
-        coupon_available_count: 999
-      });
-      setLoading(false);
-    } else {
-      api
-        .get<RewardDetail>(`/api/v1/public/rewards/${id}`)
-        .then(setReward)
-        .catch(() => setReward(null))
-        .finally(() => setLoading(false));
-    }
+    api
+      .get<RewardDetail>(`/api/v1/public/rewards/${id}`)
+      .then(setReward)
+      .catch(() => setReward(null))
+      .finally(() => setLoading(false));
 
     api
       .get<{ data: CurrencyMaster[] }>("/api/v1/public/currencies")

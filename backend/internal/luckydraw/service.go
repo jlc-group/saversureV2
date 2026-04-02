@@ -331,10 +331,17 @@ func (s *Service) Register(ctx context.Context, tenantID, campaignID, userID str
 	}
 	defer tx.Rollback(ctx)
 
+	// User lock to prevent race conditions on balance deduction
+	var dummy int
+	err = tx.QueryRow(ctx, `SELECT 1 FROM users WHERE id = $1 FOR UPDATE`, userID).Scan(&dummy)
+	if err != nil {
+		return nil, fmt.Errorf("lock user: %w", err)
+	}
+
 	if c.CostPoints > 0 {
 		var balance int
 		_ = tx.QueryRow(ctx,
-			`SELECT COALESCE(SUM(CASE WHEN entry_type = 'credit' THEN amount ELSE -amount END), 0) FROM point_ledger WHERE user_id = $1`,
+			`SELECT COALESCE(SUM(CASE WHEN entry_type = 'credit' THEN amount ELSE -amount END), 0) FROM point_ledger WHERE user_id = $1 AND currency = 'point'`,
 			userID,
 		).Scan(&balance)
 		if balance < c.CostPoints {
@@ -343,8 +350,8 @@ func (s *Service) Register(ctx context.Context, tenantID, campaignID, userID str
 
 		balanceAfter := balance - c.CostPoints
 		_, err := tx.Exec(ctx,
-			`INSERT INTO point_ledger (user_id, tenant_id, entry_type, amount, balance_after, reference_type, reference_id, description)
-			 VALUES ($1, $2, 'debit', $3, $4, 'lucky_draw', $5, 'แลกสิทธิ์ลุ้นโชค')`,
+			`INSERT INTO point_ledger (user_id, tenant_id, entry_type, amount, balance_after, reference_type, reference_id, description, currency)
+			 VALUES ($1, $2, 'debit', $3, $4, 'lucky_draw', $5, 'แลกสิทธิ์ลุ้นโชค', 'point')`,
 			userID, tenantID, c.CostPoints, balanceAfter, campaignID,
 		)
 		if err != nil {

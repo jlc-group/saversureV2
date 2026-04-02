@@ -837,11 +837,27 @@ func main() {
 	}
 
 	// Rewards API (public - no auth required)
-	publicRewardRoutes := api.Group("/rewards")
+	publicRewardRoutes := api.Group("/public/rewards")
 	publicRewardRoutes.Use(mw.TenantFromHeader())
 	{
 		publicRewardRoutes.GET("", rewardHandler.ListPublic)
 		publicRewardRoutes.GET("/:id", rewardHandler.GetDetail)
+	}
+
+	// Missions API (public - no auth required)
+	publicMissionRoutes := api.Group("/public/missions")
+	publicMissionRoutes.Use(mw.TenantFromHeader())
+	{
+		publicMissionRoutes.GET("", gamifyHandler.ListMissions)
+		publicMissionRoutes.GET("/:id", gamifyHandler.GetMission)
+	}
+
+	// Lucky Draw API (public - no auth required)
+	publicLuckyDrawRoutes := api.Group("/public/lucky-draw")
+	publicLuckyDrawRoutes.Use(mw.TenantFromHeader())
+	{
+		publicLuckyDrawRoutes.GET("", luckyDrawHandler.ListCampaigns)
+		publicLuckyDrawRoutes.GET("/:id", luckyDrawHandler.GetCampaign)
 	}
 
 	// Consumer Profile (self)
@@ -862,6 +878,7 @@ func main() {
 	{
 		myRoutes.POST("/lucky-draw/:id/register", luckyDrawHandler.Register)
 		myRoutes.GET("/lucky-draw/:id/tickets", luckyDrawHandler.GetUserTickets)
+		myRoutes.GET("/lucky-draw/tickets", luckyDrawHandler.GetUserTickets)
 		myRoutes.POST("/donations/:id/donate", donationHandler.Donate)
 		myRoutes.GET("/donations", donationHandler.GetMyDonations)
 		myRoutes.GET("/balances", currencyHandler.GetMultiBalance)
