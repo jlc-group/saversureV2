@@ -47,7 +47,7 @@ func (h *Handler) GetMission(c *gin.Context) {
 		apperror.Respond(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, m)
+	c.JSON(http.StatusOK, gin.H{"data": m})
 }
 
 func (h *Handler) CreateMission(c *gin.Context) {

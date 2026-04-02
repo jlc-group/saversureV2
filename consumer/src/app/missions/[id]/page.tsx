@@ -78,6 +78,7 @@ export default function MissionDetailPage({ params }: { params: Promise<{ id: st
   const [mission, setMission] = useState<Mission | null>(null);
   const [userProgress, setUserProgress] = useState<UserMission | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const loggedIn = isLoggedIn();
 
   useEffect(() => {
@@ -87,11 +88,21 @@ export default function MissionDetailPage({ params }: { params: Promise<{ id: st
         setMission(missionRes);
 
         if (loggedIn) {
-          const progressRes = await api.get<UserMission>(`/api/v1/my/missions/${id}`);
-          setUserProgress(progressRes);
+          try {
+            const progressRes = await api.get<UserMission>(`/api/v1/my/missions/${id}`);
+            setUserProgress(progressRes);
+          } catch (progressErr: any) {
+            console.log('No progress data for this mission:', progressErr);
+            // Don't fail the whole page if user progress not found
+          }
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Failed to load mission:', err);
+        if (err?.status === 404) {
+          setError('ไม่พบภารกิจนี้');
+        } else {
+          setError('โหลดข้อมูลไม่สำเร็จ');
+        }
       } finally {
         setLoading(false);
       }
@@ -116,16 +127,52 @@ export default function MissionDetailPage({ params }: { params: Promise<{ id: st
     );
   }
 
+  if (error) {
+    return (
+      <div className="pb-24 min-h-screen bg-background">
+        <Navbar />
+        <div className="pt-24">
+          <div className="p-5 text-center">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg viewBox="0 0 24 24" fill="none" stroke="red" strokeWidth="1.5" className="w-8 h-8">
+                <path d="M12 9v3.75m-3.375 0a3.375 3.375 0 106.75 0 3.375 3.375 0 10-6.75 0M12 21a9 9 0 100-18 9 9 0 000 18z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">ไม่พบภารกิจ</h2>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <button
+              onClick={() => router.back()}
+              className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg"
+            >
+              กลับไปหน้าก่อนหน้า
+            </button>
+          </div>
+        </div>
+        <BottomNav />
+      </div>
+    );
+  }
+
   if (!mission) {
     return (
       <div className="pb-24 min-h-screen bg-background">
         <Navbar />
-        <div className="pt-24 flex flex-col items-center justify-center px-6" style={{ minHeight: "60vh" }}>
-          <p className="text-lg font-bold mb-2">ไม่พบภารกิจ</p>
-          <p className="text-sm text-muted-foreground mb-6">ภารกิจนี้อาจไม่มีอยู่แล้ว</p>
-          <Link href="/missions" className="rounded-full bg-[var(--jh-green)] px-8 py-2.5 text-sm font-bold text-white">
-            กลับหน้าภารกิจ
-          </Link>
+        <div className="pt-24">
+          <div className="p-5 text-center">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg viewBox="0 0 24 24" fill="none" stroke="gray" strokeWidth="1.5" className="w-8 h-8">
+                <path d="M12 9v3.75m-3.375 0a3.375 3.375 0 106.75 0 3.375 3.375 0 10-6.75 0M12 21a9 9 0 100-18 9 9 0 000 18z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">ไม่พบภารกิจ</h2>
+            <p className="text-gray-600 mb-4">ภารกิจที่คุณต้องการไม่มีในระบบ</p>
+            <button
+              onClick={() => router.push('/missions')}
+              className="bg-(--jh-green) hover:bg-(--jh-green-dark) text-white px-4 py-2 rounded-lg"
+            >
+              ดูภารกิจทั้งหมด
+            </button>
+          </div>
         </div>
         <BottomNav />
       </div>

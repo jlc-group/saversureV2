@@ -87,3 +87,16 @@ func (h *Handler) Publish(c *gin.Context) {
 
 	c.JSON(http.StatusOK, campaign)
 }
+
+func (h *Handler) ListPublic(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+
+	campaigns, total, err := h.svc.ListActive(c.Request.Context(), c.GetString("tenant_id"), limit, offset)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": campaigns, "total": total})
+}

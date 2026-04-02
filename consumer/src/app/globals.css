@@ -433,6 +433,28 @@ body {
   padding: 12px 16px 120px;
   min-height: 60vh;
 }
+
+/* Campaigns Container */
+.jh-campaigns-container {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 8px 0;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.jh-campaigns-container::-webkit-scrollbar {
+  display: none;
+}
+
+.jh-campaigns-container .jh-card {
+  flex: 0 0 280px;
+  scroll-snap-align: start;
+}
+
 .jh-section-title {
   font-size: 22px;
   font-weight: 700;

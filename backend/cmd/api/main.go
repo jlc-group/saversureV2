@@ -860,6 +860,13 @@ func main() {
 		publicLuckyDrawRoutes.GET("/:id", luckyDrawHandler.GetCampaign)
 	}
 
+	// Campaigns API (public - no auth required)
+	publicCampaignRoutes := api.Group("/public/campaigns")
+	publicCampaignRoutes.Use(mw.TenantFromHeader())
+	{
+		publicCampaignRoutes.GET("", campaignHandler.ListPublic)
+	}
+
 	// Consumer Profile (self)
 	profileRoutes := tenanted.Group("/profile")
 	{

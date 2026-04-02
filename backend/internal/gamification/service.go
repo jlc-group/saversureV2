@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -169,6 +170,9 @@ func (s *Service) GetMissionByID(ctx context.Context, tenantID, id string) (*Mis
 		&m.RewardCurrency, &m.StartDate, &m.EndDate, &m.Active,
 		&m.SortOrder, &m.CreatedAt)
 	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("mission not found")
+		}
 		return nil, fmt.Errorf("get mission: %w", err)
 	}
 	return &m, nil

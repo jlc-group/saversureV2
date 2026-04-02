@@ -1,5 +1,5 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:30400";
-const ENV_TENANT_ID = process.env.NEXT_PUBLIC_TENANT_ID || "";
+const ENV_TENANT_ID = process.env.NEXT_PUBLIC_TENANT_ID || "00000000-0000-0000-0000-000000000001";
 
 export interface BrandingData {
   tenant_id: string;

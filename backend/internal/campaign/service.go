@@ -185,3 +185,52 @@ func (s *Service) Publish(ctx context.Context, tenantID, id string) (*Campaign, 
 	}
 	return &c, nil
 }
+
+func (s *Service) ListActive(ctx context.Context, tenantID string, limit, offset int) ([]Campaign, int64, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 50 {
+		limit = 50
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	var total int64
+	err := s.db.QueryRow(ctx,
+		`SELECT count(*) FROM campaigns WHERE tenant_id = $1 AND status = 'active' 
+		 AND (start_date IS NULL OR start_date <= NOW()) 
+		 AND (end_date IS NULL OR end_date >= NOW())`, tenantID,
+	).Scan(&total)
+	if err != nil {
+		return nil, 0, fmt.Errorf("count active campaigns: %w", err)
+	}
+
+	rows, err := s.db.Query(ctx,
+		`SELECT id, tenant_id, name, description, type, image_url, start_date, end_date, terms_conditions, status,
+		        COALESCE(settings, '{}'::jsonb)::text, created_by, created_at::text
+		 FROM campaigns WHERE tenant_id = $1 AND status = 'active'
+		 AND (start_date IS NULL OR start_date <= NOW()) 
+		 AND (end_date IS NULL OR end_date >= NOW())
+		 ORDER BY created_at DESC LIMIT $2 OFFSET $3`, tenantID, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list active campaigns: %w", err)
+	}
+	defer rows.Close()
+
+	var campaigns []Campaign
+	for rows.Next() {
+		var c Campaign
+		var rawSettings string
+		if err := rows.Scan(&c.ID, &c.TenantID, &c.Name, &c.Description, &c.Type, &c.ImageURL, &c.StartDate, &c.EndDate,
+			&c.TermsConditions, &c.Status, &rawSettings, &c.CreatedBy, &c.CreatedAt); err != nil {
+			return nil, 0, fmt.Errorf("scan campaign: %w", err)
+		}
+		if rawSettings != "" {
+			_ = json.Unmarshal([]byte(rawSettings), &c.Settings)
+		}
+		campaigns = append(campaigns, c)
+	}
+	return campaigns, total, nil
+}

@@ -45,16 +45,17 @@ const mediaUrl = (url?: string | null) => {
 
 export default function MissionsPage() {
   const [missions, setMissions] = useState<Mission[]>([]);
-  const [activeTab, setActiveTab] = useState<'current' | 'completed'>('current');
+  const [activeTab, setActiveTab] = useState<'all' | 'completed'>('all');
   const [progressMap, setProgressMap] = useState<Record<string, MissionProgress>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [claimedMission, setClaimedMission] = useState<Mission | null>(null);
   const [mounted, setMounted] = useState(false);
-  const loggedIn = isLoggedIn();
+  const [loggedIn, setLoggedIn] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+    setLoggedIn(isLoggedIn());
   }, []);
 
   const handleClaim = async (e: React.MouseEvent, mission: Mission) => {
@@ -75,6 +76,8 @@ export default function MissionsPage() {
 
   useEffect(() => {
     const load = async () => {
+      if (!mounted) return;
+      
       try {
         const [missionsRes, progressRes] = await Promise.all([
           api.get<{ data?: Mission[] } | Mission[]>("/api/v1/public/missions"),
@@ -101,7 +104,7 @@ export default function MissionsPage() {
       }
     };
     load();
-  }, [loggedIn]);
+  }, [loggedIn, mounted]);
 
   return (
     <div className="pb-20 min-h-screen bg-background">
@@ -142,14 +145,14 @@ export default function MissionsPage() {
         <div className={`px-5 ${!loggedIn ? "mt-4" : "-mt-6 relative z-10"} mb-4`}>
           <div className="bg-white/90 backdrop-blur-sm p-1.5 rounded-2xl flex gap-1 shadow-sm border border-gray-100">
             <button
-              onClick={() => setActiveTab('current')}
+              onClick={() => setActiveTab('all')}
               className={`flex-1 py-2 text-[14px] font-bold rounded-xl transition-all ${
-                activeTab === 'current'
+                activeTab === 'all'
                   ? 'bg-white text-[var(--jh-green)] shadow-sm'
                   : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
               }`}
             >
-              ภารกิจปัจจุบัน
+              ทั้งหมด
             </button>
             <button
               onClick={() => setActiveTab('completed')}
@@ -186,7 +189,7 @@ export default function MissionsPage() {
             </div>
           ) : (() => {
             const displayMissions = missions.filter(m => 
-              activeTab === 'current' 
+              activeTab === 'all' 
                 ? !progressMap[m.id]?.completed_at 
                 : !!progressMap[m.id]?.completed_at
             );
@@ -196,15 +199,15 @@ export default function MissionsPage() {
                 <EmptyState
                   icon={
                     <svg viewBox="0 0 24 24" fill="none" stroke="var(--jh-green)" strokeWidth="1.5" className="w-10 h-10">
-                      {activeTab === 'current' ? (
+                      {activeTab === 'all' ? (
                         <path d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z" />
                       ) : (
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       )}
                     </svg>
                   }
-                  title={activeTab === 'current' ? "ยังไม่มีภารกิจปัจจุบัน" : "ยังไม่มีภารกิจที่สำเร็จแล้ว"}
-                  subtitle={activeTab === 'current' ? "ภารกิจใหม่กำลังจะมาเร็วๆ นี้" : "มาเริ่มทำขุมทรัพย์แรกกันเถอะ"}
+                  title={activeTab === 'all' ? "ยังไม่มีภารกิจปัจจุบัน" : "ยังไม่มีภารกิจที่สำเร็จแล้ว"}
+                  subtitle={activeTab === 'all' ? "ภารกิจใหม่กำลังจะมาเร็วๆ นี้" : "มาเริ่มทำขุมทรัพย์แรกกันเถอะ"}
                 />
               );
             }
