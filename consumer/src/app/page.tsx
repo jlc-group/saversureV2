@@ -471,8 +471,8 @@ function JulaHerbHome() {
       {/* ══════ Donation Modal ══════ */}
       {selectedDonation && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-[24px] w-full max-w-md overflow-hidden shadow-2xl animate-scale-up">
-            <div className="relative h-40 bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-teal)_100%)]">
+          <div className="bg-white rounded-[20px] w-full max-w-[360px] overflow-hidden shadow-2xl animate-scale-up">
+            <div className="relative h-32 bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-teal)_100%)]">
               {selectedDonation.image_url ? (
                 <img 
                   src={mediaUrl(selectedDonation.image_url) || ""} 
@@ -480,29 +480,29 @@ function JulaHerbHome() {
                   alt="" 
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-6xl opacity-30">❤️</div>
+                <div className="w-full h-full flex items-center justify-center text-5xl opacity-30">❤️</div>
               )}
               <button 
                 onClick={() => setSelectedDonation(null)}
-                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/40 transition-colors"
+                className="absolute top-3 right-3 w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/40 transition-colors text-sm"
               >
                 ✕
               </button>
-              <div className="absolute bottom-4 left-6 right-6">
-                <h3 className="text-white font-bold text-xl line-clamp-1">{selectedDonation.title}</h3>
-                <p className="text-white/80 text-xs mt-1">ร่วมเป็นส่วนหนึ่งในการช่วยเหลือสังคม</p>
+              <div className="absolute bottom-3 left-4 right-4">
+                <h3 className="text-white font-bold text-lg line-clamp-1">{selectedDonation.title}</h3>
+                <p className="text-white/80 text-[11px] mt-0.5">ร่วมเป็นส่วนหนึ่งในการช่วยเหลือสังคม</p>
               </div>
             </div>
 
-            <div className="p-6">
-              <div className="mb-6">
-                <label className="text-sm font-bold text-gray-500 mb-3 block">เลือกจำนวนแต้มที่ต้องการบริจาค</label>
-                <div className="grid grid-cols-3 gap-3">
+            <div className="p-5">
+              <div className="mb-5">
+                <label className="text-[13px] font-bold text-gray-500 mb-2.5 block">เลือกจำนวนแต้มที่ต้องการบริจาค</label>
+                <div className="grid grid-cols-3 gap-2">
                   {[10, 50, 100, 500, 1000].map((amt) => (
                     <button
                       key={amt}
                       onClick={() => setDonateAmount(amt)}
-                      className={`py-2.5 rounded-xl font-bold text-sm transition-all border-2 ${
+                      className={`py-2 rounded-lg font-bold text-[12px] transition-all border-2 ${
                         donateAmount === amt 
                           ? "border-[var(--jh-green)] bg-green-50 text-[var(--jh-green)]" 
                           : "border-gray-100 bg-gray-50 text-gray-400 hover:border-gray-200"
@@ -515,31 +515,31 @@ function JulaHerbHome() {
                     <input
                       type="number"
                       placeholder="ระบุเอง"
-                      className="w-full py-2.5 px-3 rounded-xl font-bold text-sm border-2 border-gray-100 bg-gray-50 outline-none focus:border-[var(--jh-green)] text-center"
+                      className="w-full py-2 px-2.5 rounded-lg font-bold text-[12px] border-2 border-gray-100 bg-gray-50 outline-none focus:border-[var(--jh-green)] text-center"
                       onChange={(e) => setDonateAmount(Number(e.target.value))}
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="bg-amber-50 rounded-xl p-4 mb-6 flex items-start gap-3">
-                <div className="text-amber-500 mt-0.5">💡</div>
-                <p className="text-[12px] text-amber-700 leading-relaxed">
+              <div className="bg-amber-50 rounded-lg p-3 mb-5 flex items-start gap-2.5">
+                <div className="text-amber-500 mt-0.5 text-sm">💡</div>
+                <p className="text-[11px] text-amber-700 leading-relaxed">
                   แต้มของคุณจะถูกหักทันทีหลังจากกดยืนยัน และคุณสามารถตรวจสอบประวัติได้ที่หน้า "ประวัติการบริจาค"
                 </p>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex gap-2.5">
                 <button
                   onClick={() => setSelectedDonation(null)}
-                  className="flex-1 py-3.5 rounded-2xl font-bold text-gray-400 bg-gray-100 hover:bg-gray-200 transition-colors"
+                  className="flex-1 py-2.5 rounded-xl font-bold text-gray-400 bg-gray-100 hover:bg-gray-200 transition-colors text-[13px]"
                 >
                   ยกเลิก
                 </button>
                 <button
                   onClick={handleDonate}
                   disabled={donating || donateAmount <= 0}
-                  className="flex-[2] py-3.5 rounded-2xl font-bold text-white bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-teal)_100%)] shadow-lg shadow-green-200 disabled:opacity-50 disabled:shadow-none transition-all"
+                  className="flex-[2] py-2.5 rounded-xl font-bold text-white bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-teal)_100%)] shadow-lg shadow-green-200 disabled:opacity-50 disabled:shadow-none transition-all text-[13px]"
                 >
                   {donating ? "กำลังประมวลผล..." : "ยืนยันบริจาค"}
                 </button>

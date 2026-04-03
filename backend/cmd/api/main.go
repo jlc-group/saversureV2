@@ -38,16 +38,16 @@ import (
 	"saversure/internal/ledger"
 	"saversure/internal/linebot"
 	"saversure/internal/luckydraw"
-	"saversure/internal/migrationjob"
 	mw "saversure/internal/middleware"
+	"saversure/internal/migrationjob"
 	"saversure/internal/navmenu"
 	"saversure/internal/news"
-	"saversure/internal/pageconfig"
-	"saversure/internal/popup"
 	"saversure/internal/notification"
 	"saversure/internal/opsdigest"
 	"saversure/internal/otp"
+	"saversure/internal/pageconfig"
 	"saversure/internal/platform"
+	"saversure/internal/popup"
 	"saversure/internal/product"
 	"saversure/internal/profile"
 	"saversure/internal/promotion"
@@ -254,7 +254,6 @@ func main() {
 			"db":      dbOK,
 		})
 	})
-
 
 	// Public download (no auth required)
 	if exportHandler != nil {
@@ -648,8 +647,6 @@ func main() {
 		luckyDrawAdminRoutes.GET("/:id/winners", luckyDrawHandler.GetWinners)
 	}
 
-
-
 	// Point Currencies (Admin)
 	currencyRoutes := tenanted.Group("/currencies")
 	currencyRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
@@ -856,7 +853,7 @@ func main() {
 	publicLuckyDrawRoutes := api.Group("/public/lucky-draw")
 	publicLuckyDrawRoutes.Use(mw.TenantFromHeader())
 	{
-		publicLuckyDrawRoutes.GET("", luckyDrawHandler.ListCampaigns)
+		publicLuckyDrawRoutes.GET("", luckyDrawHandler.ListActiveCampaigns)
 		publicLuckyDrawRoutes.GET("/:id", luckyDrawHandler.GetCampaign)
 	}
 
