@@ -23,6 +23,7 @@ type Customer struct {
 	DisplayName  *string `json:"display_name"`
 	FirstName    *string `json:"first_name"`
 	LastName     *string `json:"last_name"`
+	AvatarURL    *string `json:"avatar_url"`
 	Status       string  `json:"status"`
 	Province     *string `json:"province"`
 	Occupation   *string `json:"occupation"`
@@ -68,7 +69,7 @@ func (s *Service) List(ctx context.Context, tenantID string, f ListFilter) ([]Cu
 	).Scan(&total)
 
 	query := fmt.Sprintf(
-		`SELECT u.id, u.tenant_id, u.email, u.phone, u.display_name, u.first_name, u.last_name, u.status,
+		`SELECT u.id, u.tenant_id, u.email, u.phone, u.display_name, u.first_name, u.last_name, u.avatar_url, u.status,
 		        u.province, u.occupation, COALESCE(u.customer_flag, 'green'),
 		        COALESCE((SELECT balance_after FROM point_ledger WHERE tenant_id = u.tenant_id AND user_id = u.id ORDER BY created_at DESC LIMIT 1), 0),
 		        COALESCE((SELECT COUNT(*) FROM scan_history WHERE tenant_id = u.tenant_id AND user_id = u.id AND COALESCE(scan_type, 'success') = 'success'), 0),
@@ -91,7 +92,7 @@ func (s *Service) List(ctx context.Context, tenantID string, f ListFilter) ([]Cu
 	var customers []Customer
 	for rows.Next() {
 		var c Customer
-		if err := rows.Scan(&c.ID, &c.TenantID, &c.Email, &c.Phone, &c.DisplayName, &c.FirstName, &c.LastName,
+		if err := rows.Scan(&c.ID, &c.TenantID, &c.Email, &c.Phone, &c.DisplayName, &c.FirstName, &c.LastName, &c.AvatarURL,
 			&c.Status, &c.Province, &c.Occupation, &c.CustomerFlag,
 			&c.PointBalance, &c.ScanCount, &c.RedeemCount, &c.CreatedAt); err != nil {
 			return nil, 0, fmt.Errorf("scan customer: %w", err)
@@ -104,7 +105,7 @@ func (s *Service) List(ctx context.Context, tenantID string, f ListFilter) ([]Cu
 func (s *Service) GetByID(ctx context.Context, tenantID, id string) (*Customer, error) {
 	var c Customer
 	err := s.db.QueryRow(ctx,
-		`SELECT u.id, u.tenant_id, u.email, u.phone, u.display_name, u.first_name, u.last_name, u.status,
+		`SELECT u.id, u.tenant_id, u.email, u.phone, u.display_name, u.first_name, u.last_name, u.avatar_url, u.status,
 		        u.province, u.occupation, COALESCE(u.customer_flag, 'green'),
 		        COALESCE((SELECT balance_after FROM point_ledger WHERE tenant_id = u.tenant_id AND user_id = u.id ORDER BY created_at DESC LIMIT 1), 0),
 		        COALESCE((SELECT COUNT(*) FROM scan_history WHERE tenant_id = u.tenant_id AND user_id = u.id AND COALESCE(scan_type, 'success') = 'success'), 0),
@@ -113,7 +114,7 @@ func (s *Service) GetByID(ctx context.Context, tenantID, id string) (*Customer, 
 		 FROM users u
 		 WHERE u.id = $1 AND u.tenant_id = $2`,
 		id, tenantID,
-	).Scan(&c.ID, &c.TenantID, &c.Email, &c.Phone, &c.DisplayName, &c.FirstName, &c.LastName,
+	).Scan(&c.ID, &c.TenantID, &c.Email, &c.Phone, &c.DisplayName, &c.FirstName, &c.LastName, &c.AvatarURL,
 		&c.Status, &c.Province, &c.Occupation, &c.CustomerFlag,
 		&c.PointBalance, &c.ScanCount, &c.RedeemCount, &c.CreatedAt)
 	if err != nil {
