@@ -864,6 +864,28 @@ func main() {
 		publicCampaignRoutes.GET("", campaignHandler.ListPublic)
 	}
 
+	// Branding API (public - consumer needs theme/logo)
+	publicBrandingRoutes := api.Group("/public")
+	publicBrandingRoutes.Use(mw.TenantFromHeader())
+	{
+		publicBrandingRoutes.GET("/branding", brandingHandler.GetPublic)
+	}
+
+	// Nav Menu API (public - consumer needs nav items)
+	publicNavMenuRoutes := api.Group("/public/nav-menu")
+	publicNavMenuRoutes.Use(mw.TenantFromHeader())
+	{
+		publicNavMenuRoutes.GET("/:type", navMenuHandler.GetPublic)
+	}
+
+	// News API (public - consumer news feed)
+	publicNewsRoutes := api.Group("/public/news")
+	publicNewsRoutes.Use(mw.TenantFromHeader())
+	{
+		publicNewsRoutes.GET("", newsHandler.ListPublished)
+		publicNewsRoutes.GET("/:id", newsHandler.GetByID)
+	}
+
 	// Consumer Profile (self)
 	profileRoutes := tenanted.Group("/profile")
 	{
