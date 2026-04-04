@@ -100,7 +100,7 @@ export default function PopupRenderer() {
             onClick={popup.link_url ? handleClick : undefined}
           >
             <img
-              src={mediaUrl(popup.image_url)}
+              src={mediaUrl(popup.image_url) ?? undefined}
               alt={popup.title}
               className="w-full h-auto max-h-[300px] object-cover"
             />
