@@ -516,7 +516,7 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
 
                 <div className="flex gap-2">
                   <Link
-                    href="/history/redeems"
+                    href={["product", "premium"].includes(String(reward.type).toLowerCase()) ? "/history/redeems" : "/history/coupons"}
                     className="flex-1 rounded-full border-2 border-[var(--jh-green)] py-2.5 text-center text-sm font-bold text-[var(--jh-green)]"
                   >
                     ดูประวัติ

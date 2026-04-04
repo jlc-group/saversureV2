@@ -10,6 +10,7 @@ function HistoryDashboard() {
   // URL tab fallback checks
   const initialTab = searchParams.get('tab') || 'all';
   const [activeFilter, setActiveFilter] = useState(initialTab);
+  const [fulfillmentData, setFulfillmentData] = useState<Record<string, any>>({});
 
   // Sync state if URL search param changes directly via Next.js Link
   useEffect(() => {
@@ -18,6 +19,77 @@ function HistoryDashboard() {
       setActiveFilter(tab);
     }
   }, [searchParams]);
+
+  // Fetch fulfillment data for redeem items
+  useEffect(() => {
+    const fetchFulfillmentData = async () => {
+      try {
+        // Fetch fulfillment data for confirmed reservations
+        const response = await fetch('/api/fulfillment/user');
+        if (response.ok) {
+          const data = await response.json();
+          const fulfillmentMap: Record<string, any> = {};
+          data.data?.forEach((item: any) => {
+            fulfillmentMap[item.id] = item;
+          });
+          setFulfillmentData(fulfillmentMap);
+        }
+      } catch (error) {
+        console.error('Error fetching fulfillment data:', error);
+      }
+    };
+
+    fetchFulfillmentData();
+  }, []);
+
+  // Fetch real redemption history
+  const [redemptionData, setRedemptionData] = useState<any[]>([
+    // Mock redemption data for testing
+    {
+      id: "redeem_001",
+      reward_name: "วอเตอร์เมลอน แอลอีดี คุชชั่น",
+      point_cost: 450,
+      fulfillment_status: "shipped",
+      created_at: "2026-03-20T10:15:00Z",
+      dateGroup: "เมื่อวาน",
+      dateStr: "10:15 น."
+    },
+    {
+      id: "redeem_002", 
+      reward_name: "หมอนอิงแตงโม ลิมิเต็ด อิดิชั่น",
+      point_cost: 800,
+      fulfillment_status: "preparing",
+      created_at: "2026-03-19T14:30:00Z",
+      dateGroup: "เมื่อวาน",
+      dateStr: "14:30 น."
+    },
+    {
+      id: "redeem_003",
+      reward_name: "สบู่แตงโม ล้างหน้าใส",
+      point_cost: 200,
+      fulfillment_status: "delivered",
+      created_at: "2026-03-18T09:00:00Z",
+      dateGroup: "สัปดาห์นี้",
+      dateStr: "09:00 น."
+    }
+  ]);
+  
+  useEffect(() => {
+    const fetchRedemptionData = async () => {
+      try {
+        const response = await fetch('/api/user/redemptions');
+        if (response.ok) {
+          const data = await response.json();
+          setRedemptionData(data.data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching redemption data:', error);
+      }
+    };
+
+    // Comment out for now to use mock data
+    // fetchRedemptionData();
+  }, []);
 
   const handleFilterClick = (tabId: string) => {
     setActiveFilter(tabId);
@@ -45,19 +117,20 @@ function HistoryDashboard() {
       icon: "🦷",
       bg: "#E8F5E9"
     },
-    {
-      id: 2,
+    ...redemptionData.map((item: any) => ({
+      id: item.id,
       type: "redeem",
-      title: "วอเตอร์เมลอน แอลอีดี คุชชั่น",
-      refCode: "REF: JHH-8821",
-      points: "-450 P",
-      dateGroup: "เมื่อวาน",
-      dateStr: "10:15 น.",
-      status: "success",
-      statusText: "สำเร็จแล้ว",
-      icon: "🍉",
-      bg: "#F9FBE7"
-    },
+      title: item.reward_name || "ของรางวัล",
+      refCode: `REF: ${item.id.slice(-8)}`,
+      points: `-${item.point_cost || 0} P`,
+      dateGroup: item.dateGroup || "เมื่อวาน",
+      dateStr: item.dateStr || "10:15 น.",
+      status: item.fulfillment_status || "pending",
+      statusText: getFulfillmentStatusText(item.fulfillment_status),
+      icon: "�",
+      bg: "#F9FBE7",
+      reservationId: item.id
+    })),
     {
       id: 3,
       type: "lucky",
@@ -85,6 +158,17 @@ function HistoryDashboard() {
     },
   ];
 
+  // Helper function to get status text
+  function getFulfillmentStatusText(status: string) {
+    switch (status) {
+      case 'pending': return 'รับเรื่องแล้ว';
+      case 'preparing': return 'กำลังเตรียมจัดส่ง';
+      case 'shipped': return 'กำลังจัดส่ง';
+      case 'delivered': return 'จัดส่งสำเร็จ';
+      default: return 'รับเรื่องแล้ว';
+    }
+  }
+
   const filteredData = activeFilter === "all" ? mockData : mockData.filter(d => d.type === activeFilter);
 
   // Group by DateGroup
@@ -92,7 +176,7 @@ function HistoryDashboard() {
     if (!acc[curr.dateGroup]) acc[curr.dateGroup] = [];
     acc[curr.dateGroup].push(curr);
     return acc;
-  }, {} as Record<string, typeof mockData>);
+  }, {} as Record<string, any[]>);
 
   return (
     <div className="w-full flex flex-col items-center pb-8">
@@ -154,13 +238,15 @@ function HistoryDashboard() {
                <div className="text-[12px] font-black text-gray-400 mb-3 ml-2 tracking-wide uppercase">{group}</div>
                <div className="space-y-3.5">
                   {items.map((item) => (
-                     <div key={item.id} onClick={() => { if(item.type === 'reward') router.push(`/history/tracking/${item.id}`); }} className="bg-white p-3.5 rounded-[18px] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-gray-100 flex items-center gap-3.5 hover:border-green-200 transition-colors active:scale-[0.98] cursor-pointer group">
+                     <div key={item.id} onClick={() => { if(item.type === 'redeem' && item.reservationId) router.push(`/history/tracking/${item.reservationId}`); }} className="bg-white p-3.5 rounded-[18px] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-gray-100 flex items-center gap-3.5 hover:border-green-200 transition-colors active:scale-[0.98] cursor-pointer group">
                         
                         {/* Left Icon / Image */}
                         <div className="w-12 h-12 rounded-[14px] flex items-center justify-center text-[22px] shrink-0 border border-gray-50 group-hover:scale-105 transition-transform" style={{backgroundColor: item.bg}}>
                            {item.icon}
                            {/* Small notification dot if won early */}
                            {item.type === 'reward' && <div className="absolute top-[2px] right-[2px] w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></div>}
+                           {/* Shipping indicator for redeem items */}
+                           {item.type === 'redeem' && item.status === 'shipping' && <div className="absolute top-[2px] right-[2px] w-2.5 h-2.5 bg-blue-500 rounded-full border-2 border-white animate-pulse"></div>}
                         </div>
                         
                         {/* Middle Info */}
@@ -197,6 +283,11 @@ function HistoryDashboard() {
                               <div className="text-[9.5px] font-bold text-blue-500 mt-1 flex items-center gap-1">
                                  <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
                                  {item.statusText}
+                              </div>
+                           )}
+                           {item.type === 'redeem' && item.reservationId && (
+                              <div className="text-[8.5px] font-bold text-gray-400 mt-1 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-200">
+                                 ติดตาม
                               </div>
                            )}
                         </div>
