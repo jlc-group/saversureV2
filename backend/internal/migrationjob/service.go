@@ -356,6 +356,8 @@ func normalizeModules(input []string) ([]string, error) {
 		case ModuleRedeemHistory:
 			set[ModuleCustomer] = true
 			set[ModuleRewards] = true
+		case ModuleLuckyDraw:
+			set[ModuleCustomer] = true
 		}
 		set[module] = true
 	}
@@ -363,7 +365,7 @@ func normalizeModules(input []string) ([]string, error) {
 	for _, item := range input {
 		module := strings.TrimSpace(strings.ToLower(item))
 		switch module {
-		case ModuleCustomer, ModuleProduct, ModuleRewards, ModuleScanHistory, ModuleRedeemHistory:
+		case ModuleCustomer, ModuleProduct, ModuleRewards, ModuleScanHistory, ModuleRedeemHistory, ModuleLuckyDraw:
 			add(module)
 		default:
 			return nil, fmt.Errorf("unsupported module: %s", item)

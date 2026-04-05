@@ -8,6 +8,7 @@ const (
 	ModuleRewards       = "rewards"
 	ModuleScanHistory   = "scan_history"
 	ModuleRedeemHistory = "redeem_history"
+	ModuleLuckyDraw     = "lucky_draw"
 
 	JobModeDryRun  = "dry_run"
 	JobModeExecute = "execute"
@@ -18,11 +19,13 @@ const (
 	JobStatusFailed    = "failed"
 	JobStatusCancelled = "cancelled"
 
-	EntityTypeProduct = "product"
-	EntityTypeReward  = "reward"
-	EntityTypeScan    = "scan_history"
-	EntityTypeRedeem  = "redeem_history"
-	EntityTypeAddress = "address"
+	EntityTypeProduct      = "product"
+	EntityTypeReward       = "reward"
+	EntityTypeScan         = "scan_history"
+	EntityTypeRedeem       = "redeem_history"
+	EntityTypeAddress      = "address"
+	EntityTypeLDCampaign   = "lucky_draw_campaign"
+	EntityTypeLDTicket     = "lucky_draw_ticket"
 )
 
 var moduleOrder = []string{
@@ -31,6 +34,7 @@ var moduleOrder = []string{
 	ModuleRewards,
 	ModuleScanHistory,
 	ModuleRedeemHistory,
+	ModuleLuckyDraw,
 }
 
 type CreateJobInput struct {
