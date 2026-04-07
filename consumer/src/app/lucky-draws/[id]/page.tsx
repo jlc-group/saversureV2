@@ -8,6 +8,35 @@ import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
 import { api } from "@/lib/api";
 import { isLoggedIn } from "@/lib/auth";
+import { mediaUrl } from "@/lib/media";
+
+function DescriptionCard({ description }: { description: string | null }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!description) {
+    return (
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+        <h3 className="font-bold text-gray-800 text-sm mb-2">รายละเอียดกิจกรรม</h3>
+        <p className="text-[14px] text-gray-400 italic">ไม่มีรายละเอียดเพิ่มเติม</p>
+      </div>
+    );
+  }
+  return (
+    <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+      <h3 className="font-bold text-gray-800 text-sm mb-2">รายละเอียดกิจกรรม</h3>
+      <div
+        className={`text-[13px] text-gray-600 leading-relaxed overflow-hidden transition-all duration-300 ${expanded ? "" : "max-h-[120px]"}`}
+        style={{ WebkitMaskImage: expanded ? "none" : "linear-gradient(to bottom, black 60%, transparent 100%)" }}
+        dangerouslySetInnerHTML={{ __html: description }}
+      />
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="mt-2 text-[13px] font-medium text-[var(--jh-green)] hover:underline"
+      >
+        {expanded ? "ย่อ" : "ดูเพิ่มเติม..."}
+      </button>
+    </div>
+  );
+}
 
 interface LuckyDraw {
   id: string;
@@ -18,13 +47,6 @@ interface LuckyDraw {
   status: string;
   end_date: string | null;
 }
-
-const mediaUrl = (url?: string | null) => {
-  if (!url) return null;
-  if (url.startsWith("http")) return url;
-  const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:30400";
-  return `${base}/media/${url}`;
-};
 
 export default function LuckyDrawDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -155,14 +177,7 @@ export default function LuckyDrawDetailPage({ params }: { params: Promise<{ id: 
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-            <h3 className="font-bold text-gray-800 text-sm mb-2">รายละเอียดกิจกรรม</h3>
-            {campaign.description ? (
-              <div className="text-[13px] text-gray-600 leading-relaxed whitespace-pre-wrap" dangerouslySetInnerHTML={{__html: campaign.description}}></div>
-            ) : (
-              <p className="text-[14px] text-gray-400 italic">ไม่มีรายละเอียดเพิ่มเติม</p>
-            )}
-          </div>
+          <DescriptionCard description={campaign.description} />
         </div>
       </div>
 

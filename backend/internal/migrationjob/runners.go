@@ -25,6 +25,8 @@ func (s *Service) runModule(ctx context.Context, mc moduleContext) (*moduleOutco
 		return s.runScanHistory(ctx, mc)
 	case ModuleRedeemHistory:
 		return s.runRedeemHistory(ctx, mc)
+	case ModuleLuckyDraw:
+		return s.runLuckyDraw(ctx, mc)
 	default:
 		return nil, fmt.Errorf("unknown migration module: %s", mc.ModuleName)
 	}
@@ -787,6 +789,324 @@ func (s *Service) runScanHistory(ctx context.Context, mc moduleContext) (*module
 	return outcome, nil
 }
 
+func (s *Service) runLuckyDraw(ctx context.Context, mc moduleContext) (*moduleOutcome, error) {
+	outcome := &moduleOutcome{Warnings: []string{}, Summary: map[string]any{}}
+
+	var campaignCount, historyCount int64
+	_ = mc.Source.pool.QueryRow(ctx, `SELECT COUNT(*) FROM lucky_draw_campaigns WHERE deleted_at IS NULL`).Scan(&campaignCount)
+	_ = mc.Source.pool.QueryRow(ctx, `SELECT COUNT(*) FROM lucky_draw_histories WHERE deleted_at IS NULL`).Scan(&historyCount)
+	outcome.Estimated = campaignCount + historyCount
+	if err := s.updateModuleProgress(ctx, mc.JobID, mc.ModuleName, "planning", *outcome); err != nil {
+		return nil, err
+	}
+	if mc.Mode == JobModeDryRun {
+		outcome.Processed = outcome.Estimated
+		outcome.Summary["campaigns_to_process"] = campaignCount
+		outcome.Summary["tickets_to_process"] = historyCount
+		return outcome, nil
+	}
+
+	// --- Stage 1: Campaigns ---
+	rows, err := mc.Source.pool.Query(ctx,
+		`SELECT id, name, description, images, banner_image, point, ticket, quota_balance,
+		        start_date, end_date, status, created_at, updated_at
+		 FROM lucky_draw_campaigns
+		 WHERE deleted_at IS NULL
+		 ORDER BY id`)
+	if err != nil {
+		return nil, fmt.Errorf("query v1 lucky_draw_campaigns: %w", err)
+	}
+	defer rows.Close()
+
+	var campaignsInserted, campaignsSkipped int64
+	for rows.Next() {
+		var (
+			v1ID                              int64
+			name, description, imagesRaw      *string
+			bannerImage, statusText           *string
+			pointCost, ticketCount, totalTix   *int32
+			startDate, endDate                *time.Time
+			createdAt, updatedAt              *time.Time
+		)
+		if err := rows.Scan(&v1ID, &name, &description, &imagesRaw, &bannerImage,
+			&pointCost, &ticketCount, &totalTix,
+			&startDate, &endDate, &statusText, &createdAt, &updatedAt); err != nil {
+			s.appendError(ctx, mc.JobID, mc.ModuleName, EntityTypeLDCampaign, strconv.FormatInt(v1ID, 10), err.Error(), nil)
+			outcome.Failed++
+			outcome.Processed++
+			continue
+		}
+
+		if _, found, err := s.getEntityMap(ctx, mc.TenantID, EntityTypeLDCampaign, strconv.FormatInt(v1ID, 10)); err == nil && found {
+			campaignsSkipped++
+			outcome.Processed++
+			continue
+		}
+
+		// Parse image URL from images array or banner_image
+		var imageURL *string
+		if imagesRaw != nil && *imagesRaw != "" {
+			raw := strings.Trim(*imagesRaw, "{}")
+			parts := strings.SplitN(raw, ",", 2)
+			if len(parts) > 0 {
+				trimmed := strings.Trim(strings.TrimSpace(parts[0]), "\"")
+				if trimmed != "" {
+					imageURL = &trimmed
+				}
+			}
+		}
+		if imageURL == nil && bannerImage != nil && *bannerImage != "" {
+			imageURL = bannerImage
+		}
+
+		// Map status — all V1 campaigns are historical
+		v2Status := "ended"
+		if statusText != nil && *statusText == "publish" {
+			v2Status = "ended" // V1 campaigns are all old
+		}
+
+		title := stringOrDefault(name, "Untitled Campaign")
+		if len(title) > 300 {
+			title = title[:300]
+		}
+
+		campaignID := newUUID()
+		maxTickets := intOrDefault(ticketCount, 1)
+		if maxTickets <= 0 {
+			maxTickets = 1
+		}
+
+		tx, err := s.db.Begin(ctx)
+		if err != nil {
+			return nil, err
+		}
+		_, err = tx.Exec(ctx,
+			`INSERT INTO lucky_draw_campaigns (
+				id, tenant_id, title, description, image_url, cost_points,
+				max_tickets_per_user, total_tickets, status,
+				registration_start, registration_end, draw_date,
+				created_at, updated_at
+			) VALUES (
+				$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11, $12, $13
+			)`,
+			campaignID, mc.TenantID, title, nullableString(description), imageURL,
+			intOrDefault(pointCost, 0), maxTickets, intOrDefault(totalTix, 0), v2Status,
+			startDate, endDate, createdAt, updatedAt,
+		)
+		if err == nil {
+			err = s.upsertEntityMap(ctx, tx, mc.TenantID, EntityTypeLDCampaign,
+				strconv.FormatInt(v1ID, 10), campaignID, mc.JobID, map[string]any{"v1_name": title})
+		}
+		if err != nil {
+			tx.Rollback(ctx)
+			s.appendError(ctx, mc.JobID, mc.ModuleName, EntityTypeLDCampaign, strconv.FormatInt(v1ID, 10), err.Error(), nil)
+			outcome.Failed++
+			outcome.Processed++
+			continue
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return nil, err
+		}
+		campaignsInserted++
+		outcome.Success++
+		outcome.Processed++
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating v1 lucky_draw_campaigns: %w", err)
+	}
+	if err := s.updateModuleProgress(ctx, mc.JobID, mc.ModuleName, "campaigns_done", *outcome); err != nil {
+		return nil, err
+	}
+
+	// --- Stage 2: Tickets (from lucky_draw_histories) — batch insert ---
+	userMap, err := s.loadUserMap(ctx, mc.TenantID)
+	if err != nil {
+		return nil, fmt.Errorf("load user map: %w", err)
+	}
+
+	// Load campaign map: V1 ID → V2 UUID
+	campaignMap := map[int64]string{}
+	cmRows, err := s.db.Query(ctx,
+		`SELECT source_id, target_id FROM migration_entity_maps
+		 WHERE tenant_id = $1 AND entity_type = $2 AND source_system = 'v1'`,
+		mc.TenantID, EntityTypeLDCampaign)
+	if err != nil {
+		return nil, fmt.Errorf("load campaign map: %w", err)
+	}
+	defer cmRows.Close()
+	for cmRows.Next() {
+		var srcID, tgtID string
+		if err := cmRows.Scan(&srcID, &tgtID); err == nil {
+			if id, e := strconv.ParseInt(srcID, 10, 64); e == nil {
+				campaignMap[id] = tgtID
+			}
+		}
+	}
+
+	// Load existing tickets for duplicate check
+	existingTickets := map[int64]bool{}
+	etRows, err := s.db.Query(ctx,
+		`SELECT source_id FROM migration_entity_maps
+		 WHERE tenant_id = $1 AND entity_type = $2 AND source_system = 'v1'`,
+		mc.TenantID, EntityTypeLDTicket)
+	if err == nil {
+		defer etRows.Close()
+		for etRows.Next() {
+			var srcID string
+			if err := etRows.Scan(&srcID); err == nil {
+				if id, e := strconv.ParseInt(srcID, 10, 64); e == nil {
+					existingTickets[id] = true
+				}
+			}
+		}
+	}
+
+	histRows, err := mc.Source.pool.Query(ctx,
+		`SELECT id, lucky_draw_id, user_id, ticket, point, created_at
+		 FROM lucky_draw_histories
+		 WHERE deleted_at IS NULL
+		 ORDER BY id`)
+	if err != nil {
+		return nil, fmt.Errorf("query v1 lucky_draw_histories: %w", err)
+	}
+	defer histRows.Close()
+
+	const batchSize = 500
+	type ticketRow struct {
+		targetID   string
+		campaignID string
+		userID     string
+		ticketNum  string
+		pointsSpent int32
+		createdAt  *time.Time
+		v1ID       int64
+	}
+	batch := make([]ticketRow, 0, batchSize)
+	var ticketsInserted, ticketsSkipped int64
+
+	flushTickets := func() error {
+		if len(batch) == 0 {
+			return nil
+		}
+		tx, err := s.db.Begin(ctx)
+		if err != nil {
+			return err
+		}
+		for _, r := range batch {
+			_, err = tx.Exec(ctx,
+				`INSERT INTO lucky_draw_tickets (id, campaign_id, user_id, ticket_number, points_spent, created_at)
+				 VALUES ($1, $2, $3, $4, $5, COALESCE($6, NOW()))
+				 ON CONFLICT DO NOTHING`,
+				r.targetID, r.campaignID, r.userID, r.ticketNum, r.pointsSpent, r.createdAt,
+			)
+			if err != nil {
+				tx.Rollback(ctx)
+				return fmt.Errorf("insert ticket v1=%d: %w", r.v1ID, err)
+			}
+		}
+		for _, r := range batch {
+			var jobIDParam any = mc.JobID
+			_, err = tx.Exec(ctx,
+				`INSERT INTO migration_entity_maps (tenant_id, entity_type, source_system, source_id, target_id, latest_job_id, metadata, created_at, updated_at)
+				 VALUES ($1, $2, 'v1', $3, $4, $5, '{}'::jsonb, NOW(), NOW())
+				 ON CONFLICT (tenant_id, entity_type, source_system, source_id) DO NOTHING`,
+				mc.TenantID, EntityTypeLDTicket, strconv.FormatInt(r.v1ID, 10), r.targetID, jobIDParam,
+			)
+			if err != nil {
+				tx.Rollback(ctx)
+				return fmt.Errorf("insert ticket map v1=%d: %w", r.v1ID, err)
+			}
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return err
+		}
+		ticketsInserted += int64(len(batch))
+		outcome.Success += int64(len(batch))
+		batch = batch[:0]
+		return nil
+	}
+
+	for histRows.Next() {
+		var (
+			v1ID, v1CampaignID int64
+			v1UserID           *int64
+			ticket, pointsUsed *int32
+			createdAt          *time.Time
+		)
+		if err := histRows.Scan(&v1ID, &v1CampaignID, &v1UserID, &ticket, &pointsUsed, &createdAt); err != nil {
+			outcome.Failed++
+			outcome.Processed++
+			continue
+		}
+		outcome.Processed++
+
+		if existingTickets[v1ID] {
+			ticketsSkipped++
+			continue
+		}
+		if v1UserID == nil {
+			ticketsSkipped++
+			continue
+		}
+		targetUserID, ok := userMap[*v1UserID]
+		if !ok {
+			ticketsSkipped++
+			continue
+		}
+		targetCampaignID, ok := campaignMap[v1CampaignID]
+		if !ok {
+			ticketsSkipped++
+			continue
+		}
+
+		// Generate ticket number
+		ticketNum := fmt.Sprintf("T-%010d", v1ID%10000000000)
+
+		batch = append(batch, ticketRow{
+			targetID:    newUUID(),
+			campaignID:  targetCampaignID,
+			userID:      targetUserID,
+			ticketNum:   ticketNum,
+			pointsSpent: int32(intOrDefault(pointsUsed, 0)),
+			createdAt:   createdAt,
+			v1ID:        v1ID,
+		})
+
+		if len(batch) >= batchSize {
+			if err := flushTickets(); err != nil {
+				s.appendError(ctx, mc.JobID, mc.ModuleName, EntityTypeLDTicket, "batch", err.Error(), nil)
+				outcome.Failed += int64(len(batch))
+				batch = batch[:0]
+			}
+		}
+		if outcome.Processed%5000 == 0 {
+			if err := s.ensureNotCancelled(ctx, mc.JobID); err != nil {
+				return nil, err
+			}
+			if err := s.updateModuleProgress(ctx, mc.JobID, mc.ModuleName, "migrating_tickets", *outcome); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if len(batch) > 0 {
+		if err := flushTickets(); err != nil {
+			s.appendError(ctx, mc.JobID, mc.ModuleName, EntityTypeLDTicket, "batch_final", err.Error(), nil)
+			outcome.Failed += int64(len(batch))
+		}
+	}
+	if err := histRows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating v1 lucky_draw_histories: %w", err)
+	}
+
+	outcome.Summary["campaigns_total"] = campaignCount
+	outcome.Summary["campaigns_inserted"] = campaignsInserted
+	outcome.Summary["campaigns_skipped"] = campaignsSkipped
+	outcome.Summary["tickets_total"] = historyCount
+	outcome.Summary["tickets_inserted"] = ticketsInserted
+	outcome.Summary["tickets_skipped"] = ticketsSkipped
+	return outcome, nil
+}
+
 // loadExistingScanMap loads all existing scan entity maps into memory for fast duplicate check
 func (s *Service) loadExistingScanMap(ctx context.Context, tenantID string) (map[int64]bool, error) {
 	rows, err := s.db.Query(ctx,
@@ -1365,6 +1685,13 @@ func looksLikeJSONPayload(raw *string) bool {
 func stringOrEmpty(value *string) string {
 	if value == nil {
 		return ""
+	}
+	return *value
+}
+
+func stringOrDefault(value *string, def string) string {
+	if value == nil || *value == "" {
+		return def
 	}
 	return *value
 }
