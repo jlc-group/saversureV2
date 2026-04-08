@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
+import PageRenderer from "@/components/PageRenderer";
 import { api } from "@/lib/api";
 import { isLoggedIn } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
@@ -49,7 +50,11 @@ const deliveryLabel: Record<string, string> = {
   none: "",
 };
 
-export default function RewardsPage() {
+/**
+ * RewardsFallback — original hard-coded layout kept as safety net.
+ * ใช้เมื่อ page_configs ไม่มี slug 'rewards' หรือ API error
+ */
+function RewardsFallback() {
   const [rewards, setRewards] = useState<RewardItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [userBalance, setUserBalance] = useState<Record<string, number>>({});
@@ -106,10 +111,8 @@ export default function RewardsPage() {
   };
 
   return (
-    <div className="pb-24 min-h-screen bg-background">
-      <Navbar />
-
-      <div className="pt-24">
+    <>
+      <div>
         {/* Header with animated gradient */}
         <div className="bg-[linear-gradient(277.42deg,#3C9B4D_-13.4%,#7DBD48_80.19%)] px-5 pt-8 pb-10 text-white relative overflow-hidden">
           {/* Floating decorative shapes */}
@@ -295,7 +298,19 @@ export default function RewardsPage() {
           </div>
         )}
       </div>
+    </>
+  );
+}
 
+export default function RewardsPage() {
+  return (
+    <div className="pb-24 min-h-screen bg-background">
+      <Navbar />
+      <div className="pt-24">
+        {/* Page Builder controlled — admin แก้ sections ได้จาก /page-builder
+            ถ้า config ไม่มีใน DB → fallback ไป layout เดิม (hard-coded) */}
+        <PageRenderer pageSlug="rewards" fallback={<RewardsFallback />} />
+      </div>
       <BottomNav />
     </div>
   );

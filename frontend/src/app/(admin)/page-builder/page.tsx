@@ -44,6 +44,7 @@ const BUILT_IN_PAGES = [
   { value: "home", label: "หน้าแรก (Home)" },
   { value: "scan", label: "หน้าสแกน (Scan)" },
   { value: "rewards", label: "หน้ารางวัล (Rewards)" },
+  { value: "missions", label: "หน้าภารกิจ (Missions)" },
   { value: "history", label: "หน้าประวัติ (History)" },
   { value: "profile", label: "หน้าโปรไฟล์ (Profile)" },
   { value: "news", label: "หน้าข่าวสาร (News)" },
@@ -536,6 +537,129 @@ const sectionTypes: Record<string, SectionTypeDef> = {
     fields: [
       { key: "limit", label: "จำนวนรายการ", type: "number" },
       { key: "show_end_date", label: "แสดงวันสิ้นสุด", type: "boolean" },
+    ],
+  },
+  rewards_page_header: {
+    label: "Rewards — Header",
+    icon: "🎁",
+    description: "Header gradient หน้ารางวัล + ยอดคงเหลือ currency ของผู้ใช้",
+    defaultProps: {
+      title: "🎁 แลกรางวัล",
+      subtitle: "แลกของรางวัลและสิทธิพิเศษ",
+      show_balance: true,
+    },
+    fields: [
+      { key: "title", label: "หัวข้อ", type: "text" },
+      { key: "subtitle", label: "คำอธิบาย", type: "text" },
+      { key: "show_balance", label: "แสดงยอดคงเหลือ (Balance pills)", type: "boolean" },
+    ],
+  },
+  rewards_tabs_grid: {
+    label: "Rewards — Tabs + Grid",
+    icon: "🎁",
+    description: "แท็บกรองหมวด + grid ของรางวัล (จุฬาเฮิร์บ/พรีเมียม/ไลฟ์สไตล์)",
+    defaultProps: {
+      limit: 50,
+      default_tab: "julaherb",
+      show_flash_badge: true,
+      show_stock_warning: true,
+      empty_message: "ยังไม่มีของรางวัลในหมวดนี้",
+      tabs: [
+        { id: "julaherb", label: "สินค้าจุฬาเฮิร์บ", icon: "🌱", filter_type: "product" },
+        { id: "premium", label: "สินค้าพรีเมียม", icon: "💎", filter_type: "premium" },
+        { id: "lifestyle", label: "ไลฟ์สไตล์", icon: "🎟️", filter_type: "lifestyle" },
+      ],
+    },
+    fields: [
+      { key: "limit", label: "จำนวนรางวัลที่ดึง", type: "number" },
+      { key: "default_tab", label: "แท็บเริ่มต้น (id)", type: "text" },
+      { key: "show_flash_badge", label: "แสดง FLASH badge", type: "boolean" },
+      { key: "show_stock_warning", label: "แสดงเตือนสต็อกเหลือน้อย", type: "boolean" },
+      { key: "empty_message", label: "ข้อความเมื่อไม่มีรางวัล", type: "text" },
+      {
+        key: "tabs",
+        label: "รายการแท็บ",
+        type: "items",
+        itemFields: [
+          { key: "id", label: "ID (ภาษาอังกฤษ ไม่ซ้ำ)", type: "text" },
+          { key: "label", label: "ชื่อแท็บ", type: "text" },
+          { key: "icon", label: "Emoji ไอคอน", type: "text" },
+          {
+            key: "filter_type",
+            label: "ประเภทที่กรอง",
+            type: "select",
+            options: [
+              { value: "product", label: "สินค้าจุฬาเฮิร์บ (type=product)" },
+              { value: "premium", label: "สินค้าพรีเมียม (type=premium)" },
+              { value: "lifestyle", label: "ไลฟ์สไตล์ (coupon/digital/ticket)" },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  rewards_history_cta: {
+    label: "Rewards — History CTA",
+    icon: "⏰",
+    description: "การ์ดลิงก์ไปประวัติการแลกรางวัล (ซ่อนเมื่อยังไม่ login)",
+    defaultProps: {
+      title: "ประวัติการแลกรางวัล",
+      subtitle: "ดูสถานะการจัดส่งและคูปอง",
+      link: "/history/redeems",
+      hide_if_guest: true,
+    },
+    fields: [
+      { key: "title", label: "หัวข้อ", type: "text" },
+      { key: "subtitle", label: "คำอธิบาย", type: "text" },
+      { key: "link", label: "ลิงก์ปลายทาง", type: "text" },
+      { key: "hide_if_guest", label: "ซ่อนเมื่อยังไม่ login", type: "boolean" },
+    ],
+  },
+  missions_page_header: {
+    label: "Missions — Header",
+    icon: "🎯",
+    description: "Header gradient หน้าภารกิจ (title + subtitle)",
+    defaultProps: {
+      title: "ภารกิจ",
+      subtitle: "ทำภารกิจรับคะแนนและ Badge",
+    },
+    fields: [
+      { key: "title", label: "หัวข้อ", type: "text" },
+      { key: "subtitle", label: "คำอธิบาย", type: "text" },
+    ],
+  },
+  missions_tabs_list: {
+    label: "Missions — Tabs + List",
+    icon: "🎯",
+    description: "แท็บ + รายการภารกิจ + login CTA + claim modal",
+    defaultProps: {
+      show_login_cta: true,
+      login_cta_text: "เข้าสู่ระบบเพื่อดูความคืบหน้าภารกิจ",
+      empty_all_text: "ยังไม่มีภารกิจปัจจุบัน",
+      empty_completed_text: "ยังไม่มีภารกิจที่สำเร็จแล้ว",
+      default_tab: "all",
+      show_claim_modal: true,
+      tabs: [
+        { id: "all", label: "ทั้งหมด" },
+        { id: "completed", label: "สำเร็จแล้ว" },
+      ],
+    },
+    fields: [
+      { key: "show_login_cta", label: "แสดง login CTA เมื่อยังไม่ login", type: "boolean" },
+      { key: "login_cta_text", label: "ข้อความ login CTA", type: "text" },
+      { key: "empty_all_text", label: "ข้อความเมื่อไม่มีภารกิจ (ทั้งหมด)", type: "text" },
+      { key: "empty_completed_text", label: "ข้อความเมื่อไม่มีภารกิจสำเร็จ", type: "text" },
+      { key: "default_tab", label: "แท็บเริ่มต้น (id)", type: "text" },
+      { key: "show_claim_modal", label: "แสดง claim modal", type: "boolean" },
+      {
+        key: "tabs",
+        label: "รายการแท็บ",
+        type: "items",
+        itemFields: [
+          { key: "id", label: "ID (all / completed)", type: "text" },
+          { key: "label", label: "ชื่อแท็บ", type: "text" },
+        ],
+      },
     ],
   },
 };

@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
 import Navbar from "@/components/Navbar";
-import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
+import PageRenderer from "@/components/PageRenderer";
 import { api } from "@/lib/api";
 import { isLoggedIn } from "@/lib/auth";
 import { mediaUrl } from "@/lib/media";
@@ -37,7 +37,11 @@ interface MissionProgress {
   completed_at?: string | null;
 }
 
-export default function MissionsPage() {
+/**
+ * MissionsFallback — original hard-coded layout kept as safety net.
+ * ใช้เมื่อ page_configs ไม่มี slug 'missions' หรือ API error
+ */
+function MissionsFallback() {
   const [missions, setMissions] = useState<Mission[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'completed'>('all');
   const [progressMap, setProgressMap] = useState<Record<string, MissionProgress>>({});
@@ -134,10 +138,8 @@ export default function MissionsPage() {
   }, [loggedIn, mounted]);
 
   return (
-    <div className="pb-20 min-h-screen bg-background">
-      <Navbar />
-
-      <div className="pt-24">
+    <>
+      <div>
         {/* Custom Header with very large font and green background matching the theme */}
         <div className="bg-[linear-gradient(277.42deg,#3C9B4D_-13.4%,#7DBD48_80.19%)] px-5 pt-8 pb-10 text-white relative overflow-hidden">
           {/* Abstract Leaf Graphics Background */}
@@ -355,8 +357,6 @@ export default function MissionsPage() {
         </div>
       </div>
 
-      <BottomNav />
-
       {/* Claim Success Popup Modal */}
       {claimedMission && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-5 bg-black/50 backdrop-blur-sm animate-in fade-in duration-300">
@@ -395,6 +395,20 @@ export default function MissionsPage() {
           </div>
         </div>
       )}
+    </>
+  );
+}
+
+export default function MissionsPage() {
+  return (
+    <div className="pb-24 min-h-screen bg-background">
+      <Navbar />
+      <div className="pt-24">
+        {/* Page Builder controlled — admin แก้ sections ได้จาก /page-builder
+            ถ้า config ไม่มีใน DB → fallback ไป layout เดิม (hard-coded) */}
+        <PageRenderer pageSlug="missions" fallback={<MissionsFallback />} />
+      </div>
+      <BottomNav />
     </div>
   );
 }

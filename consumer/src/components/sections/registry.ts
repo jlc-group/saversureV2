@@ -24,6 +24,11 @@ const HomeNewsBannerCarousel = dynamic(() => import("./HomeNewsBannerCarousel"))
 const HomeSectionHeading = dynamic(() => import("./HomeSectionHeading"));
 const HomeRewardsTabs = dynamic(() => import("./HomeRewardsTabs"));
 const HomeLuckyDrawList = dynamic(() => import("./HomeLuckyDrawList"));
+const RewardsPageHeader = dynamic(() => import("./RewardsPageHeader"));
+const RewardsTabsGrid = dynamic(() => import("./RewardsTabsGrid"));
+const RewardsHistoryCta = dynamic(() => import("./RewardsHistoryCta"));
+const MissionsPageHeader = dynamic(() => import("./MissionsPageHeader"));
+const MissionsTabsList = dynamic(() => import("./MissionsTabsList"));
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const sectionRegistry: Record<string, ComponentType<any>> = {
@@ -50,6 +55,11 @@ export const sectionRegistry: Record<string, ComponentType<any>> = {
   home_section_heading: HomeSectionHeading,
   home_rewards_tabs: HomeRewardsTabs,
   home_lucky_draw_list: HomeLuckyDrawList,
+  rewards_page_header: RewardsPageHeader,
+  rewards_tabs_grid: RewardsTabsGrid,
+  rewards_history_cta: RewardsHistoryCta,
+  missions_page_header: MissionsPageHeader,
+  missions_tabs_list: MissionsTabsList,
 };
 
 export interface SectionDefinition {
@@ -178,5 +188,30 @@ export const sectionMeta: Record<
     label: "Home — ลุ้นโชค",
     icon: "🏆",
     description: "รายการกิจกรรมลุ้นโชค ดึงจาก API",
+  },
+  rewards_page_header: {
+    label: "Rewards — Header",
+    icon: "🎁",
+    description: "Header gradient หน้ารางวัล + ยอดคงเหลือ currency ของผู้ใช้",
+  },
+  rewards_tabs_grid: {
+    label: "Rewards — Tabs + Grid",
+    icon: "🎁",
+    description: "แท็บกรองหมวด + grid ของรางวัล (จุฬาเฮิร์บ/พรีเมียม/ไลฟ์สไตล์)",
+  },
+  rewards_history_cta: {
+    label: "Rewards — History CTA",
+    icon: "⏰",
+    description: "การ์ดลิงก์ไปประวัติการแลกรางวัล (ซ่อนเมื่อยังไม่ login)",
+  },
+  missions_page_header: {
+    label: "Missions — Header",
+    icon: "🎯",
+    description: "Header gradient หน้าภารกิจ (title + subtitle)",
+  },
+  missions_tabs_list: {
+    label: "Missions — Tabs + List",
+    icon: "🎯",
+    description: "แท็บ (ทั้งหมด/สำเร็จแล้ว) + รายการภารกิจ + login CTA + claim modal",
   },
 };
