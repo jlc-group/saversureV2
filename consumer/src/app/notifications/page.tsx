@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { isLoggedIn } from "@/lib/auth";
 import BottomNav from "@/components/BottomNav";
 import Navbar from "@/components/Navbar";
+import PageRenderer from "@/components/PageRenderer";
 import Link from "next/link";
 
 interface Notification {
@@ -63,7 +64,7 @@ const TYPE_CONFIG: Record<
   },
 };
 
-export default function NotificationsPage() {
+function NotificationsFallback() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [total, setTotal] = useState(0);
@@ -132,8 +133,7 @@ export default function NotificationsPage() {
 
   if (!loggedIn) {
     return (
-      <div className="pb-20">
-        <Navbar />
+      <>
         <div className="bg-white sticky top-0 z-10 border-b border-[var(--outline-variant)]">
           <div className="max-w-[480px] mx-auto flex items-center h-14 px-4">
             <Link href="/" className="text-[var(--on-surface)]">
@@ -153,14 +153,12 @@ export default function NotificationsPage() {
             Login
           </Link>
         </div>
-        <BottomNav />
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="pb-20">
-      <Navbar />
+    <>
       <div className="bg-white sticky top-0 z-10 border-b border-[var(--outline-variant)]">
         <div className="max-w-[480px] mx-auto flex items-center justify-between h-14 px-4">
           <div className="flex items-center gap-3">
@@ -246,7 +244,15 @@ export default function NotificationsPage() {
           </div>
         )}
       </div>
+    </>
+  );
+}
 
+export default function NotificationsPage() {
+  return (
+    <div className="pb-20">
+      <Navbar />
+      <PageRenderer pageSlug="notifications" fallback={<NotificationsFallback />} />
       <BottomNav />
     </div>
   );

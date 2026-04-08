@@ -50,6 +50,7 @@ const BUILT_IN_PAGES = [
   { value: "history", label: "หน้าประวัติ (History)" },
   { value: "profile", label: "หน้าโปรไฟล์ (Profile)" },
   { value: "news", label: "หน้าข่าวสาร (News)" },
+  { value: "notifications", label: "หน้าแจ้งเตือน (Notifications)" },
 ];
 
 const BUILT_IN_SLUGS = new Set(BUILT_IN_PAGES.map((p) => p.value));
@@ -851,6 +852,48 @@ const sectionTypes: Record<string, SectionTypeDef> = {
       { key: "error_title", label: "หัวข้อเมื่อ error", type: "text" },
       { key: "error_text", label: "ข้อความเมื่อ error", type: "text" },
       { key: "retry_label", label: "ปุ่ม 'ลองใหม่'", type: "text" },
+    ],
+  },
+  notifications_page_header: {
+    label: "Notifications — Header",
+    icon: "🔔",
+    description: "Sticky header หน้า notifications (back + title)",
+    defaultProps: {
+      title: "Notifications",
+      back_href: "/",
+    },
+    fields: [
+      { key: "title", label: "หัวข้อ", type: "text" },
+      { key: "back_href", label: "ลิงก์ย้อนกลับ", type: "text" },
+    ],
+  },
+  notifications_list: {
+    label: "Notifications — List",
+    icon: "🔔",
+    description: "รายการแจ้งเตือน + mark-all + login CTA + empty/loading states",
+    defaultProps: {
+      mark_all_label: "Mark all read",
+      marking_label: "...",
+      empty_text: "No notifications yet",
+      login_required_text: "Please login to view notifications",
+      login_label: "Login",
+      login_href: "/login",
+      time_just_now: "Just now",
+      time_minute_suffix: "m ago",
+      time_hour_suffix: "h ago",
+      time_day_suffix: "d ago",
+    },
+    fields: [
+      { key: "mark_all_label", label: "ปุ่ม 'Mark all read'", type: "text" },
+      { key: "marking_label", label: "ข้อความระหว่าง mark-all", type: "text" },
+      { key: "empty_text", label: "ข้อความเมื่อว่าง", type: "text" },
+      { key: "login_required_text", label: "ข้อความให้ล็อกอิน", type: "text" },
+      { key: "login_label", label: "ปุ่ม Login", type: "text" },
+      { key: "login_href", label: "ลิงก์หน้า Login", type: "text" },
+      { key: "time_just_now", label: "ข้อความ 'Just now'", type: "text" },
+      { key: "time_minute_suffix", label: "suffix นาที (m ago)", type: "text" },
+      { key: "time_hour_suffix", label: "suffix ชั่วโมง (h ago)", type: "text" },
+      { key: "time_day_suffix", label: "suffix วัน (d ago)", type: "text" },
     ],
   },
 };
