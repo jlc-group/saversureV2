@@ -1,9 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import BottomNav from "@/components/BottomNav";
-import Navbar from "@/components/Navbar";
-import PageRenderer from "@/components/PageRenderer";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { isLoggedIn } from "@/lib/auth";
@@ -23,6 +20,16 @@ interface EarnedBadge {
   earned_at?: string;
 }
 
+interface BadgesGridProps {
+  login_required_text?: string;
+  login_label?: string;
+  login_href?: string;
+  empty_text?: string;
+  error_fallback_text?: string;
+  earned_label?: string;
+  not_earned_label?: string;
+}
+
 const RARITY_STYLES: Record<string, string> = {
   common: "border-2 border-gray-400",
   rare: "border-2 border-blue-500",
@@ -40,20 +47,41 @@ function formatDate(s: string | undefined): string {
   }
 }
 
-function BadgesFallback() {
+export default function BadgesGrid({
+  login_required_text = "เข้าสู่ระบบเพื่อดู Badge ที่ได้รับ",
+  login_label = "เข้าสู่ระบบ",
+  login_href = "/login",
+  empty_text = "ยังไม่มี Badge",
+  error_fallback_text = "โหลดไม่สำเร็จ",
+  earned_label = "ได้รับแล้ว",
+  not_earned_label = "ยังไม่ได้รับ",
+}: BadgesGridProps) {
   const [badges, setBadges] = useState<Badge[]>([]);
   const [earnedMap, setEarnedMap] = useState<Record<string, EarnedBadge>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const loggedIn = isLoggedIn();
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    const load = async () => {
+    setLoggedIn(isLoggedIn());
+    setAuthChecked(true);
+  }, []);
+
+  useEffect(() => {
+    if (!authChecked) return;
+    let cancelled = false;
+    (async () => {
       try {
         const [badgesRes, earnedRes] = await Promise.all([
           api.get<{ data?: Badge[] } | Badge[]>("/api/v1/public/badges"),
-          loggedIn ? api.get<{ data?: EarnedBadge[] } | EarnedBadge[]>("/api/v1/my/badges").catch(() => null) : null,
+          loggedIn
+            ? api
+                .get<{ data?: EarnedBadge[] } | EarnedBadge[]>("/api/v1/my/badges")
+                .catch(() => null)
+            : null,
         ]);
+        if (cancelled) return;
 
         const badgesList = Array.isArray(badgesRes) ? badgesRes : badgesRes.data ?? [];
         setBadges(badgesList);
@@ -67,30 +95,30 @@ function BadgesFallback() {
           setEarnedMap(map);
         }
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : "โหลดไม่สำเร็จ");
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : error_fallback_text);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
+    })();
+    return () => {
+      cancelled = true;
     };
-    load();
-  }, [loggedIn]);
+  }, [authChecked, loggedIn, error_fallback_text]);
 
   return (
     <>
-      <div className="bg-[linear-gradient(277.42deg,#3C9B4D_-13.4%,#7DBD48_80.19%)] text-white px-5 pt-12 pb-6 rounded-b-[24px]">
-        <h1 className="text-[22px] font-semibold">Badge</h1>
-        <p className="text-[13px] opacity-80 mt-1">สะสม Badge จากภารกิจและกิจกรรม</p>
-      </div>
-
-      {!loggedIn && (
+      {!loggedIn && authChecked && (
         <div className="px-5 mt-4">
           <div className="bg-white rounded-[var(--radius-lg)] elevation-1 p-4 text-center">
-            <p className="text-[14px] text-[var(--on-surface-variant)] mb-3">เข้าสู่ระบบเพื่อดู Badge ที่ได้รับ</p>
+            <p className="text-[14px] text-[var(--on-surface-variant)] mb-3">
+              {login_required_text}
+            </p>
             <Link
-              href="/login"
+              href={login_href}
               className="inline-block h-[44px] px-8 leading-[44px] bg-[var(--primary)] text-white rounded-[var(--radius-xl)] text-[14px] font-medium"
             >
-              เข้าสู่ระบบ
+              {login_label}
             </Link>
           </div>
         </div>
@@ -99,9 +127,24 @@ function BadgesFallback() {
       <div className="px-5 mt-6">
         {loading ? (
           <div className="text-center py-12">
-            <svg className="animate-spin w-8 h-8 mx-auto text-[var(--primary)]" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            <svg
+              className="animate-spin w-8 h-8 mx-auto text-[var(--primary)]"
+              viewBox="0 0 24 24"
+              fill="none"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              />
             </svg>
           </div>
         ) : error ? (
@@ -110,7 +153,7 @@ function BadgesFallback() {
           </div>
         ) : badges.length === 0 ? (
           <div className="text-center py-12 text-[var(--on-surface-variant)]">
-            <p className="text-[14px]">ยังไม่มี Badge</p>
+            <p className="text-[14px]">{empty_text}</p>
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-4">
@@ -131,10 +174,19 @@ function BadgesFallback() {
                     }`}
                   >
                     {b.image_url ? (
-                      <img src={b.image_url} alt={b.name} className="w-full h-full object-cover" />
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={b.image_url}
+                        alt={b.name}
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
                       <div className="w-full h-full bg-[var(--surface-container)] flex items-center justify-center">
-                        <svg viewBox="0 0 24 24" fill="currentColor" className="w-12 h-12 text-[var(--on-surface-variant)]">
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                          className="w-12 h-12 text-[var(--on-surface-variant)]"
+                        >
                           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                         </svg>
                       </div>
@@ -147,14 +199,22 @@ function BadgesFallback() {
                       </div>
                     )}
                   </div>
-                  <h3 className="text-[13px] font-medium text-[var(--on-surface)] mt-2 line-clamp-2">{b.name}</h3>
+                  <h3 className="text-[13px] font-medium text-[var(--on-surface)] mt-2 line-clamp-2">
+                    {b.name}
+                  </h3>
                   {isEarned ? (
-                    <p className="text-[11px] text-[var(--success)] font-medium mt-1">ได้รับแล้ว</p>
+                    <p className="text-[11px] text-[var(--success)] font-medium mt-1">
+                      {earned_label}
+                    </p>
                   ) : (
-                    <p className="text-[11px] text-[var(--on-surface-variant)] mt-1">ยังไม่ได้รับ</p>
+                    <p className="text-[11px] text-[var(--on-surface-variant)] mt-1">
+                      {not_earned_label}
+                    </p>
                   )}
                   {isEarned && earned.earned_at && (
-                    <p className="text-[10px] text-[var(--on-surface-variant)] mt-0.5">{formatDate(earned.earned_at)}</p>
+                    <p className="text-[10px] text-[var(--on-surface-variant)] mt-0.5">
+                      {formatDate(earned.earned_at)}
+                    </p>
                   )}
                 </div>
               );
@@ -163,15 +223,5 @@ function BadgesFallback() {
         )}
       </div>
     </>
-  );
-}
-
-export default function BadgesPage() {
-  return (
-    <div className="pb-20">
-      <Navbar />
-      <PageRenderer pageSlug="badges" fallback={<BadgesFallback />} />
-      <BottomNav />
-    </div>
   );
 }

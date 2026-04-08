@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import BottomNav from "@/components/BottomNav";
 import Navbar from "@/components/Navbar";
+import PageRenderer from "@/components/PageRenderer";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { isLoggedIn, getUser } from "@/lib/auth";
@@ -32,7 +33,7 @@ function getMonthKey(date: Date): string {
   return `${y}-${m}`;
 }
 
-export default function LeaderboardPage() {
+function LeaderboardFallback() {
   const [period, setPeriod] = useState<PeriodType>("weekly");
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,8 +78,7 @@ export default function LeaderboardPage() {
     e.display_name || e.user_name || (e.user_id ? `User ${e.user_id.slice(0, 8)}` : `อันดับ ${e.rank}`);
 
   return (
-    <div className="pb-20">
-      <Navbar />
+    <>
       <div className="bg-[linear-gradient(277.42deg,#3C9B4D_-13.4%,#7DBD48_80.19%)] text-white px-5 pt-12 pb-6 rounded-b-[24px]">
         <h1 className="text-[22px] font-semibold">อันดับ</h1>
         <p className="text-[13px] opacity-80 mt-1">ดูอันดับการสแกน</p>
@@ -197,7 +197,15 @@ export default function LeaderboardPage() {
           </div>
         )}
       </div>
+    </>
+  );
+}
 
+export default function LeaderboardPage() {
+  return (
+    <div className="pb-20">
+      <Navbar />
+      <PageRenderer pageSlug="leaderboard" fallback={<LeaderboardFallback />} />
       <BottomNav />
     </div>
   );

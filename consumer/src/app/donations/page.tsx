@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
+import PageRenderer from "@/components/PageRenderer";
 import { api } from "@/lib/api";
 import { isLoggedIn } from "@/lib/auth";
 import { mediaUrl } from "@/lib/media";
@@ -48,7 +49,7 @@ function SkeletonRow() {
   );
 }
 
-export default function DonationHistoryPage() {
+function DonationsFallback() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [entries, setEntries] = useState<DonationEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,10 +83,8 @@ export default function DonationHistoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
-      <Navbar />
-
-      <div className="pt-24">
+    <>
+      <div>
         {/* Header — green same as /history */}
         <div className="bg-[linear-gradient(277.42deg,#3C9B4D_-13.4%,#7DBD48_80.19%)] px-5 pt-8 pb-10 text-white relative overflow-hidden">
           <div className="absolute -right-5 -top-5 h-24 w-24 rounded-full bg-white/10 animate-float" />
@@ -224,7 +223,17 @@ export default function DonationHistoryPage() {
           )}
         </div>
       </div>
+    </>
+  );
+}
 
+export default function DonationHistoryPage() {
+  return (
+    <div className="min-h-screen bg-gray-50 pb-24">
+      <Navbar />
+      <div className="pt-24">
+        <PageRenderer pageSlug="donations" fallback={<DonationsFallback />} />
+      </div>
       <BottomNav />
     </div>
   );
