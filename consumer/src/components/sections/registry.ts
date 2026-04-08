@@ -31,6 +31,9 @@ const MissionsPageHeader = dynamic(() => import("./MissionsPageHeader"));
 const MissionsTabsList = dynamic(() => import("./MissionsTabsList"));
 const ShopPageHeader = dynamic(() => import("./ShopPageHeader"));
 const ShopLinksList = dynamic(() => import("./ShopLinksList"));
+const WalletPageHeader = dynamic(() => import("./WalletPageHeader"));
+const WalletBalanceCards = dynamic(() => import("./WalletBalanceCards"));
+const WalletTransactionList = dynamic(() => import("./WalletTransactionList"));
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const sectionRegistry: Record<string, ComponentType<any>> = {
@@ -64,6 +67,9 @@ export const sectionRegistry: Record<string, ComponentType<any>> = {
   missions_tabs_list: MissionsTabsList,
   shop_page_header: ShopPageHeader,
   shop_links_list: ShopLinksList,
+  wallet_page_header: WalletPageHeader,
+  wallet_balance_cards: WalletBalanceCards,
+  wallet_transaction_list: WalletTransactionList,
 };
 
 export interface SectionDefinition {
@@ -227,5 +233,20 @@ export const sectionMeta: Record<
     label: "Shop — Links List",
     icon: "🛒",
     description: "รายการช่องทางช้อปออนไลน์ (Shopee/Lazada/LINE/Website/Emoji/Image)",
+  },
+  wallet_page_header: {
+    label: "Wallet — Header",
+    icon: "💰",
+    description: "Header gradient หน้ากระเป๋าเงิน (title + subtitle)",
+  },
+  wallet_balance_cards: {
+    label: "Wallet — Balance Cards",
+    icon: "💳",
+    description: "การ์ดยอดคงเหลือ currency หลัก + รอง (ใช้ useCurrencies)",
+  },
+  wallet_transaction_list: {
+    label: "Wallet — Transaction List",
+    icon: "📋",
+    description: "รายการธุรกรรมแต้ม + filter ตาม currency + infinite scroll",
   },
 };
