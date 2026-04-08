@@ -807,6 +807,52 @@ const sectionTypes: Record<string, SectionTypeDef> = {
       { key: "filter_all_label", label: "ข้อความแท็บ 'ทั้งหมด'", type: "text" },
     ],
   },
+  news_page_header: {
+    label: "News — Header",
+    icon: "📰",
+    description: "Header gradient หน้าข่าวสาร (title + subtitle + icon emoji)",
+    defaultProps: {
+      title: "ข่าวสาร",
+      subtitle: "โปรโมชั่นและข่าวสารล่าสุด",
+      icon_emoji: "📰",
+    },
+    fields: [
+      { key: "title", label: "หัวข้อ", type: "text" },
+      { key: "subtitle", label: "คำบรรยาย", type: "text" },
+      { key: "icon_emoji", label: "ไอคอน (emoji)", type: "text" },
+    ],
+  },
+  news_list: {
+    label: "News — List",
+    icon: "📰",
+    description: "รายการข่าวสารเต็มหน้า + expand อ่านเนื้อหา + loading/error/empty states",
+    defaultProps: {
+      limit: 50,
+      empty_title: "ยังไม่มีข่าวสารใหม่",
+      empty_text: "ติดตามโปรโมชั่น แคมเปญพิเศษ\nและกิจกรรมดีๆ ได้ที่นี่ เร็วๆ นี้",
+      empty_cta_label: "กลับหน้าหลัก",
+      empty_cta_link: "/",
+      error_title: "ไม่สามารถโหลดข่าวสารได้",
+      error_text: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
+      retry_label: "ลองใหม่",
+      read_more_label: "อ่านเพิ่มเติม",
+      collapse_label: "ย่อ",
+      show_banner_badge: true,
+    },
+    fields: [
+      { key: "limit", label: "จำนวนข่าวสูงสุด", type: "number" },
+      { key: "show_banner_badge", label: "แสดง badge BANNER", type: "boolean" },
+      { key: "read_more_label", label: "ข้อความ 'อ่านเพิ่มเติม'", type: "text" },
+      { key: "collapse_label", label: "ข้อความ 'ย่อ'", type: "text" },
+      { key: "empty_title", label: "หัวข้อเมื่อว่าง", type: "text" },
+      { key: "empty_text", label: "ข้อความเมื่อว่าง", type: "textarea" },
+      { key: "empty_cta_label", label: "ปุ่ม CTA (เมื่อว่าง)", type: "text" },
+      { key: "empty_cta_link", label: "ลิงก์ CTA (เมื่อว่าง)", type: "text" },
+      { key: "error_title", label: "หัวข้อเมื่อ error", type: "text" },
+      { key: "error_text", label: "ข้อความเมื่อ error", type: "text" },
+      { key: "retry_label", label: "ปุ่ม 'ลองใหม่'", type: "text" },
+    ],
+  },
 };
 
 /* ------------------------------------------------------------------ */

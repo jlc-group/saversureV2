@@ -34,6 +34,8 @@ const ShopLinksList = dynamic(() => import("./ShopLinksList"));
 const WalletPageHeader = dynamic(() => import("./WalletPageHeader"));
 const WalletBalanceCards = dynamic(() => import("./WalletBalanceCards"));
 const WalletTransactionList = dynamic(() => import("./WalletTransactionList"));
+const NewsPageHeader = dynamic(() => import("./NewsPageHeader"));
+const NewsList = dynamic(() => import("./NewsList"));
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const sectionRegistry: Record<string, ComponentType<any>> = {
@@ -70,6 +72,8 @@ export const sectionRegistry: Record<string, ComponentType<any>> = {
   wallet_page_header: WalletPageHeader,
   wallet_balance_cards: WalletBalanceCards,
   wallet_transaction_list: WalletTransactionList,
+  news_page_header: NewsPageHeader,
+  news_list: NewsList,
 };
 
 export interface SectionDefinition {
@@ -248,5 +252,15 @@ export const sectionMeta: Record<
     label: "Wallet — Transaction List",
     icon: "📋",
     description: "รายการธุรกรรมแต้ม + filter ตาม currency + infinite scroll",
+  },
+  news_page_header: {
+    label: "News — Header",
+    icon: "📰",
+    description: "Header gradient หน้าข่าวสาร (title + subtitle + icon emoji)",
+  },
+  news_list: {
+    label: "News — List",
+    icon: "📰",
+    description: "รายการข่าวสารเต็มหน้า + expand อ่านเนื้อหา + loading/error/empty states",
   },
 };
