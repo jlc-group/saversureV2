@@ -3,8 +3,13 @@
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
 import Link from "next/link";
+import PageRenderer from "@/components/PageRenderer";
 
-export default function ShopPage() {
+/**
+ * ShopFallback — original hard-coded layout kept as safety net.
+ * ใช้เมื่อ page_configs ไม่มี slug 'shop' หรือ API error
+ */
+function ShopFallback() {
   const links = [
     {
       title: "Julaherb_officialshop",
@@ -75,10 +80,8 @@ export default function ShopPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <Navbar />
-      
-      <div className="pt-24">
+    <>
+      <div>
         {/* Custom Header with very large font and green background matching the theme */}
         <div className="bg-[linear-gradient(277.42deg,#3C9B4D_-13.4%,#7DBD48_80.19%)] px-5 pt-8 pb-10 text-white relative overflow-hidden">
           {/* Abstract Leaf Graphics Background */}
@@ -100,8 +103,8 @@ export default function ShopPage() {
         <div className="px-5 -mt-6 relative z-10">
           <div className="w-full flex flex-col gap-3.5">
             {links.map((link, i) => (
-              <Link 
-                key={i} 
+              <Link
+                key={i}
                 href={link.href}
                 target="_blank"
                 className={`bg-white rounded-[20px] p-2 flex items-center pr-4 shadow-[0_4px_12px_rgba(0,0,0,0.05)] border-[2px] ${link.borderColor} transition-transform active:scale-[0.97] animate-slide-up hover:shadow-[0_8px_16px_rgba(0,0,0,0.08)]`}
@@ -116,7 +119,19 @@ export default function ShopPage() {
           </div>
         </div>
       </div>
-      
+    </>
+  );
+}
+
+export default function ShopPage() {
+  return (
+    <div className="min-h-screen bg-background pb-20">
+      <Navbar />
+      <div className="pt-24">
+        {/* Page Builder controlled — admin แก้ sections ได้จาก /page-builder
+            ถ้า config ไม่มีใน DB → fallback ไป layout เดิม (hard-coded) */}
+        <PageRenderer pageSlug="shop" fallback={<ShopFallback />} />
+      </div>
       <BottomNav />
     </div>
   );

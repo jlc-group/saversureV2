@@ -45,6 +45,7 @@ const BUILT_IN_PAGES = [
   { value: "scan", label: "หน้าสแกน (Scan)" },
   { value: "rewards", label: "หน้ารางวัล (Rewards)" },
   { value: "missions", label: "หน้าภารกิจ (Missions)" },
+  { value: "shop", label: "หน้าช้อปออนไลน์ (Shop)" },
   { value: "history", label: "หน้าประวัติ (History)" },
   { value: "profile", label: "หน้าโปรไฟล์ (Profile)" },
   { value: "news", label: "หน้าข่าวสาร (News)" },
@@ -626,6 +627,94 @@ const sectionTypes: Record<string, SectionTypeDef> = {
     fields: [
       { key: "title", label: "หัวข้อ", type: "text" },
       { key: "subtitle", label: "คำอธิบาย", type: "text" },
+    ],
+  },
+  shop_page_header: {
+    label: "Shop — Header",
+    icon: "🛒",
+    description: "Header gradient หน้าช้อปออนไลน์ (title + subtitle)",
+    defaultProps: {
+      title: "ช้อปออนไลน์",
+      subtitle: "เลือกซื้อสินค้าออนไลน์กับเราได้ที่นี่เลย",
+    },
+    fields: [
+      { key: "title", label: "หัวข้อ", type: "text" },
+      { key: "subtitle", label: "คำอธิบาย", type: "text" },
+    ],
+  },
+  shop_links_list: {
+    label: "Shop — Links List",
+    icon: "🛒",
+    description: "รายการช่องทางช้อปออนไลน์ (admin เพิ่ม/ลบ/เรียงได้)",
+    defaultProps: {
+      items: [
+        {
+          icon_type: "shopee",
+          icon_value: "",
+          title: "Julaherb_officialshop",
+          link: "https://shopee.co.th/julaherb_officialshop",
+          border_color: "#EE4D2D",
+        },
+        {
+          icon_type: "lazada",
+          icon_value: "",
+          title: "Jula's Herb",
+          link: "https://www.lazada.co.th/shop/julas-herb",
+          border_color: "#0F146D",
+        },
+        {
+          icon_type: "website",
+          icon_value: "",
+          title: "www.julaherbshop.com",
+          link: "https://www.julaherbshop.com",
+          border_color: "#3C9B4D",
+        },
+        {
+          icon_type: "line",
+          icon_value: "",
+          title: "ติดตะกร้าจุฬาเฮิร์บ (LINE OpenChat)",
+          link: "https://line.me/th/",
+          border_color: "#00B900",
+        },
+        {
+          icon_type: "line_admin",
+          icon_value: "",
+          title: "สั่งซื้อที่แอดมิน",
+          link: "https://line.me/R/ti/p/@julaherb",
+          border_color: "#00B900",
+        },
+      ],
+    },
+    fields: [
+      {
+        key: "items",
+        label: "รายการช่องทางช้อปออนไลน์",
+        type: "items",
+        itemFields: [
+          {
+            key: "icon_type",
+            label: "ประเภทไอคอน",
+            type: "select",
+            options: [
+              { value: "shopee", label: "Shopee" },
+              { value: "lazada", label: "Lazada" },
+              { value: "line", label: "LINE (วงกลมเขียว)" },
+              { value: "line_admin", label: "LINE Admin (มีคำว่า LINE)" },
+              { value: "website", label: "Website (ใบไม้เขียว)" },
+              { value: "emoji", label: "Emoji (ใส่เอง)" },
+              { value: "image", label: "รูปภาพ (ใส่ URL)" },
+            ],
+          },
+          {
+            key: "icon_value",
+            label: "ค่าไอคอน (ใช้เมื่อเลือก emoji หรือ image)",
+            type: "text",
+          },
+          { key: "title", label: "ชื่อที่แสดง", type: "text" },
+          { key: "link", label: "ลิงก์ปลายทาง (URL)", type: "text" },
+          { key: "border_color", label: "สีขอบการ์ด (hex)", type: "text" },
+        ],
+      },
     ],
   },
   missions_tabs_list: {

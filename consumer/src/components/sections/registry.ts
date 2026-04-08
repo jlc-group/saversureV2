@@ -29,6 +29,8 @@ const RewardsTabsGrid = dynamic(() => import("./RewardsTabsGrid"));
 const RewardsHistoryCta = dynamic(() => import("./RewardsHistoryCta"));
 const MissionsPageHeader = dynamic(() => import("./MissionsPageHeader"));
 const MissionsTabsList = dynamic(() => import("./MissionsTabsList"));
+const ShopPageHeader = dynamic(() => import("./ShopPageHeader"));
+const ShopLinksList = dynamic(() => import("./ShopLinksList"));
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const sectionRegistry: Record<string, ComponentType<any>> = {
@@ -60,6 +62,8 @@ export const sectionRegistry: Record<string, ComponentType<any>> = {
   rewards_history_cta: RewardsHistoryCta,
   missions_page_header: MissionsPageHeader,
   missions_tabs_list: MissionsTabsList,
+  shop_page_header: ShopPageHeader,
+  shop_links_list: ShopLinksList,
 };
 
 export interface SectionDefinition {
@@ -213,5 +217,15 @@ export const sectionMeta: Record<
     label: "Missions — Tabs + List",
     icon: "🎯",
     description: "แท็บ (ทั้งหมด/สำเร็จแล้ว) + รายการภารกิจ + login CTA + claim modal",
+  },
+  shop_page_header: {
+    label: "Shop — Header",
+    icon: "🛒",
+    description: "Header gradient หน้าช้อปออนไลน์ (title + subtitle)",
+  },
+  shop_links_list: {
+    label: "Shop — Links List",
+    icon: "🛒",
+    description: "รายการช่องทางช้อปออนไลน์ (Shopee/Lazada/LINE/Website/Emoji/Image)",
   },
 };
