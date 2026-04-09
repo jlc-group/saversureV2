@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import DOMPurify from "dompurify";
 import { api } from "@/lib/api";
+import { useTenant } from "@/components/TenantProvider";
+import { mediaUrl } from "@/lib/media";
 
 interface PopupData {
   id: string;
@@ -41,17 +44,14 @@ function markSeen(popup: PopupData) {
   }
 }
 
-const mediaUrl = (url: string) => {
-  if (url.startsWith("http")) return url;
-  const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:30400";
-  return `${base}/media/${url}`;
-};
-
 export default function PopupRenderer() {
   const [popup, setPopup] = useState<PopupData | null>(null);
   const pathname = usePathname();
+  const { tenantId, ready } = useTenant();
 
   useEffect(() => {
+    if (!ready || !tenantId) return;
+
     const pageSlug = pathname === "/" ? "home" : pathname.replace("/", "");
 
     api
@@ -67,7 +67,7 @@ export default function PopupRenderer() {
         }
       })
       .catch(() => {});
-  }, [pathname]);
+  }, [pathname, ready, tenantId]);
 
   if (!popup) return null;
 
@@ -100,7 +100,7 @@ export default function PopupRenderer() {
             onClick={popup.link_url ? handleClick : undefined}
           >
             <img
-              src={mediaUrl(popup.image_url)}
+              src={mediaUrl(popup.image_url) ?? undefined}
               alt={popup.title}
               className="w-full h-auto max-h-[300px] object-cover"
             />
@@ -112,7 +112,7 @@ export default function PopupRenderer() {
           {popup.content && (
             <div
               className="mt-2 text-sm text-gray-600 leading-relaxed [&_h3]:text-base [&_h3]:font-bold [&_h3]:text-gray-900 [&_b]:font-bold [&_p]:mt-1"
-              dangerouslySetInnerHTML={{ __html: popup.content }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(popup.content) }}
             />
           )}
           <div className="mt-4 flex gap-2">

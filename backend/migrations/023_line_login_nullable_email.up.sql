@@ -3,5 +3,6 @@ ALTER TABLE users ALTER COLUMN email DROP NOT NULL;
 ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
 
 -- Update unique constraint to allow multiple NULL emails
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_tenant_id_email_key;
 DROP INDEX IF EXISTS users_tenant_id_email_key;
 CREATE UNIQUE INDEX users_tenant_id_email_key ON users (tenant_id, email) WHERE email IS NOT NULL;

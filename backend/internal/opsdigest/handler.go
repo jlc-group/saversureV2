@@ -4,6 +4,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
+	"saversure/internal/apperror"
 )
 
 type Handler struct {
@@ -23,7 +25,7 @@ func (h *Handler) GetDigest(c *gin.Context) {
 
 	digest, err := h.svc.GenerateDigest(c.Request.Context(), tenantID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "digest_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -39,7 +41,7 @@ func (h *Handler) GetAlerts(c *gin.Context) {
 
 	digest, err := h.svc.GenerateDigest(c.Request.Context(), tenantID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "alerts_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 

@@ -3,6 +3,8 @@ package linebot
 import (
 	"net/http"
 
+	"saversure/internal/apperror"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -23,7 +25,7 @@ type SendMessageInput struct {
 func (h *Handler) SendMessage(c *gin.Context) {
 	var input SendMessageInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
@@ -36,7 +38,7 @@ func (h *Handler) SendMessage(c *gin.Context) {
 	}
 
 	if err := h.svc.PushText(c.Request.Context(), tenantID, lineUID, input.Message); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "send_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -51,7 +53,7 @@ type BroadcastInput struct {
 func (h *Handler) Broadcast(c *gin.Context) {
 	var input BroadcastInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
@@ -63,7 +65,7 @@ func (h *Handler) Broadcast(c *gin.Context) {
 		tenantID,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "query_failed"})
+		apperror.Respond(c, err)
 		return
 	}
 	defer rows.Close()
@@ -91,12 +93,7 @@ func (h *Handler) Broadcast(c *gin.Context) {
 		}
 		batch := lineIDs[i:end]
 		if err := h.svc.PushMulticast(c.Request.Context(), tenantID, batch, input.Message); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error":   "partial_send",
-				"message": err.Error(),
-				"sent":    sent,
-				"total":   len(lineIDs),
-			})
+			apperror.Respond(c, err)
 			return
 		}
 		sent += len(batch)

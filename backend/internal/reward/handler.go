@@ -6,6 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"saversure/internal/apperror"
 )
 
 type Handler struct {
@@ -44,7 +46,7 @@ func (h *Handler) ListPublic(c *gin.Context) {
 
 	items, total, err := h.svc.ListPublic(c.Request.Context(), tenantID, tierID, limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": items, "total": total})

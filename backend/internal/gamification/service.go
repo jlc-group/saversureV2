@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -100,6 +101,30 @@ type CreateBadgeInput struct {
 	Rarity      string `json:"rarity"`
 }
 
+type UpdateMissionInput struct {
+	Title          *string `json:"title"`
+	Description    *string `json:"description"`
+	ImageURL       *string `json:"image_url"`
+	Type           *string `json:"type"`
+	Condition      *string `json:"condition"`
+	RewardType     *string `json:"reward_type"`
+	RewardPoints   *int    `json:"reward_points"`
+	RewardBadgeID  *string `json:"reward_badge_id"`
+	RewardCurrency *string `json:"reward_currency"`
+	StartDate      *string `json:"start_date"`
+	EndDate        *string `json:"end_date"`
+	Active         *bool   `json:"active"`
+}
+
+type UpdateBadgeInput struct {
+	Code        *string `json:"code"`
+	Name        *string `json:"name"`
+	Description *string `json:"description"`
+	IconURL     *string `json:"icon_url"`
+	Rarity      *string `json:"rarity"`
+	Active      *bool   `json:"active"`
+}
+
 func (s *Service) ListMissions(ctx context.Context, tenantID string, activeOnly bool) ([]Mission, error) {
 	query := `SELECT id, tenant_id, title, description, image_url, type,
 	                 condition::text, reward_type, reward_points, reward_badge_id,
@@ -129,6 +154,28 @@ func (s *Service) ListMissions(ctx context.Context, tenantID string, activeOnly 
 		items = append(items, m)
 	}
 	return items, nil
+}
+
+func (s *Service) GetMissionByID(ctx context.Context, tenantID, id string) (*Mission, error) {
+	var m Mission
+	err := s.db.QueryRow(ctx,
+		`SELECT id, tenant_id, title, description, image_url, type,
+		        condition::text, reward_type, reward_points, reward_badge_id,
+		        reward_currency, start_date::text, end_date::text, active,
+		        sort_order, created_at::text
+		 FROM missions WHERE id = $1 AND tenant_id = $2`,
+		id, tenantID,
+	).Scan(&m.ID, &m.TenantID, &m.Title, &m.Description, &m.ImageURL,
+		&m.Type, &m.Condition, &m.RewardType, &m.RewardPoints, &m.RewardBadgeID,
+		&m.RewardCurrency, &m.StartDate, &m.EndDate, &m.Active,
+		&m.SortOrder, &m.CreatedAt)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("mission not found")
+		}
+		return nil, fmt.Errorf("get mission: %w", err)
+	}
+	return &m, nil
 }
 
 func (s *Service) CreateMission(ctx context.Context, input CreateMissionInput) (*Mission, error) {
@@ -170,15 +217,75 @@ func (s *Service) CreateMission(ctx context.Context, input CreateMissionInput) (
 	return &m, nil
 }
 
-func (s *Service) UpdateMission(ctx context.Context, tenantID, id string, active *bool) error {
-	if active != nil {
-		_, err := s.db.Exec(ctx,
-			"UPDATE missions SET active = $3, updated_at = NOW() WHERE id = $1 AND tenant_id = $2",
-			id, tenantID, *active,
-		)
-		return err
+func (s *Service) UpdateMission(ctx context.Context, tenantID, id string, input UpdateMissionInput) error {
+	q := "UPDATE missions SET updated_at = NOW()"
+	args := []interface{}{id, tenantID}
+	i := 3
+
+	if input.Title != nil {
+		q += fmt.Sprintf(", title = $%d", i)
+		args = append(args, *input.Title)
+		i++
 	}
-	return nil
+	if input.Description != nil {
+		q += fmt.Sprintf(", description = NULLIF($%d,'')", i)
+		args = append(args, *input.Description)
+		i++
+	}
+	if input.ImageURL != nil {
+		q += fmt.Sprintf(", image_url = NULLIF($%d,'')", i)
+		args = append(args, *input.ImageURL)
+		i++
+	}
+	if input.Type != nil {
+		q += fmt.Sprintf(", type = $%d", i)
+		args = append(args, *input.Type)
+		i++
+	}
+	if input.Condition != nil {
+		q += fmt.Sprintf(", condition = $%d::jsonb", i)
+		args = append(args, *input.Condition)
+		i++
+	}
+	if input.RewardType != nil {
+		q += fmt.Sprintf(", reward_type = $%d", i)
+		args = append(args, *input.RewardType)
+		i++
+	}
+	if input.RewardPoints != nil {
+		q += fmt.Sprintf(", reward_points = $%d", i)
+		args = append(args, *input.RewardPoints)
+		i++
+	}
+	if input.RewardBadgeID != nil {
+		q += fmt.Sprintf(", reward_badge_id = CASE WHEN $%d = '' THEN NULL ELSE $%d::uuid END", i, i)
+		args = append(args, *input.RewardBadgeID)
+		i++
+	}
+	if input.RewardCurrency != nil {
+		q += fmt.Sprintf(", reward_currency = $%d", i)
+		args = append(args, *input.RewardCurrency)
+		i++
+	}
+	if input.StartDate != nil {
+		q += fmt.Sprintf(", start_date = CASE WHEN $%d = '' THEN NULL ELSE $%d::timestamptz END", i, i)
+		args = append(args, *input.StartDate)
+		i++
+	}
+	if input.EndDate != nil {
+		q += fmt.Sprintf(", end_date = CASE WHEN $%d = '' THEN NULL ELSE $%d::timestamptz END", i, i)
+		args = append(args, *input.EndDate)
+		i++
+	}
+	if input.Active != nil {
+		q += fmt.Sprintf(", active = $%d", i)
+		args = append(args, *input.Active)
+		i++
+	}
+
+	q += " WHERE id = $1 AND tenant_id = $2"
+	_, err := s.db.Exec(ctx, q, args...)
+	return err
 }
 
 func (s *Service) DeleteMission(ctx context.Context, tenantID, id string) error {
@@ -267,6 +374,47 @@ func (s *Service) CreateBadge(ctx context.Context, input CreateBadgeInput) (*Bad
 
 func (s *Service) DeleteBadge(ctx context.Context, tenantID, id string) error {
 	_, err := s.db.Exec(ctx, "DELETE FROM badges WHERE id = $1 AND tenant_id = $2", id, tenantID)
+	return err
+}
+
+func (s *Service) UpdateBadge(ctx context.Context, tenantID, id string, input UpdateBadgeInput) error {
+	q := "UPDATE badges SET updated_at = NOW()"
+	args := []interface{}{id, tenantID}
+	i := 3
+
+	if input.Code != nil {
+		q += fmt.Sprintf(", code = $%d", i)
+		args = append(args, *input.Code)
+		i++
+	}
+	if input.Name != nil {
+		q += fmt.Sprintf(", name = $%d", i)
+		args = append(args, *input.Name)
+		i++
+	}
+	if input.Description != nil {
+		q += fmt.Sprintf(", description = NULLIF($%d,'')", i)
+		args = append(args, *input.Description)
+		i++
+	}
+	if input.IconURL != nil {
+		q += fmt.Sprintf(", icon_url = NULLIF($%d,'')", i)
+		args = append(args, *input.IconURL)
+		i++
+	}
+	if input.Rarity != nil {
+		q += fmt.Sprintf(", rarity = $%d", i)
+		args = append(args, *input.Rarity)
+		i++
+	}
+	if input.Active != nil {
+		q += fmt.Sprintf(", active = $%d", i)
+		args = append(args, *input.Active)
+		i++
+	}
+
+	q += " WHERE id = $1 AND tenant_id = $2"
+	_, err := s.db.Exec(ctx, q, args...)
 	return err
 }
 

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, mediaUrl } from "@/lib/api";
 import { ImageUpload } from "@/components/ui/image-upload";
+import toast from "react-hot-toast";
 
 interface NewsItem {
   id: string;
@@ -74,7 +75,7 @@ export default function NewsPage() {
       fetchData();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed";
-      alert(msg);
+      toast.error(msg);
     }
   };
 
@@ -98,7 +99,7 @@ export default function NewsPage() {
       await api.patch(`/api/v1/news/${item.id}`, { status: newStatus });
       fetchData();
     } catch {
-      alert("Failed");
+      toast.error("Failed");
     } finally {
       setActionId(null);
     }
@@ -111,7 +112,7 @@ export default function NewsPage() {
       await api.delete(`/api/v1/news/${id}`);
       fetchData();
     } catch {
-      alert("Failed to delete");
+      toast.error("Failed to delete");
     } finally {
       setActionId(null);
     }
@@ -293,7 +294,7 @@ export default function NewsPage() {
                     <div className="flex items-center gap-3">
                       {item.image_url ? (
                         <img
-                          src={item.image_url}
+                          src={mediaUrl(item.image_url) || ""}
                           alt={item.title}
                           className="w-9 h-9 rounded-[var(--md-radius-sm)] object-cover"
                         />

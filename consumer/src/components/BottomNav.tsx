@@ -10,15 +10,45 @@ interface NavMenuItem {
   icon: string;
   label: string;
   link: string;
-  visible: boolean;
+  visible?: boolean;
+}
+
+interface RawNavItem {
+  icon: string;
+  label: string;
+  link?: string;
+  path?: string;
+  visible?: boolean;
+  order?: number;
+}
+
+function normalizeNavItems(raw: RawNavItem[]): NavMenuItem[] {
+  return raw
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    .map((item) => {
+      let link = item.link || item.path || "/";
+      let label = item.label;
+
+      if (link === "/rewards" || label === "สิทธิพิเศษ") {
+        label = "หน้าหลัก";
+        link = "/";
+      }
+
+      return {
+        icon: item.icon,
+        label,
+        link,
+        visible: item.visible !== false,
+      };
+    });
 }
 
 const FALLBACK_TABS: NavMenuItem[] = [
-  { icon: "home", label: "หน้าหลัก", link: "/", visible: true },
-  { icon: "scan", label: "สแกน", link: "/scan", visible: true },
-  { icon: "gift", label: "รางวัล", link: "/rewards", visible: true },
-  { icon: "history", label: "ประวัติ", link: "/history", visible: true },
-  { icon: "user", label: "บัญชี", link: "/profile", visible: true },
+  { icon: "gift", label: "หน้าหลัก", link: "/", visible: true },
+  { icon: "target", label: "ภารกิจ", link: "/missions", visible: true },
+  { icon: "scan", label: "สะสมแต้ม", link: "/scan", visible: true },
+  { icon: "cart", label: "ช้อปออนไลน์", link: "/shop", visible: true },
+  { icon: "user", label: "โปรไฟล์", link: "/profile", visible: true },
 ];
 
 const PRIMARY_LINKS = ["/scan"];
@@ -29,18 +59,20 @@ export default function BottomNav() {
 
   useEffect(() => {
     api
-      .get<{ items: NavMenuItem[] }>("/api/v1/public/nav-menu/bottom_nav")
+      .get<{ items: RawNavItem[] }>("/api/v1/public/nav-menu/bottom_nav")
       .then((d) => {
         if (d.items && d.items.length > 0) {
-          setTabs(d.items.filter((i) => i.visible));
+          const normalized = normalizeNavItems(d.items);
+          const visible = normalized.filter((i) => i.visible !== false);
+          if (visible.length > 0) setTabs(visible);
         }
       })
       .catch(() => {});
   }, []);
 
   return (
-    <nav className="app-fixed-bar fixed bottom-0 z-50 border-t border-border bg-white/95 backdrop-blur-md">
-      <div className="flex h-16 items-center justify-around px-2">
+    <nav className="app-fixed-bar fixed bottom-0 z-50 bg-white/95 backdrop-blur-md shadow-[0_-2px_12px_rgba(0,0,0,0.06)]">
+      <div className="flex h-16 items-center justify-around px-2 relative">
         {tabs.map((tab) => {
           const isActive =
             tab.link === "/" ? pathname === "/" : pathname.startsWith(tab.link);
@@ -49,18 +81,18 @@ export default function BottomNav() {
 
           if (isPrimary) {
             return (
-              <Link key={tab.link} href={tab.link} className="flex flex-col items-center gap-0.5">
+              <Link key={tab.link} href={tab.link} className="flex flex-col items-center -mt-5">
                 <div
-                  className={`flex h-11 w-11 items-center justify-center rounded-full ${
+                  className={`flex h-14 w-14 items-center justify-center rounded-full shadow-lg ring-4 ring-white transition-all duration-200 active:scale-90 ${
                     isActive
-                      ? "bg-[var(--jh-green)] text-white"
-                      : "bg-secondary text-[var(--jh-green)]"
-                  } transition`}
+                      ? "bg-gradient-to-br from-[var(--jh-lime)] to-[var(--jh-green)] text-white animate-pulse-glow"
+                      : "bg-gradient-to-br from-[var(--jh-green)] to-[var(--jh-green-dark)] text-white animate-pulse-glow"
+                  }`}
                 >
-                  {renderIcon(isActive)}
+                  <span className="scale-110">{renderIcon(true)}</span>
                 </div>
                 <span
-                  className={`text-[10px] font-semibold ${
+                  className={`text-[14px] font-bold mt-0.5 ${
                     isActive ? "text-[var(--jh-green)]" : "text-muted-foreground"
                   }`}
                 >
@@ -71,21 +103,27 @@ export default function BottomNav() {
           }
 
           return (
-            <Link key={tab.link} href={tab.link} className="flex flex-col items-center gap-1 py-1.5">
+            <Link key={tab.link} href={tab.link} className="flex flex-col items-center gap-0.5 py-1.5 transition-all duration-200 active:scale-90">
               <span
-                className={`${
-                  isActive ? "text-[var(--jh-green)]" : "text-muted-foreground"
-                } transition`}
+                className={`transition-all duration-200 ${
+                  isActive ? "text-[var(--jh-green)] scale-110" : "text-muted-foreground"
+                }`}
               >
                 {renderIcon(isActive)}
               </span>
               <span
-                className={`text-[10px] font-semibold ${
+                className={`text-[14px] font-semibold transition-colors ${
                   isActive ? "text-[var(--jh-green)]" : "text-muted-foreground"
                 }`}
               >
                 {tab.label}
               </span>
+              {/* Active dot indicator */}
+              <span
+                className={`h-1 w-1 rounded-full transition-all duration-300 ${
+                  isActive ? "bg-[var(--jh-green)] scale-100" : "bg-transparent scale-0"
+                }`}
+              />
             </Link>
           );
         })}

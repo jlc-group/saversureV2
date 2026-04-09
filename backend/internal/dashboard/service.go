@@ -56,6 +56,9 @@ func (s *Service) GetSummary(ctx context.Context, tenantID string) (*Summary, er
 				sum.CampaignStats[status] = cnt
 			}
 		}
+		if err := rows.Err(); err != nil {
+			return nil, fmt.Errorf("campaign stats rows: %w", err)
+		}
 	}
 
 	// Total batches
@@ -145,6 +148,9 @@ func (s *Service) GetScanChart(ctx context.Context, tenantID, groupBy string, da
 		}
 		points = append(points, p)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("scan chart rows: %w", err)
+	}
 	return points, nil
 }
 
@@ -185,6 +191,9 @@ func (s *Service) GetTopProducts(ctx context.Context, tenantID string, limit int
 			return nil, fmt.Errorf("scan top product: %w", err)
 		}
 		products = append(products, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("top products rows: %w", err)
 	}
 	return products, nil
 }
@@ -259,6 +268,9 @@ func (s *Service) GetGeoHeatmap(ctx context.Context, tenantID string) ([]GeoPoin
 		}
 		points = append(points, p)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("geo heatmap rows: %w", err)
+	}
 	return points, nil
 }
 
@@ -307,6 +319,9 @@ func (s *Service) GetRecentActivity(ctx context.Context, tenantID string, limit 
 		}
 		a.ID = a.Type + "-" + rowID
 		activities = append(activities, a)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("recent activity rows: %w", err)
 	}
 	return activities, nil
 }

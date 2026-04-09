@@ -5,6 +5,8 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+
+	"saversure/internal/apperror"
 )
 
 type Handler struct {
@@ -34,13 +36,13 @@ func (h *Handler) LinkIdentity(c *gin.Context) {
 		IdentityKey  string `json:"identity_key" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_input", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
 	link, err := h.identitySvc.LinkUser(c.Request.Context(), tenantID, userID, req.IdentityType, req.IdentityKey)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "link_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -56,7 +58,7 @@ func (h *Handler) GetPlatformUser(c *gin.Context) {
 
 	pu, err := h.identitySvc.GetPlatformUser(c.Request.Context(), platformUserID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "not_found", "message": err.Error()})
+		apperror.RespondNotFound(c, "not_found")
 		return
 	}
 
@@ -116,7 +118,7 @@ func (h *Handler) Exchange(c *gin.Context) {
 		Amount int64 `json:"amount" binding:"required,gt=0"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_input", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
@@ -126,7 +128,7 @@ func (h *Handler) Exchange(c *gin.Context) {
 		Amount:   req.Amount,
 	})
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "exchange_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -210,7 +212,7 @@ func (h *Handler) GetPlatformHistory(c *gin.Context) {
 
 	entries, err := h.ledgerSvc.GetHistory(c.Request.Context(), platformUserID, currency, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "history_failed"})
+		apperror.Respond(c, err)
 		return
 	}
 	if entries == nil {

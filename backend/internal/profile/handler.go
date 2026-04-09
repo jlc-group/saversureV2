@@ -6,6 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"saversure/internal/apperror"
 )
 
 type Handler struct {
@@ -42,13 +44,13 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 
 	var input UpdateProfileInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
 	p, err := h.svc.UpdateProfile(c.Request.Context(), tenantID, userID, input)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, p)
@@ -64,7 +66,7 @@ func (h *Handler) ListAddresses(c *gin.Context) {
 
 	addrs, err := h.svc.ListAddresses(c.Request.Context(), tenantID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": addrs})
@@ -80,13 +82,13 @@ func (h *Handler) CreateAddress(c *gin.Context) {
 
 	var input CreateAddressInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
 	addr, err := h.svc.CreateAddress(c.Request.Context(), tenantID, userID, input)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, addr)
@@ -103,7 +105,7 @@ func (h *Handler) UpdateAddress(c *gin.Context) {
 
 	var input UpdateAddressInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
@@ -113,7 +115,7 @@ func (h *Handler) UpdateAddress(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "address not found"})
 			return
 		}
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, addr)
@@ -134,7 +136,7 @@ func (h *Handler) DeleteAddress(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "address not found"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusNoContent, nil)
@@ -155,7 +157,7 @@ func (h *Handler) SetDefaultAddress(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "address not found"})
 			return
 		}
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, addr)

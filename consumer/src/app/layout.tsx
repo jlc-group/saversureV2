@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import TenantProvider from "@/components/TenantProvider";
 import PopupRenderer from "@/components/PopupRenderer";
+import { CurrencyProvider } from "@/lib/currency-context";
+import { Toaster } from "react-hot-toast";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -18,11 +20,18 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="th">
-      <head />
+      <head>
+        <link rel="preload" href="/assets/fonts/DBHeavent.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+        <link rel="preload" href="/assets/fonts/DBHeavent-Bold.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+        <link rel="preload" href="/assets/fonts/DBHeaventt-Light.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+      </head>
       <body>
         <TenantProvider>
-          {children}
-          <PopupRenderer />
+          <CurrencyProvider>
+            {children}
+            <PopupRenderer />
+            <Toaster position="top-center" reverseOrder={false} />
+          </CurrencyProvider>
         </TenantProvider>
       </body>
     </html>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import toast from "react-hot-toast";
 
 interface Webhook {
   id: string;
@@ -122,7 +123,7 @@ export default function WebhooksPage() {
       setForm({ ...emptyForm });
       fetchWebhooks();
     } catch {
-      alert("Failed to create webhook");
+      toast.error("Failed to create webhook");
     } finally {
       setSubmitting(false);
     }
@@ -143,7 +144,7 @@ export default function WebhooksPage() {
       setForm({ ...emptyForm });
       fetchWebhooks();
     } catch {
-      alert("Failed to update webhook");
+      toast.error("Failed to update webhook");
     } finally {
       setSubmitting(false);
     }
@@ -182,7 +183,7 @@ export default function WebhooksPage() {
       await api.patch(`/api/v1/webhooks/${w.id}`, { active: !w.active });
       fetchWebhooks();
     } catch {
-      alert("Failed to update");
+      toast.error("Failed to update");
     } finally {
       setActionId(null);
     }
@@ -196,7 +197,7 @@ export default function WebhooksPage() {
       if (expandedLogsId === id) setExpandedLogsId(null);
       fetchWebhooks();
     } catch {
-      alert("Failed to delete");
+      toast.error("Failed to delete");
     } finally {
       setActionId(null);
     }
@@ -209,7 +210,7 @@ export default function WebhooksPage() {
       const res = await api.post<WebhookLog>(`/api/v1/webhooks/${id}/test`, {});
       setTestResult(res);
     } catch {
-      alert("Failed to send test webhook");
+      toast.error("Failed to send test webhook");
     } finally {
       setTestLoading(false);
     }

@@ -6,6 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"saversure/internal/apperror"
 )
 
 type Handler struct {
@@ -28,7 +30,7 @@ func (h *Handler) List(c *gin.Context) {
 		Offset: offset,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": customers, "total": total})
@@ -40,7 +42,7 @@ func (h *Handler) GetByID(c *gin.Context) {
 
 	cust, err := h.svc.GetByID(c.Request.Context(), tenantID, id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		apperror.RespondNotFound(c, "not_found")
 		return
 	}
 	c.JSON(http.StatusOK, cust)
@@ -52,7 +54,7 @@ func (h *Handler) GetDetail(c *gin.Context) {
 
 	detail, err := h.svc.GetDetail(c.Request.Context(), tenantID, customerID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		apperror.RespondNotFound(c, "not_found")
 		return
 	}
 	c.JSON(http.StatusOK, detail)
@@ -64,13 +66,13 @@ func (h *Handler) Update(c *gin.Context) {
 
 	var input UpdateInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
 	cust, err := h.svc.Update(c.Request.Context(), tenantID, id, input)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, cust)

@@ -5,6 +5,8 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+
+	"saversure/internal/apperror"
 )
 
 type Handler struct {
@@ -24,7 +26,7 @@ type ImportInput struct {
 func (h *Handler) Import(c *gin.Context) {
 	var input ImportInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
@@ -36,7 +38,7 @@ func (h *Handler) Import(c *gin.Context) {
 
 	imported, err := h.svc.BulkImport(c.Request.Context(), tenantID, input.RewardID, input.Codes)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -65,7 +67,7 @@ func (h *Handler) List(c *gin.Context) {
 
 	coupons, err := h.svc.ListByReward(c.Request.Context(), tenantID, rewardID, limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -88,7 +90,7 @@ func (h *Handler) CountAvailable(c *gin.Context) {
 
 	count, err := h.svc.CountAvailable(c.Request.Context(), tenantID, rewardID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -111,7 +113,7 @@ func (h *Handler) DeleteUnclaimed(c *gin.Context) {
 
 	deleted, err := h.svc.DeleteUnclaimed(c.Request.Context(), tenantID, rewardID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 

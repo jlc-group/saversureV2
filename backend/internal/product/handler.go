@@ -6,6 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"saversure/internal/apperror"
 )
 
 type Handler struct {
@@ -36,7 +38,7 @@ func (h *Handler) List(c *gin.Context) {
 		Offset:    offset,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": products, "total": total})
@@ -46,14 +48,14 @@ func (h *Handler) Create(c *gin.Context) {
 	tenantID := c.GetString("tenant_id")
 	var input CreateInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 	input.TenantID = tenantID
 
 	p, err := h.svc.Create(c.Request.Context(), input)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, p)
@@ -65,13 +67,13 @@ func (h *Handler) Update(c *gin.Context) {
 
 	var input UpdateInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
 	p, err := h.svc.Update(c.Request.Context(), tenantID, id, input)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, p)
@@ -82,7 +84,7 @@ func (h *Handler) Delete(c *gin.Context) {
 	id := c.Param("id")
 
 	if err := h.svc.Delete(c.Request.Context(), tenantID, id); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
@@ -100,7 +102,7 @@ func (h *Handler) ImportCSV(c *gin.Context) {
 
 	result, err := h.svc.ImportCSV(c.Request.Context(), tenantID, file)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 

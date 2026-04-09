@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"saversure/internal/apperror"
 	"saversure/internal/coupon"
 	"saversure/internal/inventory"
 	"saversure/internal/ledger"
@@ -22,7 +23,7 @@ func NewHandler(svc *Service) *Handler {
 func (h *Handler) Redeem(c *gin.Context) {
 	var input RedeemInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
@@ -67,11 +68,11 @@ func (h *Handler) Redeem(c *gin.Context) {
 		if errors.Is(err, ledger.ErrInsufficientBalance) {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error":   "insufficient_balance",
-				"message": err.Error(),
+				"message": "Insufficient balance for this redemption",
 			})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "redemption_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -98,7 +99,7 @@ func (h *Handler) Confirm(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "already_confirmed"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "confirm_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 

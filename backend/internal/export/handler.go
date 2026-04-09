@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"saversure/internal/apperror"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -19,7 +21,7 @@ func NewHandler(svc *Service, apiBase string) *Handler {
 func (h *Handler) Create(c *gin.Context) {
 	var input CreateExportInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
@@ -28,7 +30,7 @@ func (h *Handler) Create(c *gin.Context) {
 
 	result, err := h.svc.CreateExport(c.Request.Context(), tenantID, actorID, h.apiBase, input)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "export_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -40,7 +42,7 @@ func (h *Handler) Download(c *gin.Context) {
 
 	reader, fileName, contentType, err := h.svc.Download(c.Request.Context(), token)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "not_found", "message": err.Error()})
+		apperror.RespondNotFound(c, "not_found")
 		return
 	}
 	defer reader.Close()
@@ -68,7 +70,7 @@ func (h *Handler) SampleCodes(c *gin.Context) {
 
 	codes, err := h.svc.SampleCodes(c.Request.Context(), tenantID, rollID, count)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "sample_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"codes": codes})
@@ -83,7 +85,7 @@ func (h *Handler) List(c *gin.Context) {
 
 	logs, total, err := h.svc.List(c.Request.Context(), tenantID, batchID, factoryID, limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 

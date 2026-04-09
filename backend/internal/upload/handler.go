@@ -15,6 +15,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+
+	"saversure/internal/apperror"
 )
 
 type Handler struct {
@@ -206,7 +208,7 @@ func (h *Handler) AIGenerateImage(c *gin.Context) {
 
 	var req aiGenerateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
@@ -243,7 +245,7 @@ func (h *Handler) AIGenerateImage(c *gin.Context) {
 	client := &http.Client{Timeout: 60 * time.Second}
 	resp, err := client.Do(httpReq)
 	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": "gemini_unreachable", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	defer resp.Body.Close()

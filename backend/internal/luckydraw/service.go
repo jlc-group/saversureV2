@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"math/big"
 
+	"saversure/internal/apperror"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -31,8 +33,8 @@ type Campaign struct {
 	RegistrationEnd   *string `json:"registration_end"`
 	DrawDate          *string `json:"draw_date"`
 	CreatedAt         string  `json:"created_at"`
-	PrizeCount        int     `json:"prize_count,omitempty"`
-	TicketCount       int     `json:"ticket_count,omitempty"`
+	PrizeCount        int     `json:"prize_count"`
+	TicketCount       int     `json:"ticket_count"`
 }
 
 type Prize struct {
@@ -311,7 +313,7 @@ func (s *Service) Register(ctx context.Context, tenantID, campaignID, userID str
 		return nil, fmt.Errorf("campaign not found")
 	}
 	if c.Status != "active" {
-		return nil, fmt.Errorf("campaign is not active")
+		return nil, apperror.BadRequest("not_active", "กิจกรรมนี้ยังไม่เปิดให้แลกสิทธิ์หรือหมดเวลาแล้ว")
 	}
 
 	var ticketCount int
@@ -320,23 +322,37 @@ func (s *Service) Register(ctx context.Context, tenantID, campaignID, userID str
 		campaignID, userID,
 	).Scan(&ticketCount)
 	if ticketCount >= c.MaxTicketsPerUser {
-		return nil, fmt.Errorf("max tickets reached (%d/%d)", ticketCount, c.MaxTicketsPerUser)
+		return nil, apperror.BadRequest("max_tickets", fmt.Sprintf("คุณมีสิทธิ์ลุ้นโชคเต็มโควต้าแล้ว (%d/%d)", ticketCount, c.MaxTicketsPerUser))
+	}
+
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// User lock to prevent race conditions on balance deduction
+	var dummy int
+	err = tx.QueryRow(ctx, `SELECT 1 FROM users WHERE id = $1 FOR UPDATE`, userID).Scan(&dummy)
+	if err != nil {
+		return nil, fmt.Errorf("lock user: %w", err)
 	}
 
 	if c.CostPoints > 0 {
 		var balance int
-		_ = s.db.QueryRow(ctx,
-			`SELECT COALESCE(SUM(CASE WHEN type = 'credit' THEN amount ELSE -amount END), 0) FROM point_ledger WHERE user_id = $1`,
+		_ = tx.QueryRow(ctx,
+			`SELECT COALESCE(SUM(CASE WHEN entry_type = 'credit' THEN amount ELSE -amount END), 0) FROM point_ledger WHERE user_id = $1 AND currency = 'point'`,
 			userID,
 		).Scan(&balance)
 		if balance < c.CostPoints {
-			return nil, fmt.Errorf("insufficient points (need %d, have %d)", c.CostPoints, balance)
+			return nil, apperror.BadRequest("insufficient_points", fmt.Sprintf("แต้มไม่เพียงพอ (ต้องการ %d, มี %d)", c.CostPoints, balance))
 		}
 
-		_, err := s.db.Exec(ctx,
-			`INSERT INTO point_ledger (user_id, tenant_id, type, amount, source, ref_id)
-			 VALUES ($1, $2, 'debit', $3, 'lucky_draw', $4)`,
-			userID, tenantID, c.CostPoints, campaignID,
+		balanceAfter := balance - c.CostPoints
+		_, err := tx.Exec(ctx,
+			`INSERT INTO point_ledger (user_id, tenant_id, entry_type, amount, balance_after, reference_type, reference_id, description, currency)
+			 VALUES ($1, $2, 'debit', $3, $4, 'lucky_draw', $5, 'แลกสิทธิ์ลุ้นโชค', 'point')`,
+			userID, tenantID, c.CostPoints, balanceAfter, campaignID,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("deduct points: %w", err)
@@ -345,7 +361,7 @@ func (s *Service) Register(ctx context.Context, tenantID, campaignID, userID str
 
 	ticketNum := generateTicketNumber()
 	var t Ticket
-	err = s.db.QueryRow(ctx,
+	err = tx.QueryRow(ctx,
 		`INSERT INTO lucky_draw_tickets (campaign_id, user_id, ticket_number, points_spent)
 		 VALUES ($1, $2, $3, $4)
 		 RETURNING id, campaign_id, user_id, ticket_number, points_spent, created_at::text`,
@@ -355,8 +371,58 @@ func (s *Service) Register(ctx context.Context, tenantID, campaignID, userID str
 		return nil, fmt.Errorf("register ticket: %w", err)
 	}
 
-	s.db.Exec(ctx, `UPDATE lucky_draw_campaigns SET total_tickets = total_tickets + 1 WHERE id = $1`, campaignID)
+	_, err = tx.Exec(ctx, `UPDATE lucky_draw_campaigns SET total_tickets = total_tickets + 1 WHERE id = $1`, campaignID)
+	if err != nil {
+		return nil, fmt.Errorf("update campaign total tickets: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit transaction: %w", err)
+	}
+
 	return &t, nil
+}
+
+type UserTicket struct {
+	ID            string `json:"id"`
+	CampaignID    string `json:"campaign_id"`
+	CampaignTitle string `json:"campaign_title"`
+	TicketNumber  string `json:"ticket_number"`
+	PointsSpent   int    `json:"points_spent"`
+	CreatedAt     string `json:"created_at"`
+	Status        string `json:"status"`
+}
+
+func (s *Service) GetAllUserTickets(ctx context.Context, userID string) ([]UserTicket, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT t.id, t.campaign_id, COALESCE(c.title, '') AS campaign_title,
+		        t.ticket_number, t.points_spent, t.created_at::text,
+		        CASE
+		          WHEN w.id IS NOT NULL THEN 'won'
+		          WHEN c.status = 'active' THEN 'active'
+		          ELSE COALESCE(c.status, 'active')
+		        END AS status
+		 FROM lucky_draw_tickets t
+		 LEFT JOIN lucky_draw_campaigns c ON c.id = t.campaign_id
+		 LEFT JOIN lucky_draw_winners w ON w.ticket_id = t.id
+		 WHERE t.user_id = $1
+		 ORDER BY t.created_at DESC`,
+		userID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list user tickets: %w", err)
+	}
+	defer rows.Close()
+
+	tickets := make([]UserTicket, 0)
+	for rows.Next() {
+		var t UserTicket
+		if err := rows.Scan(&t.ID, &t.CampaignID, &t.CampaignTitle, &t.TicketNumber, &t.PointsSpent, &t.CreatedAt, &t.Status); err != nil {
+			return nil, fmt.Errorf("scan user ticket: %w", err)
+		}
+		tickets = append(tickets, t)
+	}
+	return tickets, nil
 }
 
 func (s *Service) GetUserTickets(ctx context.Context, campaignID, userID string) ([]Ticket, error) {

@@ -54,9 +54,10 @@ export default function PointsSummary({
   }, []);
 
   return (
-    <div className="bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-green-dark)_100%)] px-5 pt-8 pb-14 text-white relative overflow-hidden">
-      <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/10" />
-      <div className="absolute -bottom-8 -left-4 h-24 w-24 rounded-full bg-white/5" />
+    <div className="bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-purple)_50%,var(--jh-pink)_100%)] animate-gradient px-5 pt-8 pb-14 text-white relative overflow-hidden">
+      <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/10 animate-float" />
+      <div className="absolute -bottom-8 -left-4 h-24 w-24 rounded-full bg-white/5 animate-float-delay-1" />
+      <div className="absolute right-1/3 top-2 h-16 w-16 rounded-full bg-white/5 animate-float-delay-2" />
 
       <div className="relative">
         {show_greeting && (
@@ -78,7 +79,7 @@ export default function PointsSummary({
         <div className="mt-5 flex items-center justify-between rounded-xl bg-white/15 px-4 py-3 ring-1 ring-white/20">
           <div>
             <p className="text-[11px] text-white/60">{primaryBalance?.name || "แต้มคงเหลือ"}</p>
-            <p className="text-3xl font-bold leading-tight">
+            <p className="text-3xl font-bold leading-tight animate-shimmer">
               {(primaryBalance?.balance ?? 0).toLocaleString()}
             </p>
             {secondaryBalances.length > 0 && (
@@ -98,7 +99,7 @@ export default function PointsSummary({
           {!loggedIn ? (
             <Link
               href="/login"
-              className="rounded-full bg-white px-5 py-2 text-sm font-bold text-[var(--jh-green-dark)]"
+              className="rounded-full bg-white px-5 py-2 text-sm font-bold text-[var(--jh-green-dark)] animate-pulse-glow"
             >
               เข้าสู่ระบบ
             </Link>

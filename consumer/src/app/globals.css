@@ -81,6 +81,20 @@
   --info-light: #eff6ff;
   --green-gradient: linear-gradient(135deg, #1a9444 0%, #15783a 100%);
   --scan-btn-gradient: linear-gradient(135deg, #94c945 0%, #7ab82e 100%);
+
+  /* ===== Playful Accent Colors ===== */
+  --jh-orange: #ff8c42;
+  --jh-orange-light: #fff3e6;
+  --jh-purple: #7c5cbf;
+  --jh-purple-light: #f3f0ff;
+  --jh-pink: #e84393;
+  --jh-pink-light: #ffeef8;
+  --jh-yellow: #ffc107;
+  --jh-yellow-light: #fff9e6;
+  --jh-teal: #00b894;
+  --jh-teal-light: #e6fff9;
+  --jh-gold: #d4a017;
+  --jh-gold-light: #fdf6e3;
 }
 
 * {
@@ -105,15 +119,17 @@ body {
   margin: 0 auto;
   line-height: 1.5;
   word-spacing: 0.5px;
-  font-size: 16px;
+  font-size: 24px;
   min-height: 100vh;
   box-shadow: 0 0 0 1px rgba(0,0,0,0.04), 0 0 60px rgba(0,0,0,0.08);
   position: relative;
 }
 
 .app-fixed-bar {
-  left: max(0px, calc(50vw - 240px));
-  right: max(0px, calc(50vw - 240px));
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
 }
 
 @theme inline {
@@ -135,6 +151,17 @@ body {
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+
+  /* ===== Custom Tailwind Typography specifically scaled for DB Heavent ===== */
+  --text-xs: 18px;
+  --text-sm: 20px;
+  --text-base: 24px;
+  --text-lg: 28px;
+  --text-xl: 32px;
+  --text-2xl: 40px;
+  --text-3xl: 48px;
+  --text-4xl: 56px;
+
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -142,8 +169,539 @@ body {
   --radius-2xl: calc(var(--radius) * 2);
 }
 
+/* ===== Playful Keyframe Animations ===== */
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(24px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideUpSheet {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  0% { transform: scale(0); opacity: 0; }
+  70% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(148, 201, 69, 0.5); }
+  50% { box-shadow: 0 0 0 12px rgba(148, 201, 69, 0); }
+}
+
+@keyframes bounceIn {
+  0% { transform: scale(0.3); opacity: 0; }
+  50% { transform: scale(1.08); }
+  70% { transform: scale(0.95); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(-4deg); }
+  40% { transform: rotate(4deg); }
+  60% { transform: rotate(-2deg); }
+  80% { transform: rotate(2deg); }
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes scanline {
+  0%, 100% { top: 10%; }
+  50% { top: 85%; }
+}
+
+@keyframes confettiFall {
+  0% { transform: translateY(-10px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(120px) rotate(720deg); opacity: 0; }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Utility animation classes */
+.animate-float { animation: float 3s ease-in-out infinite; }
+.animate-float-delay-1 { animation: float 3s ease-in-out 0.5s infinite; }
+.animate-float-delay-2 { animation: float 3s ease-in-out 1s infinite; }
+.animate-float-delay-3 { animation: float 3s ease-in-out 1.5s infinite; }
+.animate-slide-up { animation: slideUp 0.45s ease-out both; }
+.animate-slide-up-sheet { animation: slideUpSheet 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.animate-scale-in { animation: scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent 30%, rgba(255,255,255,0.4) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: shimmer 2.5s ease-in-out infinite;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+.animate-pulse-glow { animation: pulseGlow 2s ease-in-out infinite; }
+.animate-bounce-in { animation: bounceIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.animate-wiggle { animation: wiggle 0.6s ease-in-out; }
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradientShift 6s ease infinite;
+}
+.animate-shake { animation: shake 0.4s ease-in-out; }
+.animate-count-up { animation: countUp 0.6s ease-out both; }
+
+/* Staggered children animation */
+.stagger-children > * {
+  animation: slideUp 0.4s ease-out both;
+}
+.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 60ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 120ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 180ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 240ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 300ms; }
+.stagger-children > *:nth-child(7) { animation-delay: 360ms; }
+.stagger-children > *:nth-child(8) { animation-delay: 420ms; }
+
+/* Card hover interaction */
+.card-playful {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card-playful:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+.card-playful:active {
+  transform: scale(0.98);
+}
+
+/* Confetti container */
+.confetti-container {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 10;
+}
+.confetti-piece {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  animation: confettiFall 1.5s ease-out forwards;
+}
+
+/* Gamification badge styles */
+.badge-glow {
+  box-shadow: 0 0 8px rgba(26, 148, 68, 0.3);
+}
+
+/* Green border card accent */
+.card-green-border {
+  border-left: 3px solid rgba(26, 148, 68, 0.25);
+}
+
+/* Hide scrollbar for tab containers */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 @layer base {
   * {
     @apply border-border;
   }
 }
+
+/* ═══════════════════════════════════════════
+   Jula's Herb Home — CSS Classes
+   Matching Original Running App (Mockup)
+   ═══════════════════════════════════════════ */
+
+/* Points Bar */
+.jh-points-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 16px;
+  color: #fff;
+  background: linear-gradient(277.42deg, #3C9B4D -13.4%, #7DBD48 80.19%);
+  position: sticky;
+  top: 56px;
+  z-index: 40;
+  font-size: 18px;
+  font-weight: 700;
+}
+.jh-points-name { font-size: 18px; }
+.jh-points-values { display: flex; align-items: center; gap: 4px; font-size: 18px; }
+.jh-coin { font-size: 16px; }
+.jh-diamond { font-size: 16px; }
+.jh-divider { margin: 0 4px; opacity: 0.4; }
+
+/* Banner Section */
+.jh-banner-section {
+  background: linear-gradient(277.42deg, #3C9B4D -13.4%, #7DBD48 80.19%);
+  padding: 16px 0 10px;
+}
+.jh-banner-scroll {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-left: 16px;
+  scroll-snap-type: x mandatory;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.jh-banner-scroll::-webkit-scrollbar { display: none; }
+.jh-banner-slide {
+  flex-shrink: 0;
+  width: 240px;
+  scroll-snap-align: center;
+}
+.jh-banner-img {
+  width: 240px;
+  height: 112px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+.jh-banner-placeholder {
+  width: 240px;
+  height: 112px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+  padding: 12px;
+  line-height: 1.4;
+}
+.jh-banner-caption {
+  color: rgba(255,255,255,0.7);
+  font-size: 16px;
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.jh-banner-dots {
+  display: flex;
+  justify-content: center;
+  gap: 3px;
+  margin-top: 8px;
+}
+.jh-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.35);
+}
+.jh-dot.active {
+  background: rgba(148, 201, 69, 1);
+}
+
+/* Rewards Section */
+.jh-rewards-section {
+  background: #fff;
+  padding: 12px 16px 120px;
+  min-height: 60vh;
+}
+
+/* Campaigns Container */
+.jh-campaigns-container {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 8px 0;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.jh-campaigns-container::-webkit-scrollbar {
+  display: none;
+}
+
+.jh-campaigns-container .jh-card {
+  flex: 0 0 280px;
+  scroll-snap-align: start;
+}
+
+.jh-section-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 12px;
+}
+
+/* Tabs */
+.jh-tabs {
+  display: flex;
+  overflow-x: auto;
+  white-space: nowrap;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.jh-tabs::-webkit-scrollbar { display: none; }
+.jh-tab {
+  cursor: pointer;
+  padding-bottom: 8px;
+  margin-right: 16px;
+  font-size: 16px;
+  color: rgba(148, 201, 69, 0.6);
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+}
+.jh-tab.active {
+  color: rgba(148, 201, 69, 1);
+  font-weight: 700;
+  border-bottom-color: rgba(148, 201, 69, 1);
+}
+
+/* Empty state */
+.jh-empty {
+  text-align: center;
+  padding: 60px 0;
+  color: #aaa;
+}
+.jh-empty-icon { font-size: 48px; margin-bottom: 12px; }
+.jh-empty p { font-weight: 600; font-size: 16px; }
+
+/* ═══ Reward Card ═══ */
+.jh-card {
+  margin-bottom: 10px;
+}
+.jh-card-inner {
+  display: flex;
+  border: 1px solid rgba(148, 201, 69, 0.3);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+/* Image side — 42% */
+.jh-card-img {
+  width: 42%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  min-height: 180px;
+  overflow: hidden;
+}
+.jh-card-product-img {
+  object-fit: cover;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.jh-card-emoji {
+  font-size: 56px;
+}
+.jh-card-img-label {
+  margin-top: auto;
+  background: rgba(255,255,255,0.9);
+  border: 1px solid rgba(0,0,0,0.05);
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 14px;
+  line-height: 1.3;
+  color: #666;
+  text-align: center;
+  width: 100%;
+  font-weight: 500;
+}
+.jh-flash-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 999px;
+  z-index: 5;
+  animation: pulse 1.5s infinite;
+}
+
+/* Detail side — 58% */
+.jh-card-detail {
+  width: 58%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 8px 12px;
+  text-align: left;
+}
+.jh-card-detail-top {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+}
+.jh-card-detail-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+}
+
+/* "แลกรับฟรี !" */
+.jh-card-free-label {
+  color: var(--jh-green-dark);
+  font-weight: 800;
+  font-size: 14px;
+  line-height: 1;
+  text-align: left;
+  margin-bottom: 2px;
+  display: inline-block;
+  background: var(--success-light);
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+/* Product name */
+.jh-card-name {
+  color: #1a1a1a;
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.15;
+  text-align: left;
+  margin-bottom: 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Price */
+.jh-card-price {
+  color: #888;
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 1;
+  text-align: left;
+  margin-bottom: 6px;
+  margin-top: 0px;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.jh-card-price span {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+/* Discount info */
+.jh-card-discount {
+  background: transparent;
+  padding: 0;
+  font-size: 16px;
+  color: #555;
+  line-height: 1.15;
+  margin-top: 2px;
+  text-align: left;
+  width: 100%;
+}
+.jh-card-discount strong {
+  color: #e65100;
+  font-weight: 800;
+  font-size: 18px;
+  display: block;
+  margin-bottom: 2px;
+}
+.jh-pts {
+  color: rgba(148, 201, 69, 1);
+  font-weight: 900;
+  font-size: 27px;
+  line-height: 0.9;
+}
+.jh-pts-old {
+  color: #888;
+  font-size: 14px;
+  margin-left: 4px;
+}
+.jh-pts-old s {
+  color: rgba(239, 68, 68, 1);
+  text-decoration-thickness: 1px;
+}
+
+/* Shipping */
+.jh-card-shipping {
+  text-align: left;
+  color: var(--jh-green);
+  font-size: 16px;
+  margin-top: 4px;
+  margin-bottom: 4px;
+  font-weight: 700;
+}
+
+/* Point button */
+.jh-card-point-btn {
+  background: rgba(148, 201, 69, 1);
+  color: #fff;
+  text-align: center;
+  font-weight: 800;
+  font-size: 18px;
+  padding: 4px 0;
+  width: 100%;
+  border-radius: 6px;
+  margin-top: 6px;
+  margin-bottom: 0px;
+  box-shadow: 0 2px 6px rgba(148, 201, 69, 0.25);
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+}
+.jh-card-point-btn:active {
+  transform: scale(0.96);
+}
+.jh-card-point-btn span {
+  font-size: 16px;
+}
+
+/* Card image background colors */
+.jh-bg-green { background-color: #e8f5e9; }
+.jh-bg-pink { background-color: #fce4ec; }
+.jh-bg-blue { background-color: #e3f2fd; }
+.jh-bg-yellow { background-color: #fff8e1; }
+.jh-bg-purple { background-color: #f3e5f5; }
+.jh-bg-teal { background-color: #e0f7fa; }

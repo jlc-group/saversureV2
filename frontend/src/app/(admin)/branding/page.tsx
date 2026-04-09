@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import { api } from "@/lib/api";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { useTenantContext } from "@/lib/tenant-context";
@@ -64,7 +65,7 @@ export default function BrandingPage() {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch {
-      alert("Failed to save branding");
+      toast.error("Failed to save branding");
     } finally {
       setSaving(false);
     }

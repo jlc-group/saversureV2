@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
 import { api } from "@/lib/api";
+import toast from "react-hot-toast";
 
 interface Reward {
   id: string;
@@ -10,10 +11,13 @@ interface Reward {
   description: string;
   type: string;
   point_cost: number;
+  normal_point_cost: number;
+  price: number;
   cost_currency: string;
   image_url: string | null;
   delivery_type: string;
   status: string;
+  valid_from: string | null;
   expires_at: string | null;
   total_qty: number;
   reserved_qty: number;
@@ -32,7 +36,8 @@ interface CurrencyMaster {
 }
 
 const typeOptions = [
-  { value: "physical", label: "สินค้าจริง" },
+  { value: "product", label: "สินค้าจริง" },
+  { value: "premium", label: "สินค้าพรีเมียม" },
   { value: "coupon", label: "คูปอง" },
   { value: "digital", label: "ดิจิทัล" },
   { value: "ticket", label: "ตั๋ว" },
@@ -71,18 +76,21 @@ type FormData = {
   description: string;
   type: string;
   point_cost: number;
+  normal_point_cost: number;
+  price: number;
   cost_currency: string;
   delivery_type: string;
   status: string;
+  valid_from: string;
   expires_at: string;
   total_qty: number;
   image_url: string;
 };
 
 const emptyForm: FormData = {
-  campaign_id: "", name: "", description: "", type: "physical",
-  point_cost: 100, cost_currency: "point", delivery_type: "none",
-  status: "active", expires_at: "", total_qty: 100, image_url: "",
+  campaign_id: "", name: "", description: "", type: "product",
+  point_cost: 100, normal_point_cost: 0, price: 0, cost_currency: "point", delivery_type: "none",
+  status: "active", valid_from: "", expires_at: "", total_qty: 100, image_url: "",
 };
 
 export default function RewardsPage() {
@@ -96,7 +104,9 @@ export default function RewardsPage() {
   const [uploading, setUploading] = useState(false);
   const [inventoryModal, setInventoryModal] = useState<{ id: string; name: string; delta: number } | null>(null);
   const [updatingInv, setUpdatingInv] = useState(false);
-  const [filter, setFilter] = useState<"all" | "active" | "inactive" | "draft">("all");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive" | "draft">("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
 
   const getCurrencyIcon = (code: string) => {
     const c = currencies.find((x) => x.code.toLowerCase() === code.toLowerCase());
@@ -136,10 +146,13 @@ export default function RewardsPage() {
       description: r.description,
       type: r.type,
       point_cost: r.point_cost,
+      normal_point_cost: r.normal_point_cost,
+      price: r.price,
       cost_currency: r.cost_currency,
       delivery_type: r.delivery_type,
       status: r.status,
-      expires_at: r.expires_at ? r.expires_at.slice(0, 16) : "",
+      valid_from: r.valid_from ? r.valid_from.replace(' ', 'T').slice(0, 16) : "",
+      expires_at: r.expires_at ? r.expires_at.replace(' ', 'T').slice(0, 16) : "",
       total_qty: r.total_qty,
       image_url: r.image_url || "",
     });
@@ -155,16 +168,20 @@ export default function RewardsPage() {
           name: form.name || undefined,
           description: form.description || undefined,
           type: form.type || undefined,
-          point_cost: form.point_cost || undefined,
+          point_cost: form.point_cost,
+          normal_point_cost: form.normal_point_cost,
+          price: form.price,
           cost_currency: form.cost_currency || undefined,
           delivery_type: form.delivery_type || undefined,
           status: form.status || undefined,
+          valid_from: form.valid_from || "__clear__",
           expires_at: form.expires_at || "__clear__",
-          image_url: form.image_url || undefined,
+          image_url: form.image_url === "" ? "__clear__" : (form.image_url || undefined),
         });
       } else {
         await api.post("/api/v1/rewards", {
           ...form,
+          valid_from: form.valid_from || null,
           expires_at: form.expires_at || null,
           image_url: form.image_url || null,
         });
@@ -173,7 +190,7 @@ export default function RewardsPage() {
       setEditId(null);
       setForm({ ...emptyForm });
       fetchRewards();
-    } catch { alert("Failed to save reward"); } finally { setSubmitting(false); }
+    } catch { toast.error("Failed to save reward"); } finally { setSubmitting(false); }
   };
 
   const handleUpdateInventory = async () => {
@@ -183,7 +200,7 @@ export default function RewardsPage() {
       await api.patch(`/api/v1/rewards/${inventoryModal.id}/inventory`, { total_qty: inventoryModal.delta });
       setInventoryModal(null);
       fetchRewards();
-    } catch { alert("Failed to update inventory"); } finally { setUpdatingInv(false); }
+    } catch { toast.error("Failed to update inventory"); } finally { setUpdatingInv(false); }
   };
 
   const toggleStatus = async (r: Reward) => {
@@ -191,7 +208,7 @@ export default function RewardsPage() {
     try {
       await api.patch(`/api/v1/rewards/${r.id}`, { status: newStatus });
       fetchRewards();
-    } catch { alert("Failed to update status"); }
+    } catch { toast.error("Failed to update status"); }
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -201,10 +218,21 @@ export default function RewardsPage() {
     try {
       const result = await api.upload("/api/v1/upload/image", file);
       setForm({ ...form, image_url: result.url });
-    } catch { alert("Upload failed"); } finally { setUploading(false); }
+    } catch { toast.error("Upload failed"); } finally { 
+      setUploading(false);
+      e.target.value = ""; // Reset input so same file can be uploaded again if needed
+    }
   };
 
-  const filtered = filter === "all" ? rewards : rewards.filter((r) => r.status === filter);
+  const filtered = rewards.filter((r) => {
+    if (statusFilter !== "all" && r.status !== statusFilter) return false;
+    if (typeFilter !== "all" && r.type !== typeFilter) return false;
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      if (!r.name.toLowerCase().includes(q) && !r.id.toLowerCase().includes(q) && !r.type.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
 
   return (
     <div>
@@ -222,13 +250,47 @@ export default function RewardsPage() {
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-2 mb-4">
-        {(["all", "active", "inactive", "draft"] as const).map((f) => (
-          <button key={f} onClick={() => setFilter(f)} className={`px-4 py-1.5 rounded-full text-[13px] font-medium transition-all ${filter === f ? "bg-[var(--md-primary)] text-white" : "bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)] hover:bg-[var(--md-surface-container-high)]"}`}>
-            {f === "all" ? `ทั้งหมด (${rewards.length})` : `${statusBadge[f]?.label || f} (${rewards.filter((r) => r.status === f).length})`}
-          </button>
-        ))}
+      {/* Search & Filter Bar */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className="relative flex-1 max-w-[360px]">
+          <svg viewBox="0 0 24 24" fill="currentColor" className="absolute left-3 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-[var(--md-on-surface-variant)] opacity-60 pointer-events-none">
+            <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+          </svg>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="ค้นหารางวัล..."
+            className="w-full h-[40px] pl-9 pr-3 border border-[var(--md-outline)] rounded-[var(--md-radius-sm)] text-[13px] text-[var(--md-on-surface)] bg-transparent outline-none focus:border-[var(--md-primary)] focus:border-2 transition-all placeholder:text-[var(--md-on-surface-variant)] placeholder:opacity-60"
+          />
+        </div>
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+          className="h-[40px] px-3 border border-[var(--md-outline)] rounded-[var(--md-radius-sm)] text-[13px] text-[var(--md-on-surface)] bg-transparent outline-none focus:border-[var(--md-primary)] focus:border-2 transition-all cursor-pointer"
+        >
+          <option value="all">ทุกหมวดหมู่ ({rewards.length})</option>
+          {typeOptions.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label} ({rewards.filter((r) => r.type === o.value).length})
+            </option>
+          ))}
+        </select>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+          className="h-[40px] px-3 border border-[var(--md-outline)] rounded-[var(--md-radius-sm)] text-[13px] text-[var(--md-on-surface)] bg-transparent outline-none focus:border-[var(--md-primary)] focus:border-2 transition-all cursor-pointer"
+        >
+          <option value="all">ทั้งหมด ({rewards.length})</option>
+          <option value="active">Active ({rewards.filter((r) => r.status === "active").length})</option>
+          <option value="inactive">Inactive ({rewards.filter((r) => r.status === "inactive").length})</option>
+          <option value="draft">Draft ({rewards.filter((r) => r.status === "draft").length})</option>
+        </select>
+        {(search || statusFilter !== "all" || typeFilter !== "all") && (
+          <span className="text-[12px] text-[var(--md-on-surface-variant)]">
+            {filtered.length} รายการ
+          </span>
+        )}
       </div>
 
       {/* Create / Edit Form Modal */}
@@ -278,8 +340,16 @@ export default function RewardsPage() {
                   <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} className={`${fieldClass} h-auto py-2`} />
                 </div>
                 <div>
-                  <label className={labelClass}>ราคา (จำนวนแต้ม)</label>
-                  <input type="number" value={form.point_cost} onChange={(e) => setForm({ ...form, point_cost: parseInt(e.target.value) || 1 })} min={1} required className={fieldClass} />
+                  <label className={labelClass}>ราคาเต็ม (บาท)</label>
+                  <input type="number" value={form.price === 0 ? 0 : (form.price || "")} onChange={(e) => setForm({ ...form, price: e.target.value === "" ? 0 : parseFloat(e.target.value) })} required className={fieldClass} />
+                </div>
+                <div>
+                  <label className={labelClass}>แต้มปกติ (ก่อนลด)</label>
+                  <input type="number" value={form.normal_point_cost === 0 ? 0 : (form.normal_point_cost || "")} onChange={(e) => setForm({ ...form, normal_point_cost: e.target.value === "" ? 0 : parseInt(e.target.value) })} required className={fieldClass} />
+                </div>
+                <div>
+                  <label className={labelClass}>แต้มลดราคา (แต้มที่ใช้จริง)</label>
+                  <input type="number" value={form.point_cost === 0 ? 0 : (form.point_cost || "")} onChange={(e) => setForm({ ...form, point_cost: e.target.value === "" ? 0 : parseInt(e.target.value) })} min={1} required className={fieldClass} />
                 </div>
                 <div>
                   <label className={labelClass}>สกุลเงิน</label>
@@ -298,7 +368,7 @@ export default function RewardsPage() {
                   <label className={labelClass}>ประเภทสินค้า</label>
                   <select value={form.type} onChange={(e) => {
                     const t = e.target.value;
-                    const autoDelivery: Record<string, string> = { physical: "shipping", coupon: "coupon", digital: "digital", ticket: "ticket" };
+                    const autoDelivery: Record<string, string> = { product: "shipping", premium: "shipping", coupon: "coupon", digital: "digital", ticket: "ticket" };
                     setForm({ ...form, type: t, delivery_type: autoDelivery[t] || form.delivery_type });
                   }} className={fieldClass}>
                     {typeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -317,6 +387,10 @@ export default function RewardsPage() {
                     <option value="inactive">⏸️ Inactive</option>
                     <option value="draft">📝 Draft</option>
                   </select>
+                </div>
+                <div>
+                  <label className={labelClass}>วันเริ่มต้น</label>
+                  <input type="datetime-local" value={form.valid_from} onChange={(e) => setForm({ ...form, valid_from: e.target.value })} className={fieldClass} />
                 </div>
                 <div>
                   <label className={labelClass}>วันหมดอายุ</label>

@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"time"
 
+	"saversure/internal/apperror"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -39,7 +41,7 @@ func (h *Handler) List(c *gin.Context) {
 		Offset: offset,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "failed to load fulfillment items"})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -52,17 +54,17 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 
 	var input UpdateStatusInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
 	if !isValidFulfillmentStatus(input.FulfillmentStatus) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": "status must be: pending, preparing, shipped, delivered"})
+		apperror.RespondValidation(c, "status must be: pending, preparing, shipped, delivered")
 		return
 	}
 
 	if err := h.svc.UpdateStatus(c.Request.Context(), tenantID, id, input); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "not_found", "message": err.Error()})
+		apperror.RespondNotFound(c, "not_found")
 		return
 	}
 
@@ -80,7 +82,7 @@ func (h *Handler) BulkUpdate(c *gin.Context) {
 
 	var input BulkUpdateInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 	if len(input.IDs) == 0 {
@@ -97,7 +99,7 @@ func (h *Handler) BulkUpdate(c *gin.Context) {
 		TrackingNumber:    input.TrackingNumber,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "failed to update fulfillment items"})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -113,31 +115,31 @@ func (h *Handler) ExportPDF(c *gin.Context) {
 
 	var input ExportPDFInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 	if len(input.IDs) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": "ids must not be empty"})
+		apperror.RespondValidation(c, "ids must not be empty")
 		return
 	}
 
 	items, err := h.svc.ListByIDs(c.Request.Context(), tenantID, input.IDs)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "failed to load fulfillment items"})
+		apperror.Respond(c, err)
 		return
 	}
 	if len(items) == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "not_found", "message": "no fulfillment items found"})
+		apperror.RespondNotFound(c, "not_found")
 		return
 	}
 	if len(items) != len(input.IDs) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": "some selected items were not found or are not confirmed"})
+		apperror.RespondValidation(c, "some selected items were not found or are not confirmed")
 		return
 	}
 
 	pdfBytes, err := BuildDeliveryNotesPDF(items)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "pdf_error", "message": "failed to generate pdf"})
+		apperror.Respond(c, apperror.Internal("pdf_error"))
 		return
 	}
 

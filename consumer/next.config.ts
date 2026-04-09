@@ -2,8 +2,10 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   outputFileTracingRoot: path.resolve(__dirname),
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: "https",
@@ -25,7 +27,35 @@ const nextConfig: NextConfig = {
         protocol: "http",
         hostname: "192.168.0.41",
       },
+      {
+        protocol: "https",
+        hostname: "placehold.co",
+      },
+      {
+        protocol: "https",
+        hostname: "s3.konvy.com",
+      },
+      {
+        protocol: "https",
+        hostname: "media.allonline.7eleven.co.th",
+      },
     ],
+  },
+  async rewrites() {
+    return [
+      {
+        source: "/api/:path*",
+        destination: "http://127.0.0.1:30400/api/:path*",
+      },
+      {
+        source: "/auth/:path*",
+        destination: "http://127.0.0.1:30400/auth/:path*",
+      },
+      {
+        source: "/media/:path*",
+        destination: "http://127.0.0.1:30400/media/:path*",
+      },
+    ];
   },
 };
 

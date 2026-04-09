@@ -4,6 +4,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
+	"saversure/internal/apperror"
 )
 
 type Handler struct {
@@ -25,7 +27,7 @@ func (h *Handler) Request(c *gin.Context) {
 
 	otpID, refCode, err := h.svc.RequestOTP(c.Request.Context(), body.Phone)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -48,7 +50,7 @@ func (h *Handler) Verify(c *gin.Context) {
 
 	ok, err := h.svc.VerifyOTP(c.Request.Context(), body.OTPID, body.OTPCode)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 

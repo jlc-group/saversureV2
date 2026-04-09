@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import { api } from "@/lib/api";
 
 interface Factory {
@@ -109,7 +110,7 @@ export default function FactoriesPage() {
       fetchData();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed";
-      alert(msg);
+      toast.error(msg);
     }
   };
 
@@ -138,7 +139,7 @@ export default function FactoriesPage() {
       await api.patch(`/api/v1/factories/${f.id}`, { status: newStatus });
       fetchData();
     } catch {
-      alert("Failed");
+      toast.error("Failed");
     } finally {
       setActionId(null);
     }
@@ -151,7 +152,7 @@ export default function FactoriesPage() {
       await api.delete(`/api/v1/factories/${id}`);
       fetchData();
     } catch {
-      alert("Failed to delete");
+      toast.error("Failed to delete");
     } finally {
       setActionId(null);
     }
@@ -192,7 +193,7 @@ export default function FactoriesPage() {
       await refreshProductPanel();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed";
-      alert(msg);
+      toast.error(msg);
     } finally {
       setAssignLoading(false);
     }
@@ -205,7 +206,7 @@ export default function FactoriesPage() {
       await api.delete(`/api/v1/factories/${productPanelFactory.id}/products/${productId}`);
       await refreshProductPanel();
     } catch {
-      alert("Failed");
+      toast.error("Failed");
     }
   };
 

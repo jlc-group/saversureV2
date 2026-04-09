@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { type ReactElement } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface MenuItem {
@@ -14,7 +15,7 @@ interface FeatureMenuProps {
   items?: MenuItem[];
 }
 
-const iconMap: Record<string, JSX.Element> = {
+const iconMap: Record<string, ReactElement> = {
   scan: (
     <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
       <path d="M9.5 6.5v3h-3v-3h3M11 5H5v6h6V5zm-1.5 9.5v3h-3v-3h3M11 13H5v6h6v-6zm6.5-6.5v3h-3v-3h3M19 5h-6v6h6V5z" />
@@ -58,14 +59,14 @@ const iconMap: Record<string, JSX.Element> = {
 };
 
 const colorClasses = [
-  "bg-green-50 text-[var(--jh-green)]",
-  "bg-amber-50 text-amber-600",
-  "bg-blue-50 text-blue-600",
-  "bg-purple-50 text-purple-600",
-  "bg-rose-50 text-rose-600",
-  "bg-teal-50 text-teal-600",
-  "bg-orange-50 text-orange-600",
-  "bg-indigo-50 text-indigo-600",
+  "bg-gradient-to-br from-green-100 to-teal-50 text-[var(--jh-green)]",
+  "bg-gradient-to-br from-amber-100 to-yellow-50 text-amber-600",
+  "bg-gradient-to-br from-blue-100 to-indigo-50 text-blue-600",
+  "bg-gradient-to-br from-purple-100 to-pink-50 text-purple-600",
+  "bg-gradient-to-br from-rose-100 to-orange-50 text-rose-600",
+  "bg-gradient-to-br from-teal-100 to-cyan-50 text-teal-600",
+  "bg-gradient-to-br from-orange-100 to-amber-50 text-orange-600",
+  "bg-gradient-to-br from-indigo-100 to-violet-50 text-indigo-600",
 ];
 
 export default function FeatureMenu({
@@ -79,14 +80,14 @@ export default function FeatureMenu({
       <Card className="border-0 shadow-md">
         <CardContent className="p-3">
           <div
-            className="grid gap-1"
+            className="grid gap-1 stagger-children"
             style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
           >
             {items.map((item, idx) => (
               <Link
                 key={item.link + idx}
                 href={item.link}
-                className="flex flex-col items-center gap-1.5 rounded-xl py-3 transition active:bg-muted"
+                className="card-playful flex flex-col items-center gap-1.5 rounded-xl py-3 transition hover:scale-105 active:bg-muted"
               >
                 <div
                   className={`flex h-11 w-11 items-center justify-center rounded-xl ${colorClasses[idx % colorClasses.length]}`}

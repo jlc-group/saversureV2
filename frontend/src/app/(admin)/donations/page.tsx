@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import toast from "react-hot-toast";
+import { api, mediaUrl } from "@/lib/api";
 import { ImageUpload } from "@/components/ui/image-upload";
 
 interface Donation {
@@ -84,7 +85,7 @@ export default function DonationsPage() {
       fetchData();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed";
-      alert(msg);
+      toast.error(msg);
     }
   };
 
@@ -107,7 +108,7 @@ export default function DonationsPage() {
       await api.patch(`/api/v1/donations/${d.id}`, { status: "ended" });
       fetchData();
     } catch {
-      alert("Failed");
+      toast.error("Failed");
     } finally {
       setActionId(null);
     }
@@ -120,7 +121,7 @@ export default function DonationsPage() {
       await api.patch(`/api/v1/donations/${d.id}`, { status: "cancelled" });
       fetchData();
     } catch {
-      alert("Failed");
+      toast.error("Failed");
     } finally {
       setActionId(null);
     }
@@ -281,7 +282,7 @@ export default function DonationsPage() {
                       <div className="flex items-center gap-3">
                         {d.image_url ? (
                           <img
-                            src={d.image_url}
+                            src={mediaUrl(d.image_url) || ""}
                             alt={d.title}
                             className="w-9 h-9 rounded-[var(--md-radius-sm)] object-cover"
                           />
