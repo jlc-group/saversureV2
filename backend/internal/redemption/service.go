@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -116,6 +117,11 @@ func (s *Service) loadRewardMeta(ctx context.Context, tx pgx.Tx, tenantID, rewar
 }
 
 func (s *Service) getAddressByID(ctx context.Context, tx pgx.Tx, tenantID, userID, addressID string) (*shippingAddress, error) {
+	// Validate UUID format before querying database
+	if _, err := uuid.Parse(addressID); err != nil {
+		return nil, nil // Return nil to trigger address not found flow
+	}
+
 	var addr shippingAddress
 	err := tx.QueryRow(ctx,
 		`SELECT id, recipient_name, phone, address_line1, address_line2, district, sub_district, province, postal_code
@@ -407,9 +413,15 @@ func (s *Service) Confirm(ctx context.Context, tenantID, userID, reservationID s
 
 	if time.Now().After(r.ExpiresAt) {
 		// Expired: release the reservation
-		s.inventorySvc.ReleaseReservation(ctx, tx, r.RewardID)
-		tx.Exec(ctx, `UPDATE reward_reservations SET status = 'EXPIRED' WHERE id = $1`, r.ID)
-		tx.Commit(ctx)
+		if err := s.inventorySvc.ReleaseReservation(ctx, tx, r.RewardID); err != nil {
+			return nil, fmt.Errorf("release expired reservation inventory: %w", err)
+		}
+		if _, err := tx.Exec(ctx, `UPDATE reward_reservations SET status = 'EXPIRED' WHERE id = $1`, r.ID); err != nil {
+			return nil, fmt.Errorf("mark reservation expired: %w", err)
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return nil, fmt.Errorf("commit expired reservation: %w", err)
+		}
 		return nil, ErrReservationExpired
 	}
 

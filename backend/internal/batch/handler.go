@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"saversure/internal/apperror"
 	"saversure/pkg/codegen"
 )
 
@@ -24,13 +25,13 @@ func NewHandler(svc *Service, db *pgxpool.Pool) *Handler {
 func (h *Handler) Create(c *gin.Context) {
 	var input CreateInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
 	batch, err := h.svc.Create(c.Request.Context(), c.GetString("tenant_id"), c.GetString("user_id"), input)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -40,7 +41,7 @@ func (h *Handler) Create(c *gin.Context) {
 func (h *Handler) List(c *gin.Context) {
 	batches, err := h.svc.List(c.Request.Context(), c.GetString("tenant_id"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error"})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -52,13 +53,13 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 		Status string `json:"status" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
 	batch, err := h.svc.UpdateStatus(c.Request.Context(), c.GetString("tenant_id"), c.Param("id"), input.Status)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_transition", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -70,13 +71,13 @@ func (h *Handler) Recall(c *gin.Context) {
 		Reason string `json:"reason" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
 	batch, err := h.svc.Recall(c.Request.Context(), c.GetString("tenant_id"), c.Param("id"), input.Reason, c.GetString("user_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "recall_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -194,7 +195,7 @@ func (h *Handler) Export(c *gin.Context) {
 		}
 		records, err := h.svc.ExportCodes(c.Request.Context(), tenantID, batchID, tenantSettings, campaignSettings, opts)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "export_failed", "message": err.Error()})
+			apperror.Respond(c, err)
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{

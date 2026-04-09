@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import RichTextEditor from "@/components/RichTextEditor";
 import { ImageUpload } from "@/components/ui/image-upload";
+import toast from "react-hot-toast";
 
 interface PopupItem {
   id: string;
@@ -86,7 +87,7 @@ export default function PopupManagerPage() {
       setForm(emptyForm);
       fetchData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed");
+      toast.error(err instanceof Error ? err.message : "Failed");
     }
   };
 
@@ -114,7 +115,7 @@ export default function PopupManagerPage() {
       await api.patch(`/api/v1/popups/${item.id}`, { status: newStatus });
       fetchData();
     } catch {
-      alert("Failed");
+      toast.error("Failed");
     } finally {
       setActionId(null);
     }
@@ -127,7 +128,7 @@ export default function PopupManagerPage() {
       await api.delete(`/api/v1/popups/${id}`);
       fetchData();
     } catch {
-      alert("Failed");
+      toast.error("Failed");
     } finally {
       setActionId(null);
     }

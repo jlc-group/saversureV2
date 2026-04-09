@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import toast from "react-hot-toast";
 
 interface Tier {
   id: string;
@@ -66,7 +67,7 @@ export default function TiersPage() {
       setForm(emptyForm);
       fetchTiers();
     } catch {
-      alert("Failed to save tier");
+      toast.error("Failed to save tier");
     } finally {
       setSubmitting(false);
     }
@@ -96,7 +97,7 @@ export default function TiersPage() {
       await api.patch(`/api/v1/tiers/${t.id}`, { active: !t.active });
       fetchTiers();
     } catch {
-      alert("Failed to update");
+      toast.error("Failed to update");
     } finally {
       setActionId(null);
     }
@@ -109,7 +110,7 @@ export default function TiersPage() {
       await api.delete(`/api/v1/tiers/${id}`);
       fetchTiers();
     } catch {
-      alert("Failed to delete");
+      toast.error("Failed to delete");
     } finally {
       setActionId(null);
     }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 import { api } from "@/lib/api";
 
 interface Customer {
@@ -12,6 +13,7 @@ interface Customer {
   display_name: string | null;
   first_name: string | null;
   last_name: string | null;
+  avatar_url: string | null;
   status: string;
   province: string | null;
   occupation: string | null;
@@ -68,7 +70,7 @@ export default function CustomersPage() {
     try {
       await api.patch(`/api/v1/customers/${id}`, { status });
       fetchData();
-    } catch { alert("Failed to update"); } finally { setActionId(null); }
+    } catch { toast.error("Failed to update"); } finally { setActionId(null); }
   };
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
@@ -131,7 +133,7 @@ export default function CustomersPage() {
                 >
                   <td className="px-5 py-3">
                     <div
-                      className="cursor-pointer"
+                      className="flex items-center gap-3 cursor-pointer"
                       onClick={(e) => {
                         e.stopPropagation();
                         router.push(`/customers/${c.id}`);
@@ -146,8 +148,21 @@ export default function CustomersPage() {
                       role="link"
                       tabIndex={0}
                     >
-                      <p className="text-[13px] font-medium text-[var(--md-primary)] hover:underline">{name || "—"}</p>
-                      <p className="text-[11px] text-[var(--md-on-surface-variant)]">{c.email || "—"}</p>
+                      {c.avatar_url ? (
+                        <img
+                          src={c.avatar_url}
+                          alt={name || ""}
+                          className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-[var(--md-surface-container)] flex items-center justify-center text-[12px] font-medium text-[var(--md-on-surface-variant)] flex-shrink-0">
+                          {(name || "?").charAt(0)}
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-[13px] font-medium text-[var(--md-primary)] hover:underline">{name || "—"}</p>
+                        <p className="text-[11px] text-[var(--md-on-surface-variant)]">{c.email || "—"}</p>
+                      </div>
                     </div>
                   </td>
                   <td className="px-5 py-3 text-[13px] text-[var(--md-on-surface-variant)]">{c.phone || "—"}</td>

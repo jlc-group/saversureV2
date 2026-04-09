@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"saversure/internal/apperror"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -30,7 +32,7 @@ func (h *Handler) List(c *gin.Context) {
 		Offset: offset,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": items, "total": total})
@@ -43,7 +45,7 @@ func (h *Handler) ListPublished(c *gin.Context) {
 
 	items, err := h.svc.ListPublished(c.Request.Context(), tenantID, newsType, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": items})
@@ -55,7 +57,7 @@ func (h *Handler) GetByID(c *gin.Context) {
 
 	n, err := h.svc.GetByID(c.Request.Context(), tenantID, id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		apperror.RespondNotFound(c, "not_found")
 		return
 	}
 	c.JSON(http.StatusOK, n)
@@ -65,14 +67,14 @@ func (h *Handler) Create(c *gin.Context) {
 	tenantID := c.GetString("tenant_id")
 	var input CreateInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	input.TenantID = tenantID
 
 	n, err := h.svc.Create(c.Request.Context(), input)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, n)
@@ -84,13 +86,13 @@ func (h *Handler) Update(c *gin.Context) {
 
 	var input UpdateInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
 	n, err := h.svc.Update(c.Request.Context(), tenantID, id, input)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, n)
@@ -101,7 +103,7 @@ func (h *Handler) Delete(c *gin.Context) {
 	id := c.Param("id")
 
 	if err := h.svc.Delete(c.Request.Context(), tenantID, id); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})

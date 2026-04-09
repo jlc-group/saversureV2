@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"saversure/internal/apperror"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -23,7 +25,7 @@ func (h *Handler) List(c *gin.Context) {
 
 	items, total, unread, err := h.svc.ListForUser(c.Request.Context(), userID, limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": items, "total": total, "unread": unread})
@@ -34,7 +36,7 @@ func (h *Handler) UnreadCount(c *gin.Context) {
 
 	count, err := h.svc.UnreadCount(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"unread": count})
@@ -45,7 +47,7 @@ func (h *Handler) MarkRead(c *gin.Context) {
 	notifID := c.Param("id")
 
 	if err := h.svc.MarkRead(c.Request.Context(), userID, notifID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "marked as read"})
@@ -55,7 +57,7 @@ func (h *Handler) MarkAllRead(c *gin.Context) {
 	userID := c.GetString("user_id")
 
 	if err := h.svc.MarkAllRead(c.Request.Context(), userID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "all marked as read"})

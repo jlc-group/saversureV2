@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import toast from "react-hot-toast";
 import { api } from "@/lib/api";
 
 const EMOJI_GROUPS: { label: string; emojis: string[] }[] = [
@@ -75,7 +76,7 @@ export default function CurrenciesPage() {
       setEditingId(null);
       setForm(emptyForm);
       fetchCurrencies();
-    } catch { alert("Failed to save currency"); }
+    } catch { toast.error("Failed to save currency"); }
     finally { setSubmitting(false); }
   };
 
@@ -97,7 +98,7 @@ export default function CurrenciesPage() {
   const handleToggleActive = async (c: Currency) => {
     setActionId(c.id);
     try { await api.patch(`/api/v1/currencies/${c.id}`, { active: !c.active }); fetchCurrencies(); }
-    catch { alert("Failed to update"); }
+    catch { toast.error("Failed to update"); }
     finally { setActionId(null); }
   };
 
@@ -105,7 +106,7 @@ export default function CurrenciesPage() {
     if (!confirm("Delete this currency?")) return;
     setActionId(id);
     try { await api.delete(`/api/v1/currencies/${id}`); fetchCurrencies(); }
-    catch { alert("Failed to delete"); }
+    catch { toast.error("Failed to delete"); }
     finally { setActionId(null); }
   };
 
@@ -116,9 +117,9 @@ export default function CurrenciesPage() {
       const result = await api.post<{ users_affected: number; total_converted: number; points_credited: number }>(
         `/api/v1/currencies/${c.code}/convert`, {}
       );
-      alert(`แปลงสำเร็จ!\n\nUsers: ${result.users_affected}\nConverted: ${result.total_converted} ${c.code}\nPoints credited: ${result.points_credited}`);
+      toast.success(`แปลงสำเร็จ!\n\nUsers: ${result.users_affected}\nConverted: ${result.total_converted} ${c.code}\nPoints credited: ${result.points_credited}`);
       fetchCurrencies();
-    } catch (err) { alert(err instanceof Error ? err.message : "Conversion failed"); }
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Conversion failed"); }
     finally { setConverting(null); }
   };
 

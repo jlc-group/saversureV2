@@ -4,6 +4,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
+	"saversure/internal/apperror"
 )
 
 type Handler struct {
@@ -17,13 +19,13 @@ func NewHandler(svc *Service) *Handler {
 func (h *Handler) Create(c *gin.Context) {
 	var input CreateInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
 	t, err := h.svc.Create(c.Request.Context(), input)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -33,7 +35,7 @@ func (h *Handler) Create(c *gin.Context) {
 func (h *Handler) List(c *gin.Context) {
 	tenants, err := h.svc.List(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error"})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -71,12 +73,12 @@ func (h *Handler) UpdateCurrent(c *gin.Context) {
 	}
 	var input UpdateInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 	t, err := h.svc.Update(c.Request.Context(), tenantID, input)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, t)
@@ -104,13 +106,13 @@ func (h *Handler) Update(c *gin.Context) {
 	id := c.Param("id")
 	var input UpdateInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
 	t, err := h.svc.Update(c.Request.Context(), id, input)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 

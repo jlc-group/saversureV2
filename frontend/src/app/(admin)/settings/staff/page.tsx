@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import toast from "react-hot-toast";
 
 interface StaffUser {
   id: string;
@@ -199,7 +200,7 @@ export default function StaffPage() {
       setInviteForm({ email: "", password: "", first_name: "", last_name: "", role: "brand_staff", factory_id: "" });
       fetchData();
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Failed");
+      toast.error(err instanceof Error ? err.message : "Failed");
     }
   };
 
@@ -209,7 +210,7 @@ export default function StaffPage() {
     try {
       await api.patch(`/api/v1/staff/${id}`, { status: newStatus });
       fetchData();
-    } catch { alert("Failed to update"); }
+    } catch { toast.error("Failed to update"); }
     finally { setActionId(null); }
   };
 
@@ -219,7 +220,7 @@ export default function StaffPage() {
     try {
       await api.delete(`/api/v1/staff/${id}`);
       fetchData();
-    } catch { alert("Failed to delete"); }
+    } catch { toast.error("Failed to delete"); }
     finally { setActionId(null); }
   };
 

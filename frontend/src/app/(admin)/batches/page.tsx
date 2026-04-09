@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import toast from "react-hot-toast";
 import { api } from "@/lib/api";
 
 interface Batch {
@@ -63,6 +64,8 @@ export default function BatchesPage() {
   const [form, setForm] = useState({ campaign_id: "", prefix: "", quantity: 10000, codes_per_roll: 10000, product_id: "", factory_id: "" });
   const [submitting, setSubmitting] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const fetchBatches = async () => {
     try {
@@ -110,7 +113,7 @@ export default function BatchesPage() {
       setShowForm(false);
       setForm({ campaign_id: "", prefix: "", quantity: 10000, codes_per_roll: 10000, product_id: "", factory_id: "" });
       fetchBatches();
-    } catch { alert("Failed to create batch"); } finally { setSubmitting(false); }
+    } catch { toast.error("Failed to create batch"); } finally { setSubmitting(false); }
   };
 
   const handleUpdateStatus = async (batch: Batch) => {
@@ -121,7 +124,7 @@ export default function BatchesPage() {
     try {
       await api.patch(`/api/v1/batches/${batch.id}/status`, { status: nextStatus });
       fetchBatches();
-    } catch { alert("Failed to update status"); } finally { setActionId(null); }
+    } catch { toast.error("Failed to update status"); } finally { setActionId(null); }
   };
 
   const handleRecall = async (batch: Batch) => {
@@ -131,8 +134,24 @@ export default function BatchesPage() {
     try {
       await api.post(`/api/v1/batches/${batch.id}/recall`, { reason });
       fetchBatches();
-    } catch { alert("Failed to recall batch"); } finally { setActionId(null); }
+    } catch { toast.error("Failed to recall batch"); } finally { setActionId(null); }
   };
+
+  const campaignMap = Object.fromEntries(campaigns.map((c) => [c.id, c.name]));
+
+  const filteredBatches = batches.filter((b) => {
+    if (statusFilter !== "all" && b.status !== statusFilter) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      const campaignName = campaignMap[b.campaign_id] || "";
+      if (
+        !b.prefix.toLowerCase().includes(q) &&
+        !campaignName.toLowerCase().includes(q) &&
+        !(b.product_name || "").toLowerCase().includes(q)
+      ) return false;
+    }
+    return true;
+  });
 
   const fieldClass = "w-full h-[48px] px-4 border border-[var(--md-outline)] rounded-[var(--md-radius-sm)] text-[14px] text-[var(--md-on-surface)] bg-transparent outline-none focus:border-[var(--md-primary)] focus:border-2 transition-all duration-200";
 
@@ -215,6 +234,33 @@ export default function BatchesPage() {
         </div>
       )}
 
+      {/* Search & Filter */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className="relative flex-1 max-w-[360px]">
+          <svg viewBox="0 0 24 24" fill="currentColor" className="absolute left-3 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-[var(--md-on-surface-variant)] pointer-events-none">
+            <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+          </svg>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="ค้นหา batch..."
+            className="w-full h-[40px] pl-10 pr-4 border border-[var(--md-outline-variant)] rounded-[var(--md-radius-sm)] text-[14px] text-[var(--md-on-surface)] bg-[var(--md-surface)] outline-none focus:border-[var(--md-primary)] focus:border-2 transition-all duration-200"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="h-[40px] px-4 border border-[var(--md-outline-variant)] rounded-[var(--md-radius-sm)] text-[14px] text-[var(--md-on-surface)] bg-[var(--md-surface)] outline-none focus:border-[var(--md-primary)] focus:border-2 transition-all duration-200"
+        >
+          <option value="all">All statuses</option>
+          <option value="generated">Generated</option>
+          <option value="printed">Printed</option>
+          <option value="distributed">Distributed</option>
+          <option value="recalled">Recalled</option>
+        </select>
+      </div>
+
       {/* Table */}
       <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 overflow-x-auto">
         <table className="w-full min-w-[800px]">
@@ -232,10 +278,10 @@ export default function BatchesPage() {
           <tbody>
             {loading ? (
               <tr><td colSpan={7} className="px-6 py-12 text-center"><div className="inline-flex items-center gap-3 text-[var(--md-on-surface-variant)]"><svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Loading...</div></td></tr>
-            ) : batches.length === 0 ? (
-              <tr><td colSpan={7} className="px-6 py-12 text-center"><div className="text-[var(--md-on-surface-variant)]"><svg viewBox="0 0 24 24" fill="currentColor" className="w-12 h-12 mx-auto mb-3 opacity-30"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z" /></svg><p className="text-[14px]">No batches yet</p></div></td></tr>
+            ) : filteredBatches.length === 0 ? (
+              <tr><td colSpan={7} className="px-6 py-12 text-center"><div className="text-[var(--md-on-surface-variant)]"><svg viewBox="0 0 24 24" fill="currentColor" className="w-12 h-12 mx-auto mb-3 opacity-30"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z" /></svg><p className="text-[14px]">{search || statusFilter !== "all" ? "No matching batches" : "No batches yet"}</p></div></td></tr>
             ) : (
-              batches.map((b) => {
+              filteredBatches.map((b) => {
                 const s = statusStyle[b.status] || statusStyle.generated;
                 const nextStatus = statusTransitions[b.status];
                 const rollCount = Math.ceil(b.code_count / 10000);

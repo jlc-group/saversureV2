@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { ImageUpload } from "@/components/ui/image-upload";
+import toast from "react-hot-toast";
 
 interface LDCampaign {
   id: string;
@@ -77,7 +78,7 @@ export default function LuckyDrawPage() {
     draw_date: "",
   };
 
-  const prizeFormInit = { name: "", description: "", quantity: 1, prize_order: 0 };
+  const prizeFormInit = { name: "", description: "", image_url: "", quantity: 1, prize_order: 0 };
   const [campaignForm, setCampaignForm] = useState(campaignFormInit);
   const [prizeForm, setPrizeForm] = useState(prizeFormInit);
 
@@ -144,7 +145,7 @@ export default function LuckyDrawPage() {
       fetchCampaigns();
       if (editingId === selectedId) fetchDetail(selectedId!);
     } catch {
-      alert("Failed to save campaign");
+      toast.error("Failed to save campaign");
     } finally {
       setSubmitting(false);
     }
@@ -155,12 +156,15 @@ export default function LuckyDrawPage() {
     if (!selectedId) return;
     setSubmitting(true);
     try {
-      await api.post(`/api/v1/lucky-draw/${selectedId}/prizes`, prizeForm);
+      await api.post(`/api/v1/lucky-draw/${selectedId}/prizes`, {
+        ...prizeForm,
+        image_url: prizeForm.image_url || null,
+      });
       setShowPrizeForm(false);
       setPrizeForm(prizeFormInit);
       fetchDetail(selectedId);
     } catch {
-      alert("Failed to add prize");
+      toast.error("Failed to add prize");
     } finally {
       setSubmitting(false);
     }
@@ -173,7 +177,7 @@ export default function LuckyDrawPage() {
       await api.delete(`/api/v1/lucky-draw/${selectedId}/prizes/${prizeId}`);
       fetchDetail(selectedId);
     } catch {
-      alert("Failed to delete prize");
+      toast.error("Failed to delete prize");
     } finally {
       setActionId(null);
     }
@@ -188,7 +192,7 @@ export default function LuckyDrawPage() {
       fetchDetail(selectedId);
       fetchCampaigns();
     } catch {
-      alert("Failed to draw winners");
+      toast.error("Failed to draw winners");
     } finally {
       setDrawing(false);
     }
@@ -202,7 +206,7 @@ export default function LuckyDrawPage() {
       fetchCampaigns();
       if (selectedId === id) fetchDetail(id);
     } catch {
-      alert("Failed to activate");
+      toast.error("Failed to activate");
     } finally {
       setActionId(null);
     }
@@ -216,7 +220,7 @@ export default function LuckyDrawPage() {
       fetchCampaigns();
       if (selectedId === id) fetchDetail(id);
     } catch {
-      alert("Failed to end campaign");
+      toast.error("Failed to end campaign");
     } finally {
       setActionId(null);
     }
@@ -258,7 +262,7 @@ export default function LuckyDrawPage() {
               {" · "}{campaign.ticket_count} tickets · {campaign.prize_count} prizes
             </p>
           </div>
-          {(campaign.status === "draft" || campaign.status === "active") && (
+          {(campaign.status === "draft" || campaign.status === "active" || campaign.status === "announced") && (
             <button
               onClick={() => handleEdit(campaign)}
               className="h-[40px] px-6 bg-[var(--md-primary)] text-white rounded-[var(--md-radius-xl)] text-[14px] font-medium hover:bg-[var(--md-primary-dark)] transition-all duration-200"
@@ -351,14 +355,14 @@ export default function LuckyDrawPage() {
                 </div>
               </div>
               {campaign.description && (
-                <p className="text-[14px] text-[var(--md-on-surface-variant)] mt-4">{campaign.description}</p>
+                <div className="text-[14px] text-[var(--md-on-surface-variant)] mt-4 max-h-[200px] overflow-y-auto" dangerouslySetInnerHTML={{ __html: campaign.description }} />
               )}
             </div>
 
             <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 p-6 mb-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-[16px] font-medium text-[var(--md-on-surface)] tracking-[0.1px]">Prizes</h2>
-                {campaign.status === "draft" && (
+                {(campaign.status === "draft" || campaign.status === "active") && (
                   <button
                     onClick={() => setShowPrizeForm(!showPrizeForm)}
                     className="h-[40px] px-4 text-[14px] font-medium text-[var(--md-primary)] bg-[var(--md-primary-light)] rounded-[var(--md-radius-xl)] hover:opacity-80 transition-all duration-200"
@@ -385,6 +389,13 @@ export default function LuckyDrawPage() {
                     <div>
                       <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5 tracking-[0.4px] uppercase">Order</label>
                       <input type="number" value={prizeForm.prize_order} onChange={(e) => setPrizeForm({ ...prizeForm, prize_order: parseInt(e.target.value) || 0 })} className={fieldClass} />
+                    </div>
+                    <div className="md:col-span-2">
+                      <ImageUpload
+                        value={prizeForm.image_url}
+                        onChange={(url) => setPrizeForm({ ...prizeForm, image_url: url })}
+                        label="รูปภาพรางวัล"
+                      />
                     </div>
                   </div>
                   <button type="submit" disabled={submitting} className="h-[40px] px-6 bg-[var(--md-primary)] text-white rounded-[var(--md-radius-xl)] text-[14px] font-medium hover:bg-[var(--md-primary-dark)] disabled:opacity-60 transition-all duration-200">
@@ -569,7 +580,20 @@ export default function LuckyDrawPage() {
             <tr className="border-b border-[var(--md-outline-variant)]">
               <th className="text-left px-6 py-3.5 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Title</th>
               <th className="text-left px-6 py-3.5 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Cost (pts)</th>
-              <th className="text-left px-6 py-3.5 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Tickets</th>
+              <th className="text-left px-6 py-3.5 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">
+                <div className="flex items-center gap-1 group relative">
+                  <span>Tickets</span>
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
+                    <div className="bg-gray-800 text-white text-[11px] rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
+                      <div className="font-medium mb-1">จำนวนใบที่ขายไปแล้ว</div>
+                      <div className="text-gray-300 text-[10px]">จากทุกคนที่ซื้อ tickets ไปแล้วทั้งหมด</div>
+                    </div>
+                  </div>
+                  <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              </th>
               <th className="text-left px-6 py-3.5 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Prizes</th>
               <th className="text-left px-6 py-3.5 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Status</th>
               <th className="text-left px-6 py-3.5 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Draw Date</th>
@@ -601,6 +625,11 @@ export default function LuckyDrawPage() {
                         <button onClick={() => setSelectedId(c.id)} className="h-[26px] px-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] bg-[var(--md-surface-container)] rounded-[var(--md-radius-sm)] hover:bg-[var(--md-surface-container-high)] transition-all duration-200">
                           View
                         </button>
+                        {c.status !== "ended" && (
+                          <button onClick={() => handleEdit(c)} className="h-[26px] px-3 text-[12px] font-medium text-[var(--md-primary)] bg-[var(--md-primary-light)] rounded-[var(--md-radius-sm)] hover:opacity-90 transition-all duration-200">
+                            Edit
+                          </button>
+                        )}
                         {c.status === "draft" && (
                           <button onClick={() => handleActivate(c.id)} disabled={actionId === c.id} className="h-[26px] px-3 text-[12px] font-medium text-white bg-[var(--md-success)] rounded-[var(--md-radius-sm)] hover:opacity-90 disabled:opacity-50 transition-all duration-200">
                             {actionId === c.id ? "..." : "Activate"}

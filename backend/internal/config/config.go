@@ -4,22 +4,24 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
 type Config struct {
-	App       AppConfig
-	DB        DBConfig
-	LegacyV1  DBConfig
-	Redis     RedisConfig
-	NATS      NATSConfig
-	JWT       JWTConfig
-	MinIO     MinIOConfig
-	SMS       SMSConfig
-	HMAC      HMACConfig
-	RateLimit RateLimitConfig
-	LINE      LINEConfig
-	Google    GoogleConfig
+	App         AppConfig
+	DB          DBConfig
+	LegacyV1    DBConfig
+	Redis       RedisConfig
+	NATS        NATSConfig
+	JWT         JWTConfig
+	MinIO       MinIOConfig
+	SMS         SMSConfig
+	HMAC        HMACConfig
+	RateLimit   RateLimitConfig
+	LINE        LINEConfig
+	Google      GoogleConfig
+	CORSOrigins []string
 }
 
 type LINEConfig struct {
@@ -102,6 +104,8 @@ type RateLimitConfig struct {
 	Scan     int
 	Redeem   int
 	Transfer int
+	Upload   int
+	Export   int
 }
 
 func Load() (*Config, error) {
@@ -166,6 +170,8 @@ func Load() (*Config, error) {
 			Scan:     getEnvInt("RATE_LIMIT_SCAN", 10),
 			Redeem:   getEnvInt("RATE_LIMIT_REDEEM", 5),
 			Transfer: getEnvInt("RATE_LIMIT_TRANSFER", 3),
+			Upload:   getEnvInt("RATE_LIMIT_UPLOAD", 20),
+			Export:   getEnvInt("RATE_LIMIT_EXPORT", 10),
 		},
 		LINE: LINEConfig{
 			ChannelID:     getEnv("LINE_CHANNEL_ID", ""),
@@ -176,6 +182,15 @@ func Load() (*Config, error) {
 			ClientID:     getEnv("GOOGLE_CLIENT_ID", ""),
 			GeminiAPIKey: getEnv("GEMINI_API_KEY", ""),
 		},
+	}
+
+	// Parse CORS origins (comma-separated)
+	if origins := getEnv("CORS_ORIGINS", ""); origins != "" {
+		for _, o := range strings.Split(origins, ",") {
+			if trimmed := strings.TrimSpace(o); trimmed != "" {
+				cfg.CORSOrigins = append(cfg.CORSOrigins, trimmed)
+			}
+		}
 	}
 
 	if cfg.DB.Password == "" {

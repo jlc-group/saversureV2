@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import { api } from "@/lib/api";
 
 interface APIKey {
@@ -71,7 +72,7 @@ export default function APIKeysPage() {
       setRawKeyModal(res);
       fetchKeys();
     } catch {
-      alert("Failed to create API key");
+      toast.error("Failed to create API key");
     } finally {
       setSubmitting(false);
     }
@@ -92,7 +93,7 @@ export default function APIKeysPage() {
       setRevokeTarget(null);
       fetchKeys();
     } catch {
-      alert("Failed to revoke");
+      toast.error("Failed to revoke");
     } finally {
       setActionId(null);
     }
@@ -105,7 +106,7 @@ export default function APIKeysPage() {
       await api.delete(`/api/v1/api-keys/${id}`);
       fetchKeys();
     } catch {
-      alert("Failed to delete");
+      toast.error("Failed to delete");
     } finally {
       setActionId(null);
     }

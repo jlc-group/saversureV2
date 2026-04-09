@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"saversure/internal/apperror"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -18,7 +20,7 @@ func NewHandler(svc *Service) *Handler {
 func (h *Handler) GetBalance(c *gin.Context) {
 	balance, err := h.svc.GetBalance(c.Request.Context(), c.GetString("tenant_id"), c.GetString("user_id"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error"})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -31,7 +33,7 @@ func (h *Handler) GetHistory(c *gin.Context) {
 
 	entries, err := h.svc.GetHistory(c.Request.Context(), c.GetString("tenant_id"), c.GetString("user_id"), limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -48,13 +50,13 @@ func (h *Handler) RefundPoints(c *gin.Context) {
 		Reason string `json:"reason" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
 	entry, err := h.svc.RefundPoints(c.Request.Context(), tenantID, input.UserID, input.Amount, input.Reason, adminUserID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, entry)

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import toast from "react-hot-toast";
 
 const TIME_OPTIONS = (() => {
   const opts: string[] = [];
@@ -134,7 +135,7 @@ export default function PromotionsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (form.bonus_rules.length === 0) { alert("กรุณาเพิ่ม Bonus Rule อย่างน้อย 1 รายการ"); return; }
+    if (form.bonus_rules.length === 0) { toast.error("กรุณาเพิ่ม Bonus Rule อย่างน้อย 1 รายการ"); return; }
     setSubmitting(true);
     try {
       const payload = {
@@ -161,13 +162,13 @@ export default function PromotionsPage() {
       setForm(emptyForm);
       setEditId(null);
       fetchAll();
-    } catch (err) { alert(err instanceof Error ? err.message : "Failed"); }
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Failed"); }
     finally { setSubmitting(false); }
   };
 
   const handleAction = async (id: string, action: string, body?: object) => {
     try { await api.post(`/api/v1/promotions/${id}/${action}`, body || {}); fetchAll(); }
-    catch (err) { alert(err instanceof Error ? err.message : `Failed to ${action}`); }
+    catch (err) { toast.error(err instanceof Error ? err.message : `Failed to ${action}`); }
   };
 
   const handleReject = async () => {
@@ -178,7 +179,7 @@ export default function PromotionsPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this promotion?")) return;
-    try { await api.delete(`/api/v1/promotions/${id}`); fetchAll(); } catch { alert("Failed to delete"); }
+    try { await api.delete(`/api/v1/promotions/${id}`); fetchAll(); } catch { toast.error("Failed to delete"); }
   };
 
   // --- Bonus Rules helpers ---

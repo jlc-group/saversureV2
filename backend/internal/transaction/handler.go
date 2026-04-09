@@ -7,6 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"saversure/internal/apperror"
 )
 
 type Handler struct {
@@ -40,7 +42,7 @@ func (h *Handler) List(c *gin.Context) {
 
 	txns, total, err := h.svc.List(c.Request.Context(), tenantID, f)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": txns, "total": total})
@@ -52,7 +54,7 @@ func (h *Handler) Summary(c *gin.Context) {
 
 	counts, err := h.svc.Summary(c.Request.Context(), tenantID, f)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": counts})
@@ -65,7 +67,7 @@ func (h *Handler) ListMine(c *gin.Context) {
 
 	txns, total, err := h.svc.ListMine(c.Request.Context(), tenantID, userID, f)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": txns, "total": total})
@@ -80,13 +82,13 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 		Tracking string `json:"tracking"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
 	txn, err := h.svc.UpdateStatus(c.Request.Context(), tenantID, id, input.Status, input.Tracking)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, txn)
@@ -107,7 +109,7 @@ func (h *Handler) ExportCSV(c *gin.Context) {
 
 	txns, _, err := h.svc.List(c.Request.Context(), tenantID, f)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -116,7 +118,7 @@ func (h *Handler) ExportCSV(c *gin.Context) {
 
 	writer := csv.NewWriter(c.Writer)
 	writer.Write([]string{
-		"ID", "User ID", "User Name", "User Phone", "Reward ID", "Reward Name",
+		"ID", "User ID", "User Name", "User Phone", "Reward ID", "Reward Name", "Reward Image URL",
 		"Status", "Tracking", "Delivery Type", "Coupon Code",
 		"Recipient Name", "Recipient Phone",
 		"Address Line 1", "Address Line 2", "District", "Sub District", "Province", "Postal Code",
@@ -125,7 +127,7 @@ func (h *Handler) ExportCSV(c *gin.Context) {
 	for _, t := range txns {
 		writer.Write([]string{
 			t.ID, t.UserID, ptrStr(t.UserName), ptrStr(t.UserPhone),
-			t.RewardID, ptrStr(t.RewardName),
+			t.RewardID, ptrStr(t.RewardName), ptrStr(t.RewardImageURL),
 			t.Status, ptrStr(t.Tracking), ptrStr(t.DeliveryType), ptrStr(t.CouponCode),
 			ptrStr(t.RecipientName), ptrStr(t.RecipientPhone),
 			ptrStr(t.AddressLine1), ptrStr(t.AddressLine2),

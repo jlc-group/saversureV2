@@ -6,6 +6,23 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// TenantFromHeader extracts tenant_id from X-Tenant-ID header only (no JWT required).
+// Used for public endpoints that need tenant context without authentication.
+func TenantFromHeader() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tenantID := c.GetHeader("X-Tenant-ID")
+		if tenantID == "" {
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
+				"error":   "missing_tenant",
+				"message": "X-Tenant-ID header is required",
+			})
+			return
+		}
+		c.Set("tenant_id", tenantID)
+		c.Next()
+	}
+}
+
 // TenantIsolation extracts tenant_id from the JWT claims (set by auth middleware)
 // and makes it available to downstream handlers. All DB queries should filter by this.
 // super_admin can override the active tenant via X-Tenant-ID header.

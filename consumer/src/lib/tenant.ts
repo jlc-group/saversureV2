@@ -1,5 +1,5 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:30400";
-const ENV_TENANT_ID = process.env.NEXT_PUBLIC_TENANT_ID || "";
+const ENV_TENANT_ID = process.env.NEXT_PUBLIC_TENANT_ID || "00000000-0000-0000-0000-000000000001";
 
 export interface BrandingData {
   tenant_id: string;
@@ -59,21 +59,34 @@ export async function resolveTenant(): Promise<BrandingData | null> {
   if (ENV_TENANT_ID) {
     resolvedTenantId = ENV_TENANT_ID;
     try {
-      const res = await fetch(`${API_BASE}/api/v1/public/branding-by-slug?slug=`, {
+      const brandRes = await fetch(`${API_BASE}/api/v1/public/branding`, {
         headers: { "X-Tenant-ID": ENV_TENANT_ID },
       });
-      if (!res.ok) {
-        const brandRes = await fetch(`${API_BASE}/api/v1/public/branding`, {
-          headers: { "X-Tenant-ID": ENV_TENANT_ID },
-        });
-        if (brandRes.ok) {
-          const data = await brandRes.json();
-          resolvedBranding = { ...data, tenant_id: ENV_TENANT_ID };
-          return resolvedBranding;
-        }
+      if (brandRes.ok) {
+        const data = await brandRes.json();
+        resolvedBranding = { ...data, tenant_id: ENV_TENANT_ID };
+        return resolvedBranding;
       }
     } catch {
       // branding unavailable, use defaults
+    }
+  }
+
+  const host = window.location.hostname.toLowerCase();
+  if (!slug && !ENV_TENANT_ID && (host === "localhost" || host === "127.0.0.1")) {
+    const demoId = "00000000-0000-0000-0000-000000000001";
+    resolvedTenantId = demoId;
+    try {
+      const brandRes = await fetch(`${API_BASE}/api/v1/public/branding`, {
+        headers: { "X-Tenant-ID": demoId },
+      });
+      if (brandRes.ok) {
+        const data = await brandRes.json();
+        resolvedBranding = { ...data, tenant_id: demoId };
+        return resolvedBranding;
+      }
+    } catch {
+      // keep demo tenant id for API headers even if branding fails
     }
   }
 

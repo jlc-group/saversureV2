@@ -8,9 +8,8 @@ import { setToken } from "@/lib/auth";
 import { getTenantId } from "@/lib/tenant";
 import { getPendingScanTarget, setPendingScan } from "@/lib/pendingScan";
 
-const PRIMARY = "#1976d2";
 const inputClass =
-  "w-full h-[48px] px-4 border border-[var(--outline)] rounded-[var(--radius-md)] text-[14px] text-[var(--on-surface)] bg-transparent outline-none focus:border-[#1976d2] focus:border-2 transition-all";
+  "w-full h-[48px] px-4 border border-[var(--outline)] rounded-[var(--radius-md)] text-[14px] text-[var(--on-surface)] bg-transparent outline-none focus:border-[var(--jh-green)] focus:border-2 transition-all";
 
 function formatPhone(phone: string) {
   const digits = phone.replace(/\D/g, "");
@@ -127,30 +126,56 @@ function RegisterPageInner() {
         </Link>
         <h1 className="text-[22px] font-semibold text-[var(--on-surface)]">ลงทะเบียนสมาชิก</h1>
 
-        {/* Step indicator */}
-        <div className="flex gap-2 mt-6">
-          {steps.map((s) => (
-            <div
-              key={s.num}
-              className={`flex-1 h-[4px] rounded-full transition-colors ${
-                step >= s.num ? "bg-[#1976d2]" : "bg-[var(--outline-variant)]"
-              }`}
-            />
+        {/* Gamified step indicator - circular nodes connected by lines */}
+        <div className="flex items-center justify-between mt-6 px-2">
+          {steps.map((s, i) => (
+            <div key={s.num} className="flex items-center" style={{ flex: i < steps.length - 1 ? 1 : "none" }}>
+              {/* Step node */}
+              <div className="flex flex-col items-center relative">
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center text-[14px] font-bold transition-all duration-300 ${
+                    step > s.num
+                      ? "bg-[var(--jh-green)] text-white shadow-md shadow-green-200/50"
+                      : step === s.num
+                      ? "bg-[var(--jh-green)] text-white shadow-lg shadow-green-300/50 animate-pulse-glow"
+                      : "bg-gray-100 text-gray-400"
+                  }`}
+                >
+                  {step > s.num ? (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="w-5 h-5">
+                      <path d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    s.num
+                  )}
+                </div>
+                <span className={`text-[10px] mt-1.5 font-medium whitespace-nowrap ${
+                  step >= s.num ? "text-[var(--jh-green)]" : "text-gray-400"
+                }`}>
+                  {s.label}
+                </span>
+              </div>
+              {/* Connecting line */}
+              {i < steps.length - 1 && (
+                <div className="flex-1 h-[3px] mx-2 rounded-full mb-5 transition-colors duration-300"
+                  style={{ background: step > s.num ? "var(--jh-green)" : "#e5e7eb" }}
+                />
+              )}
+            </div>
           ))}
         </div>
-        <p className="text-[12px] text-[var(--on-surface-variant)] mt-2">{steps[step - 1].label}</p>
       </div>
 
       <div className="flex-1 px-5 pb-8">
-        <div className="bg-white rounded-[var(--radius-lg)] elevation-2 p-6 shadow-sm">
+        <div className="bg-white rounded-[var(--radius-lg)] elevation-2 p-6 shadow-sm animate-slide-up" key={step}>
           {error && (
-            <div className="mb-4 p-3 bg-[var(--error-light)] rounded-[var(--radius-sm)] text-[13px] text-[var(--error)]">
+            <div className="mb-4 p-3 bg-[var(--error-light)] rounded-[var(--radius-sm)] text-[13px] text-[var(--error)] animate-shake">
               {error}
             </div>
           )}
 
           {step === 1 && (
-            <form onSubmit={handleRequestOTP} className="space-y-4">
+            <form onSubmit={handleRequestOTP} className="space-y-4 animate-slide-up">
               <div>
                 <label className="block text-[12px] text-[var(--on-surface-variant)] mb-1">เบอร์โทรศัพท์</label>
                 <input
@@ -165,7 +190,7 @@ function RegisterPageInner() {
               <button
                 type="submit"
                 disabled={loading || phone.replace(/\D/g, "").length < 10}
-                className="w-full h-[48px] bg-[#1976d2] text-white rounded-[var(--radius-xl)] text-[15px] font-medium disabled:opacity-50 active:scale-[0.98] transition-all"
+                className="w-full h-[48px] bg-[var(--jh-green)] text-white rounded-[var(--radius-xl)] text-[15px] font-medium disabled:opacity-50 active:scale-[0.98] transition-all shadow-md shadow-green-200/40 hover:shadow-lg hover:shadow-green-200/50"
               >
                 {loading ? "กำลังส่ง..." : "ส่ง OTP"}
               </button>
@@ -173,7 +198,7 @@ function RegisterPageInner() {
           )}
 
           {step === 2 && (
-            <form onSubmit={handleStep2Next} className="space-y-4">
+            <form onSubmit={handleStep2Next} className="space-y-4 animate-slide-up">
               <p className="text-[13px] text-[var(--on-surface-variant)]">
                 ส่ง OTP ไปที่ <strong>{formatPhone(phone)}</strong>
                 {refCode && (
@@ -189,7 +214,7 @@ function RegisterPageInner() {
                   placeholder="000000"
                   value={otpCode}
                   onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
-                  className={`${inputClass} text-center text-[20px] tracking-[0.5em]`}
+                  className={`${inputClass} text-center text-[20px] tracking-[0.5em] font-mono focus:border-[var(--jh-green)]`}
                   required
                 />
               </div>
@@ -234,7 +259,7 @@ function RegisterPageInner() {
                         name="gender"
                         checked={gender === g}
                         onChange={() => setGender(g)}
-                        className="w-4 h-4 accent-[#1976d2]"
+                        className="w-4 h-4 accent-[var(--jh-green)]"
                       />
                       <span className="text-[14px] text-[var(--on-surface)]">
                         {g === "male" ? "ชาย" : g === "female" ? "หญิง" : "อื่นๆ"}
@@ -271,11 +296,11 @@ function RegisterPageInner() {
                   type="checkbox"
                   checked={pdpaConsent}
                   onChange={(e) => setPdpaConsent(e.target.checked)}
-                  className="mt-1 w-4 h-4 accent-[#1976d2]"
+                  className="mt-1 w-4 h-4 accent-[var(--jh-green)]"
                 />
                 <span className="text-[13px] text-[var(--on-surface)]">
                   ข้าพเจ้ายอมรับ{" "}
-                  <Link href="/privacy" className="text-[#1976d2] underline" target="_blank">
+                  <Link href="/privacy" className="text-[var(--jh-green)] underline font-medium" target="_blank">
                     นโยบายความเป็นส่วนตัว (PDPA)
                   </Link>{" "}
                   และข้อกำหนดการใช้งาน
@@ -289,14 +314,14 @@ function RegisterPageInner() {
                     setOtpId("");
                     setOtpCode("");
                   }}
-                  className="flex-1 h-[48px] border border-[var(--outline)] rounded-[var(--radius-xl)] text-[14px] font-medium text-[var(--on-surface)]"
+                  className="flex-1 h-[48px] border border-[var(--outline)] rounded-[var(--radius-xl)] text-[14px] font-medium text-[var(--on-surface)] hover:bg-gray-50 transition-all"
                 >
                   ย้อนกลับ
                 </button>
                 <button
                   type="submit"
                   disabled={otpCode.length !== 6}
-                  className="flex-1 h-[48px] bg-[#1976d2] text-white rounded-[var(--radius-xl)] text-[15px] font-medium disabled:opacity-50 active:scale-[0.98] transition-all"
+                  className="flex-1 h-[48px] bg-[var(--jh-green)] text-white rounded-[var(--radius-xl)] text-[15px] font-medium disabled:opacity-50 active:scale-[0.98] transition-all shadow-md shadow-green-200/40"
                 >
                   ถัดไป
                 </button>
@@ -305,11 +330,11 @@ function RegisterPageInner() {
           )}
 
           {step === 3 && (
-            <form onSubmit={handleRegister} className="space-y-4">
+            <form onSubmit={handleRegister} className="space-y-4 animate-slide-up">
               <p className="text-[14px] text-[var(--on-surface-variant)]">
                 ตรวจสอบข้อมูลของคุณและกดส่งเพื่อลงทะเบียน
               </p>
-              <div className="bg-[var(--surface-container)] rounded-[var(--radius-md)] p-4 space-y-2 text-[13px]">
+              <div className="bg-[var(--surface-container)] rounded-[var(--radius-md)] p-4 space-y-2 text-[13px] border border-green-100">
                 <p><strong>เบอร์:</strong> {formatPhone(phone)}</p>
                 <p><strong>ชื่อ:</strong> {firstName} {lastName}</p>
                 <p><strong>วันเกิด:</strong> {birthDate || "-"}</p>
@@ -319,14 +344,14 @@ function RegisterPageInner() {
                 <button
                   type="button"
                   onClick={() => setStep(2)}
-                  className="flex-1 h-[48px] border border-[var(--outline)] rounded-[var(--radius-xl)] text-[14px] font-medium text-[var(--on-surface)]"
+                  className="flex-1 h-[48px] border border-[var(--outline)] rounded-[var(--radius-xl)] text-[14px] font-medium text-[var(--on-surface)] hover:bg-gray-50 transition-all"
                 >
                   ย้อนกลับ
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 h-[48px] bg-[#1976d2] text-white rounded-[var(--radius-xl)] text-[15px] font-medium disabled:opacity-50 active:scale-[0.98] transition-all"
+                  className="flex-1 h-[48px] bg-[var(--jh-green)] text-white rounded-[var(--radius-xl)] text-[15px] font-medium disabled:opacity-50 active:scale-[0.98] transition-all shadow-md shadow-green-200/40"
                 >
                   {loading ? "กำลังลงทะเบียน..." : "ลงทะเบียน"}
                 </button>

@@ -5,6 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"saversure/internal/apperror"
 )
 
 type Handler struct {
@@ -21,7 +23,7 @@ func (h *Handler) List(c *gin.Context) {
 
 	items, err := h.svc.List(c.Request.Context(), tenantID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	if items == nil {
@@ -36,7 +38,7 @@ func (h *Handler) GetBySlug(c *gin.Context) {
 
 	pc, err := h.svc.GetBySlug(c.Request.Context(), tenantID, slug)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		apperror.RespondNotFound(c, "not_found")
 		return
 	}
 	c.JSON(http.StatusOK, pc)
@@ -48,7 +50,7 @@ func (h *Handler) Upsert(c *gin.Context) {
 
 	var input UpsertInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 	input.TenantID = tenantID
@@ -58,7 +60,7 @@ func (h *Handler) Upsert(c *gin.Context) {
 
 	pc, err := h.svc.Upsert(c.Request.Context(), input)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -75,7 +77,7 @@ func (h *Handler) ListVersions(c *gin.Context) {
 
 	versions, err := h.history.ListVersions(c.Request.Context(), tenantID, slug)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	if versions == nil {
@@ -93,13 +95,13 @@ func (h *Handler) RestoreVersion(c *gin.Context) {
 		Version int `json:"version" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
 	v, err := h.history.GetVersion(c.Request.Context(), tenantID, slug, body.Version)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		apperror.RespondNotFound(c, "not_found")
 		return
 	}
 
@@ -116,7 +118,7 @@ func (h *Handler) RestoreVersion(c *gin.Context) {
 		Status:   v.Status,
 	})
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, pc)
@@ -131,7 +133,7 @@ func (h *Handler) Duplicate(c *gin.Context) {
 		ToSlug   string `json:"to_slug" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
@@ -149,7 +151,7 @@ func (h *Handler) Duplicate(c *gin.Context) {
 		Status:   "draft",
 	})
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, pc)
@@ -160,7 +162,7 @@ func (h *Handler) Delete(c *gin.Context) {
 	slug := c.Param("slug")
 
 	if err := h.svc.Delete(c.Request.Context(), tenantID, slug); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})

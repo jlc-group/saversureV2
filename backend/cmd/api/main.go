@@ -70,7 +70,7 @@ import (
 )
 
 func main() {
-	godotenv.Load()
+	_ = godotenv.Load(".env", "../.env", "../../.env", "../../../.env") // Try multiple depths
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -236,7 +236,24 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(mw.RequestLogger())
-	r.Use(mw.CORS())
+	r.Use(mw.CORS(cfg.CORSOrigins))
+
+	// Routes introspection (dev tool — list all registered routes)
+	r.GET("/api/v1/_routes", func(c *gin.Context) {
+		routes := r.Routes()
+		list := make([]gin.H, 0, len(routes))
+		for _, rt := range routes {
+			list = append(list, gin.H{
+				"method":  rt.Method,
+				"path":    rt.Path,
+				"handler": rt.Handler,
+			})
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"count":  len(list),
+			"routes": list,
+		})
+	})
 
 	// Health check
 	r.GET("/health", func(c *gin.Context) {
@@ -601,6 +618,8 @@ func main() {
 		navMenuRoutes.GET("/:type", navMenuHandler.GetByType)
 		navMenuRoutes.PUT("", navMenuHandler.Upsert)
 		navMenuRoutes.DELETE("/:type", navMenuHandler.Delete)
+		navMenuRoutes.GET("/:type/versions", navMenuHandler.ListVersions)
+		navMenuRoutes.POST("/:type/restore", navMenuHandler.RestoreVersion)
 	}
 
 	// News Management (Admin)
@@ -774,6 +793,7 @@ func main() {
 	{
 		badgeRoutes.GET("", gamifyHandler.ListBadges)
 		badgeRoutes.POST("", gamifyHandler.CreateBadge)
+		badgeRoutes.PATCH("/:id", gamifyHandler.UpdateBadge)
 		badgeRoutes.DELETE("/:id", gamifyHandler.DeleteBadge)
 	}
 
@@ -794,51 +814,117 @@ func main() {
 		platformAdminRoutes.GET("/users/:id", platformHandler.GetPlatformUser)
 	}
 
-	// File Upload (requires MinIO)
+	// File Upload (requires MinIO, rate limited)
 	if uploadHandler != nil {
 		uploadRoutes := tenanted.Group("/upload")
 		uploadRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+		uploadRoutes.Use(mw.RateLimit(rdb, "upload", cfg.RateLimit.Upload, time.Minute))
 		{
 			uploadRoutes.POST("/file", uploadHandler.UploadFile)
 		}
 		// factory_user สามารถ upload รูปหลักฐานได้
 		uploadImageRoute := tenanted.Group("/upload")
 		uploadImageRoute.Use(mw.RequireRole("super_admin", "brand_admin", "factory_user"))
+		uploadImageRoute.Use(mw.RateLimit(rdb, "upload", cfg.RateLimit.Upload, time.Minute))
 		{
 			uploadImageRoute.POST("/image", uploadHandler.UploadImage)
 			uploadImageRoute.POST("/ai-generate", uploadHandler.AIGenerateImage)
 		}
 	}
 
-	// Export Management
+	// Export Management (rate limited)
 	if exportHandler != nil {
 		exportRoutes := tenanted.Group("/exports")
 		exportRoutes.Use(mw.RequireRole("super_admin", "brand_admin", "factory_user"))
+		exportRoutes.Use(mw.RateLimit(rdb, "export", cfg.RateLimit.Export, time.Minute))
 		{
 			exportRoutes.POST("", exportHandler.Create)
 			exportRoutes.GET("", exportHandler.List)
 		}
 	}
 
-	// Public APIs (consumer-facing — no role restriction)
-	publicRoutes := tenanted.Group("/public")
+	// Popups — cosmetic, no tenant required (graceful fallback in handler)
+	api.GET("/public/popups", popupHandler.ListActive)
+
+	// Public Donations (no auth required)
+	publicDonationRoutes := api.Group("/public/donations")
+	publicDonationRoutes.Use(mw.TenantFromHeader())
 	{
-		publicRoutes.GET("/rewards", rewardHandler.ListPublic)
-		publicRoutes.GET("/rewards/:id", rewardHandler.GetDetail)
-		publicRoutes.GET("/news", newsHandler.ListPublished)
-		publicRoutes.GET("/lucky-draw", luckyDrawHandler.ListActiveCampaigns)
-		publicRoutes.GET("/lucky-draw/:id", luckyDrawHandler.GetCampaign)
-		publicRoutes.GET("/lucky-draw/:id/winners", luckyDrawHandler.GetWinners)
-		publicRoutes.GET("/donations", donationHandler.ListActive)
-		publicRoutes.GET("/missions", gamifyHandler.ListActiveMissions)
-		publicRoutes.GET("/leaderboard", gamifyHandler.GetLeaderboard)
-		publicRoutes.GET("/badges", gamifyHandler.ListBadges)
-		publicRoutes.GET("/tiers", tierHandler.List)
-		publicRoutes.GET("/branding", brandingHandler.GetPublic)
-		publicRoutes.GET("/page-config/:slug", pageConfigHandler.GetPublic)
-		publicRoutes.GET("/popups", popupHandler.ListActive)
-		publicRoutes.GET("/nav-menu/:type", navMenuHandler.GetPublic)
-		publicRoutes.GET("/currencies", currencyHandler.ListPublic)
+		publicDonationRoutes.GET("", donationHandler.ListActive)
+	}
+
+	// Rewards API (public - no auth required)
+	publicRewardRoutes := api.Group("/public/rewards")
+	publicRewardRoutes.Use(mw.TenantFromHeader())
+	{
+		publicRewardRoutes.GET("", rewardHandler.ListPublic)
+		publicRewardRoutes.GET("/:id", rewardHandler.GetDetail)
+	}
+
+	// Missions API (public - no auth required)
+	publicMissionRoutes := api.Group("/public/missions")
+	publicMissionRoutes.Use(mw.TenantFromHeader())
+	{
+		publicMissionRoutes.GET("", gamifyHandler.ListActiveMissions)
+		publicMissionRoutes.GET("/:id", gamifyHandler.GetMission)
+	}
+
+	// Lucky Draw API (public - no auth required)
+	publicLuckyDrawRoutes := api.Group("/public/lucky-draw")
+	publicLuckyDrawRoutes.Use(mw.TenantFromHeader())
+	{
+		publicLuckyDrawRoutes.GET("", luckyDrawHandler.ListActiveCampaigns)
+		publicLuckyDrawRoutes.GET("/:id", luckyDrawHandler.GetCampaign)
+	}
+
+	// Campaigns API (public - no auth required)
+	publicCampaignRoutes := api.Group("/public/campaigns")
+	publicCampaignRoutes.Use(mw.TenantFromHeader())
+	{
+		publicCampaignRoutes.GET("", campaignHandler.ListPublic)
+	}
+
+	// Branding API (public - consumer needs theme/logo)
+	publicBrandingRoutes := api.Group("/public")
+	publicBrandingRoutes.Use(mw.TenantFromHeader())
+	{
+		publicBrandingRoutes.GET("/branding", brandingHandler.GetPublic)
+	}
+
+	// Nav Menu API (public - consumer needs nav items)
+	publicNavMenuRoutes := api.Group("/public/nav-menu")
+	publicNavMenuRoutes.Use(mw.TenantFromHeader())
+	{
+		publicNavMenuRoutes.GET("/:type", navMenuHandler.GetPublic)
+	}
+
+	// News API (public - consumer news feed)
+	publicNewsRoutes := api.Group("/public/news")
+	publicNewsRoutes.Use(mw.TenantFromHeader())
+	{
+		publicNewsRoutes.GET("", newsHandler.ListPublished)
+		publicNewsRoutes.GET("/:id", newsHandler.GetByID)
+	}
+
+	// Page Config API (public - consumer page builder rendering)
+	publicPageConfigRoutes := api.Group("/public/page-config")
+	publicPageConfigRoutes.Use(mw.TenantFromHeader())
+	{
+		publicPageConfigRoutes.GET("/:slug", pageConfigHandler.GetPublic)
+	}
+
+	// Currencies API (public - consumer needs currency master for balances display)
+	publicCurrencyRoutes := api.Group("/public/currencies")
+	publicCurrencyRoutes.Use(mw.TenantFromHeader())
+	{
+		publicCurrencyRoutes.GET("", currencyHandler.ListPublic)
+	}
+
+	// Tiers API (public - consumer tier badges/progress)
+	publicTierRoutes := api.Group("/public/tiers")
+	publicTierRoutes.Use(mw.TenantFromHeader())
+	{
+		publicTierRoutes.GET("", tierHandler.List)
 	}
 
 	// Consumer Profile (self)
@@ -859,7 +945,9 @@ func main() {
 	{
 		myRoutes.POST("/lucky-draw/:id/register", luckyDrawHandler.Register)
 		myRoutes.GET("/lucky-draw/:id/tickets", luckyDrawHandler.GetUserTickets)
+		myRoutes.GET("/lucky-draw/tickets", luckyDrawHandler.GetAllUserTickets)
 		myRoutes.POST("/donations/:id/donate", donationHandler.Donate)
+		myRoutes.GET("/donations", donationHandler.GetMyDonations)
 		myRoutes.GET("/balances", currencyHandler.GetMultiBalance)
 		myRoutes.GET("/redeem-transactions", transactionHandler.ListMine)
 		myRoutes.GET("/missions", gamifyHandler.GetUserMissions)

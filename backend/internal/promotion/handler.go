@@ -4,6 +4,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
+	"saversure/internal/apperror"
 )
 
 type Handler struct {
@@ -17,7 +19,7 @@ func NewHandler(svc *Service) *Handler {
 func (h *Handler) List(c *gin.Context) {
 	promos, err := h.svc.List(c.Request.Context(), c.GetString("tenant_id"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": promos})
@@ -35,13 +37,13 @@ func (h *Handler) GetByID(c *gin.Context) {
 func (h *Handler) Create(c *gin.Context) {
 	var input CreateInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
 	p, err := h.svc.Create(c.Request.Context(), c.GetString("tenant_id"), c.GetString("user_id"), input)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "create_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -51,13 +53,13 @@ func (h *Handler) Create(c *gin.Context) {
 func (h *Handler) Update(c *gin.Context) {
 	var input UpdateInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		apperror.RespondValidation(c, err.Error())
 		return
 	}
 
 	p, err := h.svc.Update(c.Request.Context(), c.GetString("tenant_id"), c.Param("id"), input)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "update_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 
@@ -66,7 +68,7 @@ func (h *Handler) Update(c *gin.Context) {
 
 func (h *Handler) Delete(c *gin.Context) {
 	if err := h.svc.Delete(c.Request.Context(), c.GetString("tenant_id"), c.Param("id")); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "delete_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
@@ -77,7 +79,7 @@ func (h *Handler) Delete(c *gin.Context) {
 func (h *Handler) Submit(c *gin.Context) {
 	p, err := h.svc.Submit(c.Request.Context(), c.GetString("tenant_id"), c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "submit_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, p)
@@ -86,7 +88,7 @@ func (h *Handler) Submit(c *gin.Context) {
 func (h *Handler) Approve(c *gin.Context) {
 	p, err := h.svc.Approve(c.Request.Context(), c.GetString("tenant_id"), c.Param("id"), c.GetString("user_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "approve_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, p)
@@ -103,7 +105,7 @@ func (h *Handler) Reject(c *gin.Context) {
 
 	p, err := h.svc.Reject(c.Request.Context(), c.GetString("tenant_id"), c.Param("id"), c.GetString("user_id"), body.Note)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "reject_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, p)
@@ -112,7 +114,7 @@ func (h *Handler) Reject(c *gin.Context) {
 func (h *Handler) Deactivate(c *gin.Context) {
 	p, err := h.svc.Deactivate(c.Request.Context(), c.GetString("tenant_id"), c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "deactivate_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, p)
@@ -121,7 +123,7 @@ func (h *Handler) Deactivate(c *gin.Context) {
 func (h *Handler) Reactivate(c *gin.Context) {
 	p, err := h.svc.Reactivate(c.Request.Context(), c.GetString("tenant_id"), c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "reactivate_failed", "message": err.Error()})
+		apperror.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, p)
