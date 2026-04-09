@@ -69,6 +69,20 @@ const BUILT_IN_PAGES: BuiltInPage[] = [
 
 const BUILT_IN_SLUGS = new Set(BUILT_IN_PAGES.map((p) => p.value));
 
+interface BottomNavItem {
+  icon: string;
+  label: string;
+  link: string;
+  visible: boolean;
+}
+
+// Convert a nav link (e.g. "/", "/scan", "/p/shop") to a page slug
+// that maps to BUILT_IN_PAGES / customPages entries.
+function navLinkToSlug(link: string): string {
+  const trimmed = link.replace(/^\//, "").replace(/^p\//, "");
+  return trimmed || "home";
+}
+
 /* ------------------------------------------------------------------ */
 /*  Section Type Registry (mirrors consumer sections)                  */
 /* ------------------------------------------------------------------ */
@@ -1075,10 +1089,12 @@ interface SectionCategory {
   types: string[];
 }
 
+// Section taxonomy — แผน 1 (แยกตาม "หน้าที่", 7 หมวด, label ไทย)
+// เป็น single source of truth ของ tab bar ใน AddSectionModal
 const sectionCategories: SectionCategory[] = [
   {
     id: "banners",
-    label: "Banners & Hero",
+    label: "แบนเนอร์ & รูป",
     icon: "🖼️",
     types: [
       "hero_banner",
@@ -1089,24 +1105,30 @@ const sectionCategories: SectionCategory[] = [
   },
   {
     id: "headers_layout",
-    label: "Headers & Layout",
+    label: "หัวข้อ & โครงสร้าง",
     icon: "📐",
-    types: ["section_header", "home_section_heading", "rich_text", "spacer"],
+    types: [
+      "section_header",
+      "home_section_heading",
+      "rich_text",
+      "spacer",
+    ],
   },
   {
     id: "menus_nav",
-    label: "Menus & Navigation",
+    label: "เมนู & ลิงก์",
     icon: "🧭",
     types: [
       "feature_menu",
       "feature_list",
       "profile_menu_group",
       "history_tabs_nav",
+      "shop_links_list",
     ],
   },
   {
     id: "points_wallet",
-    label: "Points & Wallet",
+    label: "แต้ม & กระเป๋าเงิน",
     icon: "💰",
     types: [
       "points_summary",
@@ -1117,31 +1139,20 @@ const sectionCategories: SectionCategory[] = [
     ],
   },
   {
-    id: "profile_account",
-    label: "Profile & Account",
-    icon: "👤",
-    types: [
-      "profile_header_card",
-      "profile_warning_alert",
-      "profile_logout_button",
-    ],
-  },
-  {
-    id: "rewards_shop_missions",
-    label: "Rewards, Shop & Missions",
+    id: "rewards_missions",
+    label: "รางวัล & ภารกิจ",
     icon: "🎁",
     types: [
       "home_rewards_tabs",
       "home_lucky_draw_list",
       "rewards_tabs_grid",
       "rewards_history_cta",
-      "shop_links_list",
       "missions_tabs_list",
     ],
   },
   {
     id: "lists_feeds",
-    label: "Lists & Feeds",
+    label: "รายการข้อมูล",
     icon: "📋",
     types: [
       "history_stat_summary",
@@ -1156,10 +1167,13 @@ const sectionCategories: SectionCategory[] = [
     ],
   },
   {
-    id: "support_settings",
-    label: "Support & Settings",
-    icon: "⚙️",
+    id: "account_settings",
+    label: "บัญชี & ตั้งค่า",
+    icon: "👤",
     types: [
+      "profile_header_card",
+      "profile_warning_alert",
+      "profile_logout_button",
       "support_contact_cta",
       "settings_notifications_group",
       "settings_delete_account_card",
@@ -1566,19 +1580,6 @@ function LivePreviewPanel({
 /*  Add Section Modal                                                  */
 /* ------------------------------------------------------------------ */
 
-// Per-category visual tint (subtle background + border on cards)
-const CATEGORY_TINT: Record<string, { bg: string; border: string; ring: string }> = {
-  banners:               { bg: "bg-sky-50/60",     border: "border-sky-100",     ring: "hover:ring-sky-300" },
-  headers_layout:        { bg: "bg-slate-50/60",   border: "border-slate-100",   ring: "hover:ring-slate-300" },
-  menus_nav:             { bg: "bg-indigo-50/60",  border: "border-indigo-100",  ring: "hover:ring-indigo-300" },
-  points_wallet:         { bg: "bg-amber-50/60",   border: "border-amber-100",   ring: "hover:ring-amber-300" },
-  profile_account:       { bg: "bg-violet-50/60",  border: "border-violet-100",  ring: "hover:ring-violet-300" },
-  rewards_shop_missions: { bg: "bg-orange-50/60",  border: "border-orange-100",  ring: "hover:ring-orange-300" },
-  lists_feeds:           { bg: "bg-emerald-50/60", border: "border-emerald-100", ring: "hover:ring-emerald-300" },
-  support_settings:      { bg: "bg-zinc-50/60",    border: "border-zinc-100",    ring: "hover:ring-zinc-300" },
-  __other:               { bg: "bg-gray-50/60",    border: "border-gray-100",    ring: "hover:ring-gray-300" },
-};
-
 function AddSectionModal({
   open,
   onAdd,
@@ -1588,11 +1589,17 @@ function AddSectionModal({
   onAdd: (type: string) => void;
   onClose: () => void;
 }) {
+  const ALL_KEY = "__all__";
+  const OTHER_KEY = "__other__";
   const [search, setSearch] = useState("");
+  const [activeCat, setActiveCat] = useState<string>(ALL_KEY);
 
-  // Reset search whenever the modal opens fresh
+  // Reset state whenever the modal opens fresh
   useEffect(() => {
-    if (open) setSearch("");
+    if (open) {
+      setSearch("");
+      setActiveCat(ALL_KEY);
+    }
   }, [open]);
 
   if (!open) return null;
@@ -1609,33 +1616,93 @@ function AddSectionModal({
     );
   };
 
-  // Build list of categories whose name itself matches the query (so we can keep all their items)
-  const categoryNameMatches = (catLabel: string) =>
-    !!query && catLabel.toLowerCase().includes(query);
-
   const categorized = new Set(sectionCategories.flatMap((c) => c.types));
   const uncategorized = Object.keys(sectionTypes).filter(
     (t) => !categorized.has(t),
   );
 
-  // Compute filtered groups
-  const filteredGroups = sectionCategories
-    .map((cat) => {
-      const items = cat.types
-        .filter((t) => sectionTypes[t])
-        .filter((t) => (categoryNameMatches(cat.label) ? true : matches(t)));
-      return { cat, items };
-    })
-    .filter((g) => g.items.length > 0);
+  // Build flat tab list: all categories that have items + "Other" if any
+  const tabs: Array<{ id: string; label: string; count: number }> = [
+    {
+      id: ALL_KEY,
+      label: "ทั้งหมด",
+      count:
+        sectionCategories.reduce(
+          (s, c) => s + c.types.filter((t) => sectionTypes[t]).length,
+          0,
+        ) + uncategorized.length,
+    },
+    ...sectionCategories
+      .filter((c) => c.types.some((t) => sectionTypes[t]))
+      .map((c) => ({
+        id: c.id,
+        label: c.label,
+        count: c.types.filter((t) => sectionTypes[t]).length,
+      })),
+    ...(uncategorized.length > 0
+      ? [{ id: OTHER_KEY, label: "อื่นๆ", count: uncategorized.length }]
+      : []),
+  ];
 
-  const filteredOther = uncategorized.filter((t) => matches(t));
-  const totalFound =
-    filteredGroups.reduce((s, g) => s + g.items.length, 0) + filteredOther.length;
+  // Build grouped content for display:
+  //   - When searching → flat list (no groups)
+  //   - When "ทั้งหมด" → every category as its own group (with header)
+  //   - When specific tab → single group (no header needed)
+  interface RenderGroup {
+    id: string;
+    icon: string;
+    label: string;
+    items: string[];
+  }
+  const renderGroups: RenderGroup[] = (() => {
+    if (query) {
+      const flat = [
+        ...sectionCategories.flatMap((c) => c.types.filter((t) => sectionTypes[t])),
+        ...uncategorized,
+      ].filter(matches);
+      return flat.length > 0
+        ? [{ id: "__search__", icon: "🔍", label: "ผลการค้นหา", items: flat }]
+        : [];
+    }
+    if (activeCat === ALL_KEY) {
+      const groups: RenderGroup[] = sectionCategories
+        .map((c) => ({
+          id: c.id,
+          icon: c.icon,
+          label: c.label,
+          items: c.types.filter((t) => sectionTypes[t]),
+        }))
+        .filter((g) => g.items.length > 0);
+      if (uncategorized.length > 0) {
+        groups.push({
+          id: OTHER_KEY,
+          icon: "📦",
+          label: "อื่นๆ",
+          items: uncategorized,
+        });
+      }
+      return groups;
+    }
+    if (activeCat === OTHER_KEY) {
+      return uncategorized.length > 0
+        ? [{ id: OTHER_KEY, icon: "📦", label: "อื่นๆ", items: uncategorized }]
+        : [];
+    }
+    const cat = sectionCategories.find((c) => c.id === activeCat);
+    if (!cat) return [];
+    const items = cat.types.filter((t) => sectionTypes[t]);
+    return items.length > 0
+      ? [{ id: cat.id, icon: cat.icon, label: cat.label, items }]
+      : [];
+  })();
 
-  const renderCard = (type: string, tintKey: string) => {
+  const totalItems = renderGroups.reduce((s, g) => s + g.items.length, 0);
+  // Hide group header when showing a single category (redundant with active tab)
+  const showGroupHeaders = activeCat === ALL_KEY && !query;
+
+  const renderRow = (type: string) => {
     const meta = sectionTypes[type];
     if (!meta) return null;
-    const tint = CATEGORY_TINT[tintKey] || CATEGORY_TINT.__other;
     return (
       <button
         key={type}
@@ -1643,58 +1710,55 @@ function AddSectionModal({
           onAdd(type);
           onClose();
         }}
-        className={`group flex items-start gap-3 p-3.5 h-[88px] rounded-xl border ${tint.border} ${tint.bg} hover:shadow-md hover:-translate-y-0.5 hover:ring-2 ${tint.ring} transition-all text-left`}
+        className="group w-full flex items-start gap-3 px-4 py-3 text-left border-b border-[var(--md-outline-variant)]/50 last:border-b-0 hover:bg-[var(--md-surface-container-low)] transition-colors"
       >
-        <span className="text-2xl shrink-0 leading-none mt-0.5 group-hover:scale-110 transition-transform">
+        <span className="text-[18px] shrink-0 leading-none mt-0.5 w-6 text-center">
           {meta.icon}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-semibold text-[var(--md-on-surface)] truncate">
+          <p className="text-[13px] font-medium text-[var(--md-on-surface)] truncate">
             {meta.label}
           </p>
-          <p className="text-[11px] text-[var(--md-on-surface-variant)] mt-0.5 line-clamp-2 leading-snug">
-            {meta.description}
-          </p>
+          {meta.description && (
+            <p className="text-[11px] text-[var(--md-on-surface-variant)] mt-0.5 line-clamp-1 leading-snug">
+              {meta.description}
+            </p>
+          )}
         </div>
+        <span className="text-[18px] text-[var(--md-on-surface-variant)]/0 group-hover:text-[var(--md-primary)] transition-colors shrink-0 mt-1">
+          →
+        </span>
       </button>
     );
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-[var(--md-surface)] rounded-2xl md-elevation-3 w-full max-w-[560px] max-h-[85vh] overflow-hidden flex flex-col">
+      <div className="bg-[var(--md-surface)] rounded-2xl md-elevation-3 w-full max-w-[520px] max-h-[85vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--md-outline-variant)]">
-          <div>
-            <h3 className="text-[18px] font-semibold text-[var(--md-on-surface)]">
-              เพิ่ม Section
-            </h3>
-            <p className="text-[11px] text-[var(--md-on-surface-variant)] mt-0.5">
-              เลือก section ที่ต้องการเพิ่มในหน้านี้
-            </p>
-          </div>
+        <div className="flex items-center justify-between px-5 pt-5 pb-3">
+          <h3 className="text-[17px] font-medium text-[var(--md-on-surface)]">
+            เพิ่ม Section
+          </h3>
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-full hover:bg-[var(--md-surface-container)] flex items-center justify-center text-[var(--md-on-surface-variant)] transition-colors"
+            className="w-8 h-8 rounded-full hover:bg-[var(--md-surface-container)] flex items-center justify-center text-[var(--md-on-surface-variant)] transition-colors text-[14px]"
             aria-label="ปิด"
           >
             ✕
           </button>
         </div>
 
-        {/* Search bar */}
-        <div className="px-5 py-3 border-b border-[var(--md-outline-variant)] bg-[var(--md-surface)]">
+        {/* Search bar — minimal */}
+        <div className="px-5 pb-3">
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--md-on-surface-variant)] text-sm pointer-events-none">
-              🔍
-            </span>
             <input
               type="text"
               autoFocus
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="ค้นหา section... (ชื่อ / คำอธิบาย / หมวด)"
-              className="w-full pl-9 pr-9 py-2.5 text-[13px] rounded-lg border border-[var(--md-outline-variant)] bg-[var(--md-surface-container-low)] focus:outline-none focus:ring-2 focus:ring-[var(--md-primary)]/40 focus:border-[var(--md-primary)] transition-all"
+              placeholder="ค้นหา section..."
+              className="w-full px-3 py-2 text-[13px] rounded-lg border border-[var(--md-outline-variant)] bg-transparent focus:outline-none focus:border-[var(--md-primary)] transition-colors"
             />
             {search && (
               <button
@@ -1706,67 +1770,84 @@ function AddSectionModal({
               </button>
             )}
           </div>
-          {query && (
-            <p className="text-[11px] text-[var(--md-on-surface-variant)] mt-2 px-1">
-              พบ <span className="font-semibold text-[var(--md-on-surface)]">{totalFound}</span> รายการ
-            </p>
-          )}
         </div>
+
+        {/* Category tabs (Option A underline style) — hidden during search */}
+        {!query && (
+          <div className="border-b border-[var(--md-outline-variant)] bg-[var(--md-surface-container-low)]/40">
+            <div className="flex gap-1 items-center px-3 py-2 overflow-x-auto">
+              {tabs.map((t) => {
+                const isActive = activeCat === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => setActiveCat(t.id)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium whitespace-nowrap transition-colors ${
+                      isActive
+                        ? "bg-[var(--md-primary)] text-white"
+                        : "text-[var(--md-on-surface-variant)] hover:bg-[var(--md-surface-container-high)]"
+                    }`}
+                  >
+                    <span>{t.label}</span>
+                    <span
+                      className={`inline-flex items-center justify-center min-w-[18px] h-[16px] px-1 rounded-full text-[10px] font-semibold ${
+                        isActive
+                          ? "bg-white/25 text-white"
+                          : "bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)]"
+                      }`}
+                    >
+                      {t.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Scrollable list */}
         <div className="overflow-y-auto flex-1">
-          {totalFound === 0 ? (
+          {totalItems === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-              <div className="text-4xl mb-3">🔍</div>
-              <p className="text-[14px] font-medium text-[var(--md-on-surface)]">
-                ไม่พบ section ที่ตรงกับ &quot;{search}&quot;
+              <p className="text-[13px] text-[var(--md-on-surface-variant)]">
+                {query ? `ไม่พบ section ที่ตรงกับ "${search}"` : "ไม่มี section ในหมวดนี้"}
               </p>
-              <p className="text-[12px] text-[var(--md-on-surface-variant)] mt-1">
-                ลองค้นหาด้วยคำอื่น หรือล้างการค้นหา
-              </p>
-              <button
-                onClick={() => setSearch("")}
-                className="mt-4 px-4 py-2 text-[12px] rounded-lg bg-[var(--md-primary)] text-white hover:opacity-90 transition-opacity"
-              >
-                ล้างการค้นหา
-              </button>
+              {query && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="mt-3 text-[12px] text-[var(--md-primary)] hover:underline"
+                >
+                  ล้างการค้นหา
+                </button>
+              )}
             </div>
           ) : (
-            <>
-              {filteredGroups.map(({ cat, items }) => (
-                <div key={cat.id}>
-                  <div className="sticky top-0 z-10 bg-[var(--md-surface)]/95 backdrop-blur-sm border-b border-[var(--md-outline-variant)] px-5 py-2.5 flex items-center gap-2 shadow-sm">
-                    <span className="text-base leading-none">{cat.icon}</span>
-                    <span className="text-[11px] font-bold text-[var(--md-on-surface)] uppercase tracking-wider">
-                      {cat.label}
-                    </span>
-                    <span className="text-[10px] font-medium text-[var(--md-on-surface-variant)] bg-[var(--md-surface-container)] px-2 py-0.5 rounded-full ml-auto">
-                      {items.length}
-                    </span>
-                  </div>
-                  <div className="px-5 py-4 grid grid-cols-2 gap-3">
-                    {items.map((t) => renderCard(t, cat.id))}
+            <div>
+              {renderGroups.map((g) => (
+                <div key={g.id}>
+                  {showGroupHeaders && (
+                    <div className="sticky top-0 z-10 bg-[var(--md-surface)]/95 backdrop-blur-sm border-b border-[var(--md-outline-variant)] px-5 py-2 flex items-center gap-2">
+                      <span className="text-[14px] leading-none">{g.icon}</span>
+                      <span className="text-[11px] font-bold text-[var(--md-on-surface)] uppercase tracking-wider">
+                        {g.label}
+                      </span>
+                      <span className="ml-auto text-[10px] font-medium text-[var(--md-on-surface-variant)] bg-[var(--md-surface-container)] px-1.5 py-0.5 rounded-full">
+                        {g.items.length}
+                      </span>
+                    </div>
+                  )}
+                  <div className="divide-y divide-[var(--md-outline-variant)]/50">
+                    {g.items.map(renderRow)}
                   </div>
                 </div>
               ))}
-              {filteredOther.length > 0 && (
-                <div>
-                  <div className="sticky top-0 z-10 bg-[var(--md-surface)]/95 backdrop-blur-sm border-b border-[var(--md-outline-variant)] px-5 py-2.5 flex items-center gap-2 shadow-sm">
-                    <span className="text-base leading-none">📦</span>
-                    <span className="text-[11px] font-bold text-[var(--md-on-surface)] uppercase tracking-wider">
-                      Other
-                    </span>
-                    <span className="text-[10px] font-medium text-[var(--md-on-surface-variant)] bg-[var(--md-surface-container)] px-2 py-0.5 rounded-full ml-auto">
-                      {filteredOther.length}
-                    </span>
-                  </div>
-                  <div className="px-5 py-4 grid grid-cols-2 gap-3">
-                    {filteredOther.map((t) => renderCard(t, "__other"))}
-                  </div>
-                </div>
-              )}
-            </>
+            </div>
           )}
+        </div>
+
+        {/* Footer — count */}
+        <div className="px-5 py-2.5 border-t border-[var(--md-outline-variant)] text-[11px] text-[var(--md-on-surface-variant)] text-right">
+          {totalItems} section{totalItems !== 1 ? "s" : ""}
         </div>
       </div>
     </div>
@@ -1794,6 +1875,7 @@ export default function PageBuilderPage() {
   const [showDuplicate, setShowDuplicate] = useState(false);
   const [dupTarget, setDupTarget] = useState("");
   const [customPages, setCustomPages] = useState<{ value: string; label: string }[]>([]);
+  const [bottomNav, setBottomNav] = useState<BottomNavItem[]>([]);
   const [showNewPage, setShowNewPage] = useState(false);
   const [newSlug, setNewSlug] = useState("");
   const [newLabel, setNewLabel] = useState("");
@@ -1818,6 +1900,13 @@ export default function PageBuilderPage() {
     } catch { /* ignore */ }
   }, []);
 
+  const fetchBottomNav = useCallback(async () => {
+    try {
+      const data = await api.get<{ items: BottomNavItem[] }>("/api/v1/nav-menus/bottom_nav");
+      setBottomNav(data.items || []);
+    } catch { /* ignore — groups fallback to "อื่นๆ" */ }
+  }, []);
+
   const fetchConfig = useCallback(async (slug: string) => {
     setLoading(true);
     setActiveId(null);
@@ -1838,7 +1927,8 @@ export default function PageBuilderPage() {
 
   useEffect(() => {
     fetchCustomPages();
-  }, [fetchCustomPages]);
+    fetchBottomNav();
+  }, [fetchCustomPages, fetchBottomNav]);
 
   useEffect(() => {
     fetchConfig(pageSlug);
@@ -2092,53 +2182,149 @@ export default function PageBuilderPage() {
         </div>
       </div>
 
-      {/* Page Selector — top-level (hides nested sub-pages) */}
-      <div className="flex gap-2 mb-3 flex-wrap items-center">
-        {allPages
-          .filter((p) => !("parent" in p) || !p.parent)
-          .map((p) => {
-            // Highlight parent when a child of it is currently selected
-            const currentChild = BUILT_IN_PAGES.find(
-              (bp) => bp.value === pageSlug && bp.parent,
-            );
-            const isActive =
-              pageSlug === p.value ||
-              (currentChild && currentChild.parent === p.value);
-            return (
-              <div key={p.value} className="relative group">
-                <button
-                  onClick={() => setPageSlug(p.value)}
-                  className={`h-[36px] px-4 rounded-[var(--md-radius-sm)] text-[13px] font-medium transition-all ${
-                    isActive
-                      ? "bg-[var(--md-primary)] text-white"
-                      : "bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)] hover:bg-[var(--md-surface-container-high)]"
-                  }`}
-                >
-                  {p.label}
-                </button>
-                {!BUILT_IN_SLUGS.has(p.value) && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeletePage(p.value);
-                    }}
-                    className="absolute -top-1.5 -right-1.5 hidden group-hover:flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[var(--md-error)] text-white text-[10px] leading-none"
-                    title="ลบหน้านี้"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            );
-          })}
+      {/* Page Selector — Option A: Two-level tabs grouped by Bottom Navigation */}
+      {(() => {
+        const OTHER_KEY = "__other__";
+        const topLevelPages = allPages.filter(
+          (p) => !("parent" in p) || !p.parent,
+        );
+        const currentChild = BUILT_IN_PAGES.find(
+          (bp) => bp.value === pageSlug && bp.parent,
+        );
+        const currentTopSlug = currentChild ? currentChild.parent! : pageSlug;
 
-        <button
-          onClick={() => setShowNewPage(true)}
-          className="h-[36px] px-3 rounded-[var(--md-radius-sm)] text-[13px] font-medium border-2 border-dashed border-[var(--md-outline)] text-[var(--md-on-surface-variant)] hover:border-[var(--md-primary)] hover:text-[var(--md-primary)] transition-all"
-        >
-          + สร้างหน้าใหม่
-        </button>
-      </div>
+        // Build group list from bottom_nav (single source of truth)
+        const groups: Array<{
+          key: string;
+          label: string;
+          visible: boolean;
+          pages: typeof topLevelPages;
+        }> = bottomNav.map((nav) => ({
+          key: nav.link,
+          label: nav.label,
+          visible: nav.visible,
+          pages: [],
+        }));
+
+        const assigned = new Set<string>();
+        for (const nav of bottomNav) {
+          const targetSlug = navLinkToSlug(nav.link);
+          const grp = groups.find((g) => g.key === nav.link);
+          if (!grp) continue;
+          for (const p of topLevelPages) {
+            if (p.value === targetSlug) {
+              grp.pages.push(p);
+              assigned.add(p.value);
+            }
+          }
+        }
+        const otherPages = topLevelPages.filter((p) => !assigned.has(p.value));
+
+        // Visible groups only (drop empty ones) + append "อื่นๆ" if needed
+        const visibleGroups = groups.filter((g) => g.pages.length > 0);
+        const allGroups = [
+          ...visibleGroups,
+          ...(otherPages.length > 0
+            ? [{ key: OTHER_KEY, label: "อื่นๆ", visible: true, pages: otherPages }]
+            : []),
+        ];
+
+        // Determine active group from current pageSlug
+        const activeGroupKey =
+          allGroups.find((g) => g.pages.some((p) => p.value === currentTopSlug))
+            ?.key ?? allGroups[0]?.key ?? OTHER_KEY;
+        const activeGroup = allGroups.find((g) => g.key === activeGroupKey);
+        const pagesInActiveGroup = activeGroup?.pages ?? topLevelPages;
+
+        const renderChip = (p: (typeof topLevelPages)[number]) => {
+          const isActive =
+            pageSlug === p.value ||
+            (currentChild && currentChild.parent === p.value);
+          return (
+            <div key={p.value} className="relative group">
+              <button
+                onClick={() => setPageSlug(p.value)}
+                className={`h-[36px] px-4 rounded-[var(--md-radius-sm)] text-[13px] font-medium transition-all ${
+                  isActive
+                    ? "bg-[var(--md-primary)] text-white"
+                    : "bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)] hover:bg-[var(--md-surface-container-high)]"
+                }`}
+              >
+                {p.label}
+              </button>
+              {!BUILT_IN_SLUGS.has(p.value) && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeletePage(p.value);
+                  }}
+                  className="absolute -top-1.5 -right-1.5 hidden group-hover:flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[var(--md-error)] text-white text-[10px] leading-none"
+                  title="ลบหน้านี้"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          );
+        };
+
+        // Fallback when bottom_nav not loaded yet → simple flat list
+        if (bottomNav.length === 0) {
+          return (
+            <div className="flex gap-2 mb-3 flex-wrap items-center">
+              {topLevelPages.map(renderChip)}
+              <button
+                onClick={() => setShowNewPage(true)}
+                className="h-[36px] px-3 rounded-[var(--md-radius-sm)] text-[13px] font-medium border-2 border-dashed border-[var(--md-outline)] text-[var(--md-on-surface-variant)] hover:border-[var(--md-primary)] hover:text-[var(--md-primary)] transition-all"
+              >
+                + สร้างหน้าใหม่
+              </button>
+            </div>
+          );
+        }
+
+        return (
+          <div className="mb-4">
+            {/* Row 1 — Group tabs (underline style, minimal) */}
+            <div className="flex gap-6 items-center border-b border-[var(--md-outline-variant)] mb-3 overflow-x-auto">
+              {allGroups.map((g) => {
+                const isActive = g.key === activeGroupKey;
+                return (
+                  <button
+                    key={g.key}
+                    onClick={() => {
+                      if (g.pages.length > 0) setPageSlug(g.pages[0].value);
+                    }}
+                    className={`relative pb-2.5 text-[13px] font-medium whitespace-nowrap transition-colors ${
+                      isActive
+                        ? "text-[var(--md-primary)]"
+                        : g.visible
+                          ? "text-[var(--md-on-surface-variant)] hover:text-[var(--md-on-surface)]"
+                          : "text-[var(--md-on-surface-variant)]/50 hover:text-[var(--md-on-surface-variant)]"
+                    }`}
+                  >
+                    {g.label}
+                    {isActive && (
+                      <span className="absolute left-0 right-0 -bottom-px h-[2px] bg-[var(--md-primary)] rounded-full" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Row 2 — Pages inside the active group */}
+            <div className="flex gap-2 flex-wrap items-center">
+              {pagesInActiveGroup.map(renderChip)}
+              <button
+                onClick={() => setShowNewPage(true)}
+                className="h-[36px] px-3 rounded-[var(--md-radius-sm)] text-[13px] font-medium border-2 border-dashed border-[var(--md-outline)] text-[var(--md-on-surface-variant)] hover:border-[var(--md-primary)] hover:text-[var(--md-primary)] transition-all"
+              >
+                + สร้างหน้าใหม่
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Sub-page tabs — shown only when a parent page (with children) is active */}
       {(() => {
