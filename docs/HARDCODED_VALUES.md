@@ -20,13 +20,13 @@
 
 | Value | Where |
 |-------|-------|
-| **DB Password:** `julaherb789` | `docker-compose.yml`, `backend/.env`, `backend/check_*.go` × 4, `backup/*.py` × 6, `.claude/settings.local.json` |
-| **MinIO Secret:** `julaherb789minio` | `docker-compose.yml`, `backend/.env`, `backend/env.cloudflare.example` |
-| **JWT Secret:** `saversure-dev-jwt-secret-change-in-prod-2026` | `docker-compose.yml`, `backend/.env`, `backend/env.cloudflare.example` |
-| **HMAC Secret:** `saversure-dev-hmac-2026` | `docker-compose.yml`, `backend/.env`, `backend/env.cloudflare.example` |
-| **SMS (Ants) Password:** `jb3cPSuX%6#wh` | `backend/.env` |
-| **SMS Username:** `Julaherb_Thailand` | `backend/.env`, `V1_PRODUCTION_REFERENCE.md` |
-| **SMS OTP OTC ID:** `633904b9-3ac3-4beb-8ecc-b81cc76e3be4` | `backend/.env`, `V1_PRODUCTION_REFERENCE.md` |
+| **DB Password:** `[REDACTED]` | `docker-compose.yml`, `backend/.env`, `backend/check_*.go` × 4, `backup/*.py` × 6, `.claude/settings.local.json` |
+| **MinIO Secret:** `[REDACTED]` | `docker-compose.yml`, `backend/.env`, `backend/env.cloudflare.example` |
+| **JWT Secret:** `[REDACTED]` | `docker-compose.yml`, `backend/.env`, `backend/env.cloudflare.example` |
+| **HMAC Secret:** `[REDACTED]` | `docker-compose.yml`, `backend/.env`, `backend/env.cloudflare.example` |
+| **SMS (Ants) Password:** `[REDACTED]` | `backend/.env` |
+| **SMS Username:** `[REDACTED]` | `backend/.env`, `V1_PRODUCTION_REFERENCE.md` |
+| **SMS OTP OTC ID:** `[REDACTED]` | `backend/.env`, `V1_PRODUCTION_REFERENCE.md` |
 | **MinIO Access Key:** `saversure-admin` | `docker-compose.yml`, `backend/.env` |
 | **POSTGRES_USER:** `saversure_app` | ทุกที่ที่ระบุ DB |
 
@@ -77,8 +77,8 @@
 | Field | Value | Where |
 |-------|-------|-------|
 | Host | `https://api-service.ants.co.th` | `backend/.env` |
-| Username | `Julaherb_Thailand` | `backend/.env` |
-| OTC ID | `633904b9-3ac3-4beb-8ecc-b81cc76e3be4` | `backend/.env` |
+| Username | `[REDACTED]` | `backend/.env` |
+| OTC ID | `[REDACTED]` | `backend/.env` |
 
 ---
 
