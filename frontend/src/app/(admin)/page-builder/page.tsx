@@ -56,6 +56,8 @@ const BUILT_IN_PAGES = [
   { value: "donations", label: "หน้าประวัติบริจาค (Donations)" },
   { value: "support", label: "หน้าช่วยเหลือ (Support)" },
   { value: "settings", label: "หน้าตั้งค่า (Settings)" },
+  { value: "privacy", label: "หน้านโยบายความเป็นส่วนตัว (Privacy)" },
+  { value: "terms", label: "หน้าข้อกำหนดและเงื่อนไข (Terms)" },
 ];
 
 const BUILT_IN_SLUGS = new Set(BUILT_IN_PAGES.map((p) => p.value));
@@ -1152,6 +1154,21 @@ const sectionTypes: Record<string, SectionTypeDef> = {
     },
     fields: [
       { key: "text", label: "ข้อความ version", type: "text" },
+    ],
+  },
+  page_header_basic: {
+    label: "Page Header (Basic)",
+    icon: "📑",
+    description: "Header generic ใช้ซ้ำได้ทุกหน้า",
+    defaultProps: {
+      title: "หัวข้อหน้า",
+      subtitle: "",
+      back_href: "",
+    },
+    fields: [
+      { key: "title", label: "หัวข้อ", type: "text" },
+      { key: "subtitle", label: "คำอธิบาย", type: "text" },
+      { key: "back_href", label: "ลิงก์ปุ่มย้อนกลับ (เว้นว่าง = ไม่มี)", type: "text" },
     ],
   },
 };

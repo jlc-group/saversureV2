@@ -51,6 +51,7 @@ const SettingsPageHeader = dynamic(() => import("./SettingsPageHeader"));
 const SettingsNotificationsGroup = dynamic(() => import("./SettingsNotificationsGroup"));
 const SettingsDeleteAccountCard = dynamic(() => import("./SettingsDeleteAccountCard"));
 const SettingsAppVersionFooter = dynamic(() => import("./SettingsAppVersionFooter"));
+const PageHeaderBasic = dynamic(() => import("./PageHeaderBasic"));
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const sectionRegistry: Record<string, ComponentType<any>> = {
@@ -104,6 +105,7 @@ export const sectionRegistry: Record<string, ComponentType<any>> = {
   settings_notifications_group: SettingsNotificationsGroup,
   settings_delete_account_card: SettingsDeleteAccountCard,
   settings_app_version_footer: SettingsAppVersionFooter,
+  page_header_basic: PageHeaderBasic,
 };
 
 export interface SectionDefinition {
@@ -367,5 +369,10 @@ export const sectionMeta: Record<
     label: "Settings — App Version",
     icon: "🏷️",
     description: "ข้อความ version ล่างสุด (admin แก้ได้)",
+  },
+  page_header_basic: {
+    label: "Page Header (Basic)",
+    icon: "📑",
+    description: "Header generic ใช้ซ้ำได้ทุกหน้า (title + subtitle + back link)",
   },
 };

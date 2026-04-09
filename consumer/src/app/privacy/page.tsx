@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import PageRenderer from "@/components/PageRenderer";
 
-export default function PrivacyPage() {
+function PrivacyFallback() {
   return (
     <div className="min-h-screen bg-white px-5 py-12">
       <Link href="/register" className="inline-flex items-center gap-2 text-[var(--on-surface-variant)] text-[14px] mb-6">
@@ -31,4 +32,8 @@ export default function PrivacyPage() {
       </div>
     </div>
   );
+}
+
+export default function PrivacyPage() {
+  return <PageRenderer pageSlug="privacy" fallback={<PrivacyFallback />} />;
 }
