@@ -390,25 +390,8 @@ const sectionTypes: Record<string, SectionTypeDef> = {
       { key: "confirm_message", label: "ข้อความยืนยัน (เว้นว่าง = ไม่ confirm)", type: "text" },
     ],
   },
-  history_page_header: {
-    label: "History Page Header",
-    icon: "📜",
-    description: "Header gradient ของหน้า /history",
-    defaultProps: {
-      title: "ประวัติการสะสมแต้ม",
-      show_scan_count: true,
-      gradient_from: "#3C9B4D",
-      gradient_to: "#7DBD48",
-    },
-    fields: [
-      { key: "title", label: "หัวข้อ", type: "text" },
-      { key: "show_scan_count", label: "แสดงจำนวนสแกน", type: "boolean" },
-      { key: "gradient_from", label: "สี gradient เริ่ม (hex)", type: "text" },
-      { key: "gradient_to", label: "สี gradient จบ (hex)", type: "text" },
-    ],
-  },
   history_stat_summary: {
-    label: "History Stat Summary",
+    label: "Stat Summary (4 คอลัมน์)",
     icon: "📊",
     description: "การ์ดสรุป 4-column",
     defaultProps: {
@@ -434,7 +417,7 @@ const sectionTypes: Record<string, SectionTypeDef> = {
     fields: [],
   },
   history_scan_list: {
-    label: "History Scan List",
+    label: "Scans",
     icon: "📋",
     description: "รายการสแกน + infinite scroll",
     defaultProps: {
@@ -453,7 +436,7 @@ const sectionTypes: Record<string, SectionTypeDef> = {
     ],
   },
   home_news_banner_carousel: {
-    label: "Home — News Banner",
+    label: "News Banner Carousel",
     icon: "🎠",
     description: "Banner carousel ดึงข่าวล่าสุดจาก API",
     defaultProps: {
@@ -470,7 +453,7 @@ const sectionTypes: Record<string, SectionTypeDef> = {
     ],
   },
   home_section_heading: {
-    label: "Home — หัวข้อ Section",
+    label: "Section Heading",
     icon: "📝",
     description: "หัวข้อ section (title + subtitle)",
     defaultProps: {
@@ -546,21 +529,6 @@ const sectionTypes: Record<string, SectionTypeDef> = {
       { key: "show_end_date", label: "แสดงวันสิ้นสุด", type: "boolean" },
     ],
   },
-  rewards_page_header: {
-    label: "Rewards — Header",
-    icon: "🎁",
-    description: "Header gradient หน้ารางวัล + ยอดคงเหลือ currency ของผู้ใช้",
-    defaultProps: {
-      title: "🎁 แลกรางวัล",
-      subtitle: "แลกของรางวัลและสิทธิพิเศษ",
-      show_balance: true,
-    },
-    fields: [
-      { key: "title", label: "หัวข้อ", type: "text" },
-      { key: "subtitle", label: "คำอธิบาย", type: "text" },
-      { key: "show_balance", label: "แสดงยอดคงเหลือ (Balance pills)", type: "boolean" },
-    ],
-  },
   rewards_tabs_grid: {
     label: "Rewards — Tabs + Grid",
     icon: "🎁",
@@ -622,34 +590,8 @@ const sectionTypes: Record<string, SectionTypeDef> = {
       { key: "hide_if_guest", label: "ซ่อนเมื่อยังไม่ login", type: "boolean" },
     ],
   },
-  missions_page_header: {
-    label: "Missions — Header",
-    icon: "🎯",
-    description: "Header gradient หน้าภารกิจ (title + subtitle)",
-    defaultProps: {
-      title: "ภารกิจ",
-      subtitle: "ทำภารกิจรับคะแนนและ Badge",
-    },
-    fields: [
-      { key: "title", label: "หัวข้อ", type: "text" },
-      { key: "subtitle", label: "คำอธิบาย", type: "text" },
-    ],
-  },
-  shop_page_header: {
-    label: "Shop — Header",
-    icon: "🛒",
-    description: "Header gradient หน้าช้อปออนไลน์ (title + subtitle)",
-    defaultProps: {
-      title: "ช้อปออนไลน์",
-      subtitle: "เลือกซื้อสินค้าออนไลน์กับเราได้ที่นี่เลย",
-    },
-    fields: [
-      { key: "title", label: "หัวข้อ", type: "text" },
-      { key: "subtitle", label: "คำอธิบาย", type: "text" },
-    ],
-  },
   shop_links_list: {
-    label: "Shop — Links List",
+    label: "Shop Channels",
     icon: "🛒",
     description: "รายการช่องทางช้อปออนไลน์ (admin เพิ่ม/ลบ/เรียงได้)",
     defaultProps: {
@@ -724,7 +666,7 @@ const sectionTypes: Record<string, SectionTypeDef> = {
     ],
   },
   missions_tabs_list: {
-    label: "Missions — Tabs + List",
+    label: "Missions",
     icon: "🎯",
     description: "แท็บ + รายการภารกิจ + login CTA + claim modal",
     defaultProps: {
@@ -757,21 +699,8 @@ const sectionTypes: Record<string, SectionTypeDef> = {
       },
     ],
   },
-  wallet_page_header: {
-    label: "Wallet — Header",
-    icon: "💰",
-    description: "Header gradient หน้ากระเป๋าเงิน (title + subtitle)",
-    defaultProps: {
-      title: "กระเป๋าเงิน",
-      subtitle: "ยอดคงเหลือทั้งหมดของคุณ",
-    },
-    fields: [
-      { key: "title", label: "หัวข้อ", type: "text" },
-      { key: "subtitle", label: "คำอธิบาย", type: "text" },
-    ],
-  },
   wallet_balance_cards: {
-    label: "Wallet — Balance Cards",
+    label: "Balance Cards",
     icon: "💳",
     description: "การ์ดยอดคงเหลือ currency หลัก + รอง (auto จาก useCurrencies)",
     defaultProps: {
@@ -794,7 +723,7 @@ const sectionTypes: Record<string, SectionTypeDef> = {
     ],
   },
   wallet_transaction_list: {
-    label: "Wallet — Transaction List",
+    label: "Transactions",
     icon: "📋",
     description: "รายการธุรกรรมแต้ม + filter ตาม currency + infinite scroll",
     defaultProps: {
@@ -812,23 +741,8 @@ const sectionTypes: Record<string, SectionTypeDef> = {
       { key: "filter_all_label", label: "ข้อความแท็บ 'ทั้งหมด'", type: "text" },
     ],
   },
-  news_page_header: {
-    label: "News — Header",
-    icon: "📰",
-    description: "Header gradient หน้าข่าวสาร (title + subtitle + icon emoji)",
-    defaultProps: {
-      title: "ข่าวสาร",
-      subtitle: "โปรโมชั่นและข่าวสารล่าสุด",
-      icon_emoji: "📰",
-    },
-    fields: [
-      { key: "title", label: "หัวข้อ", type: "text" },
-      { key: "subtitle", label: "คำบรรยาย", type: "text" },
-      { key: "icon_emoji", label: "ไอคอน (emoji)", type: "text" },
-    ],
-  },
   news_list: {
-    label: "News — List",
+    label: "News",
     icon: "📰",
     description: "รายการข่าวสารเต็มหน้า + expand อ่านเนื้อหา + loading/error/empty states",
     defaultProps: {
@@ -858,21 +772,8 @@ const sectionTypes: Record<string, SectionTypeDef> = {
       { key: "retry_label", label: "ปุ่ม 'ลองใหม่'", type: "text" },
     ],
   },
-  notifications_page_header: {
-    label: "Notifications — Header",
-    icon: "🔔",
-    description: "Sticky header หน้า notifications (back + title)",
-    defaultProps: {
-      title: "Notifications",
-      back_href: "/",
-    },
-    fields: [
-      { key: "title", label: "หัวข้อ", type: "text" },
-      { key: "back_href", label: "ลิงก์ย้อนกลับ", type: "text" },
-    ],
-  },
   notifications_list: {
-    label: "Notifications — List",
+    label: "Notifications",
     icon: "🔔",
     description: "รายการแจ้งเตือน + mark-all + login CTA + empty/loading states",
     defaultProps: {
@@ -900,21 +801,8 @@ const sectionTypes: Record<string, SectionTypeDef> = {
       { key: "time_day_suffix", label: "suffix วัน (d ago)", type: "text" },
     ],
   },
-  support_page_header: {
-    label: "Support — Header",
-    icon: "❓",
-    description: "Header gradient หน้า support",
-    defaultProps: {
-      title: "คำถามที่พบบ่อย",
-      subtitle: "รวมคำตอบและวิธีการใช้งานเบื้องต้น",
-    },
-    fields: [
-      { key: "title", label: "หัวข้อ", type: "text" },
-      { key: "subtitle", label: "คำอธิบาย", type: "text" },
-    ],
-  },
   support_faq_list: {
-    label: "Support — FAQ List",
+    label: "Accordion",
     icon: "❓",
     description: "รายการ FAQ accordion (แก้ items ได้)",
     defaultProps: {
@@ -935,7 +823,7 @@ const sectionTypes: Record<string, SectionTypeDef> = {
     ],
   },
   support_contact_cta: {
-    label: "Support — Contact CTA",
+    label: "Contact CTA Card",
     icon: "✉️",
     description: "การ์ด CTA ลิงก์ไปหน้าแจ้งปัญหา",
     defaultProps: {
@@ -949,23 +837,8 @@ const sectionTypes: Record<string, SectionTypeDef> = {
       { key: "cta_href", label: "ลิงก์ปุ่ม", type: "text" },
     ],
   },
-  settings_page_header: {
-    label: "Settings — Header",
-    icon: "⚙️",
-    description: "Header หน้าตั้งค่า",
-    defaultProps: {
-      title: "การตั้งค่าแอปพลิเคชัน",
-      subtitle: "จัดการการแจ้งเตือนและความเป็นส่วนตัว",
-      back_href: "/profile",
-    },
-    fields: [
-      { key: "title", label: "หัวข้อ", type: "text" },
-      { key: "subtitle", label: "คำอธิบาย", type: "text" },
-      { key: "back_href", label: "ลิงก์ปุ่มย้อนกลับ", type: "text" },
-    ],
-  },
   settings_notifications_group: {
-    label: "Settings — Notifications Group",
+    label: "Notification Settings",
     icon: "🔔",
     description: "กลุ่ม toggle การแจ้งเตือน (state local)",
     defaultProps: {
@@ -988,7 +861,7 @@ const sectionTypes: Record<string, SectionTypeDef> = {
     ],
   },
   settings_delete_account_card: {
-    label: "Settings — Delete Account",
+    label: "Delete Account Card",
     icon: "🗑️",
     description: "การ์ดปุ่มลบบัญชี + warning",
     defaultProps: {
@@ -1005,7 +878,7 @@ const sectionTypes: Record<string, SectionTypeDef> = {
     ],
   },
   settings_app_version_footer: {
-    label: "Settings — App Version",
+    label: "App Version Footer",
     icon: "🏷️",
     description: "ข้อความ version ล่างสุด",
     defaultProps: {
@@ -1015,19 +888,83 @@ const sectionTypes: Record<string, SectionTypeDef> = {
       { key: "text", label: "ข้อความ version", type: "text" },
     ],
   },
-  page_header_basic: {
-    label: "Page Header (Basic)",
+  section_header: {
+    label: "Header",
     icon: "📑",
-    description: "Header generic ใช้ซ้ำได้ทุกหน้า",
+    description:
+      "Header ส่วนหัวของหน้า ใช้ได้ทุกหน้า (เลือก variant/decoration/icon/title size ได้)",
     defaultProps: {
+      variant: "gradient",
       title: "หัวข้อหน้า",
       subtitle: "",
       back_href: "",
+      decoration: "circles",
+      title_size: "lg",
+      icon_style: "none",
+      icon_emoji: "",
+      gradient_from: "#3C9B4D",
+      gradient_to: "#7DBD48",
+      show_balance: false,
+      show_scan_count: false,
     },
     fields: [
+      {
+        key: "variant",
+        label: "รูปแบบ Layout",
+        type: "select",
+        options: [
+          { value: "gradient", label: "Gradient (มาตรฐาน — มีพื้นหลัง gradient เขียว)" },
+          { value: "sticky", label: "Sticky (แถบขาวติดด้านบน + ปุ่มย้อนกลับ)" },
+          { value: "basic", label: "Basic (gradient + ปุ่มย้อนกลับเล็ก)" },
+        ],
+      },
       { key: "title", label: "หัวข้อ", type: "text" },
       { key: "subtitle", label: "คำอธิบาย", type: "text" },
       { key: "back_href", label: "ลิงก์ปุ่มย้อนกลับ (เว้นว่าง = ไม่มี)", type: "text" },
+      {
+        key: "title_size",
+        label: "ขนาดหัวข้อ (เฉพาะ gradient)",
+        type: "select",
+        options: [
+          { value: "lg", label: "ใหญ่ (text-[40px] — default)" },
+          { value: "md", label: "กลาง (text-3xl — ใช้กับหน้า rewards)" },
+          { value: "sm", label: "เล็ก (text-xl — ใช้กับหน้า news)" },
+        ],
+      },
+      {
+        key: "decoration",
+        label: "ลวดลายพื้นหลัง (เฉพาะ gradient)",
+        type: "select",
+        options: [
+          { value: "circles", label: "วงกลมลอย (default)" },
+          { value: "leaf", label: "ใบไม้ (missions/shop)" },
+          { value: "simple", label: "เรียบ (wallet — 2 วงกลม)" },
+          { value: "none", label: "ไม่มีลวดลาย" },
+        ],
+      },
+      {
+        key: "icon_style",
+        label: "ไอคอนข้างหัวข้อ",
+        type: "select",
+        options: [
+          { value: "none", label: "ไม่มี" },
+          { value: "emoji_inline", label: "Emoji inline (ใช้กับ news)" },
+          { value: "help_circle", label: "วงกลม ? (ใช้กับ support)" },
+        ],
+      },
+      { key: "icon_emoji", label: "Emoji (เมื่อเลือก emoji_inline)", type: "text" },
+      { key: "gradient_from", label: "สี gradient เริ่ม (hex)", type: "text" },
+      { key: "gradient_to", label: "สี gradient จบ (hex)", type: "text" },
+      {
+        key: "show_balance",
+        label: "แสดง Balance pills (เฉพาะ logged in) — ใช้กับ rewards",
+        type: "boolean",
+      },
+      {
+        key: "show_scan_count",
+        label: "แสดงจำนวนสแกน (เฉพาะ logged in) — ใช้กับ history",
+        type: "boolean",
+      },
     ],
   },
 };

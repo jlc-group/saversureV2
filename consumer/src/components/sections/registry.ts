@@ -16,7 +16,6 @@ const ProfilePointsCard = dynamic(() => import("./ProfilePointsCard"));
 const ProfileWarningAlert = dynamic(() => import("./ProfileWarningAlert"));
 const ProfileMenuGroup = dynamic(() => import("./ProfileMenuGroup"));
 const ProfileLogoutButton = dynamic(() => import("./ProfileLogoutButton"));
-const HistoryPageHeader = dynamic(() => import("./HistoryPageHeader"));
 const HistoryStatSummary = dynamic(() => import("./HistoryStatSummary"));
 const HistoryTabsNav = dynamic(() => import("./HistoryTabsNav"));
 const HistoryScanList = dynamic(() => import("./HistoryScanList"));
@@ -24,28 +23,54 @@ const HomeNewsBannerCarousel = dynamic(() => import("./HomeNewsBannerCarousel"))
 const HomeSectionHeading = dynamic(() => import("./HomeSectionHeading"));
 const HomeRewardsTabs = dynamic(() => import("./HomeRewardsTabs"));
 const HomeLuckyDrawList = dynamic(() => import("./HomeLuckyDrawList"));
-const RewardsPageHeader = dynamic(() => import("./RewardsPageHeader"));
 const RewardsTabsGrid = dynamic(() => import("./RewardsTabsGrid"));
 const RewardsHistoryCta = dynamic(() => import("./RewardsHistoryCta"));
-const MissionsPageHeader = dynamic(() => import("./MissionsPageHeader"));
 const MissionsTabsList = dynamic(() => import("./MissionsTabsList"));
-const ShopPageHeader = dynamic(() => import("./ShopPageHeader"));
 const ShopLinksList = dynamic(() => import("./ShopLinksList"));
-const WalletPageHeader = dynamic(() => import("./WalletPageHeader"));
 const WalletBalanceCards = dynamic(() => import("./WalletBalanceCards"));
 const WalletTransactionList = dynamic(() => import("./WalletTransactionList"));
-const NewsPageHeader = dynamic(() => import("./NewsPageHeader"));
 const NewsList = dynamic(() => import("./NewsList"));
-const NotificationsPageHeader = dynamic(() => import("./NotificationsPageHeader"));
 const NotificationsList = dynamic(() => import("./NotificationsList"));
-const SupportPageHeader = dynamic(() => import("./SupportPageHeader"));
 const SupportFaqList = dynamic(() => import("./SupportFaqList"));
 const SupportContactCta = dynamic(() => import("./SupportContactCta"));
-const SettingsPageHeader = dynamic(() => import("./SettingsPageHeader"));
 const SettingsNotificationsGroup = dynamic(() => import("./SettingsNotificationsGroup"));
 const SettingsDeleteAccountCard = dynamic(() => import("./SettingsDeleteAccountCard"));
 const SettingsAppVersionFooter = dynamic(() => import("./SettingsAppVersionFooter"));
-const PageHeaderBasic = dynamic(() => import("./PageHeaderBasic"));
+
+// Generic SectionHeader (replaces 10 per-page header sections)
+const SectionHeader = dynamic(() => import("./SectionHeader"));
+
+// Backward-compat aliases for legacy header types (preset variant props)
+const RewardsHeaderAlias = dynamic(() =>
+  import("./SectionHeaderAliases").then((m) => m.RewardsHeaderAlias),
+);
+const MissionsHeaderAlias = dynamic(() =>
+  import("./SectionHeaderAliases").then((m) => m.MissionsHeaderAlias),
+);
+const ShopHeaderAlias = dynamic(() =>
+  import("./SectionHeaderAliases").then((m) => m.ShopHeaderAlias),
+);
+const WalletHeaderAlias = dynamic(() =>
+  import("./SectionHeaderAliases").then((m) => m.WalletHeaderAlias),
+);
+const NewsHeaderAlias = dynamic(() =>
+  import("./SectionHeaderAliases").then((m) => m.NewsHeaderAlias),
+);
+const NotificationsHeaderAlias = dynamic(() =>
+  import("./SectionHeaderAliases").then((m) => m.NotificationsHeaderAlias),
+);
+const SupportHeaderAlias = dynamic(() =>
+  import("./SectionHeaderAliases").then((m) => m.SupportHeaderAlias),
+);
+const SettingsHeaderAlias = dynamic(() =>
+  import("./SectionHeaderAliases").then((m) => m.SettingsHeaderAlias),
+);
+const HistoryHeaderAlias = dynamic(() =>
+  import("./SectionHeaderAliases").then((m) => m.HistoryHeaderAlias),
+);
+const PageHeaderBasicAlias = dynamic(() =>
+  import("./SectionHeaderAliases").then((m) => m.PageHeaderBasicAlias),
+);
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const sectionRegistry: Record<string, ComponentType<any>> = {
@@ -64,7 +89,6 @@ export const sectionRegistry: Record<string, ComponentType<any>> = {
   profile_warning_alert: ProfileWarningAlert,
   profile_menu_group: ProfileMenuGroup,
   profile_logout_button: ProfileLogoutButton,
-  history_page_header: HistoryPageHeader,
   history_stat_summary: HistoryStatSummary,
   history_tabs_nav: HistoryTabsNav,
   history_scan_list: HistoryScanList,
@@ -72,28 +96,34 @@ export const sectionRegistry: Record<string, ComponentType<any>> = {
   home_section_heading: HomeSectionHeading,
   home_rewards_tabs: HomeRewardsTabs,
   home_lucky_draw_list: HomeLuckyDrawList,
-  rewards_page_header: RewardsPageHeader,
   rewards_tabs_grid: RewardsTabsGrid,
   rewards_history_cta: RewardsHistoryCta,
-  missions_page_header: MissionsPageHeader,
   missions_tabs_list: MissionsTabsList,
-  shop_page_header: ShopPageHeader,
   shop_links_list: ShopLinksList,
-  wallet_page_header: WalletPageHeader,
   wallet_balance_cards: WalletBalanceCards,
   wallet_transaction_list: WalletTransactionList,
-  news_page_header: NewsPageHeader,
   news_list: NewsList,
-  notifications_page_header: NotificationsPageHeader,
   notifications_list: NotificationsList,
-  support_page_header: SupportPageHeader,
   support_faq_list: SupportFaqList,
   support_contact_cta: SupportContactCta,
-  settings_page_header: SettingsPageHeader,
   settings_notifications_group: SettingsNotificationsGroup,
   settings_delete_account_card: SettingsDeleteAccountCard,
   settings_app_version_footer: SettingsAppVersionFooter,
-  page_header_basic: PageHeaderBasic,
+
+  // Unified header (new canonical type)
+  section_header: SectionHeader,
+
+  // Legacy header aliases (preserve existing DB rows)
+  rewards_page_header: RewardsHeaderAlias,
+  missions_page_header: MissionsHeaderAlias,
+  shop_page_header: ShopHeaderAlias,
+  wallet_page_header: WalletHeaderAlias,
+  news_page_header: NewsHeaderAlias,
+  notifications_page_header: NotificationsHeaderAlias,
+  support_page_header: SupportHeaderAlias,
+  settings_page_header: SettingsHeaderAlias,
+  history_page_header: HistoryHeaderAlias,
+  page_header_basic: PageHeaderBasicAlias,
 };
 
 export interface SectionDefinition {
@@ -108,6 +138,11 @@ export const sectionMeta: Record<
   string,
   { label: string; icon: string; description: string }
 > = {
+  section_header: {
+    label: "Header",
+    icon: "📑",
+    description: "Header ส่วนหัวของหน้า (รองรับทุกรูปแบบ — gradient / sticky / มี back button / ไอคอน / balance chips)",
+  },
   hero_banner: {
     label: "Hero Banner",
     icon: "🖼️",
@@ -183,13 +218,8 @@ export const sectionMeta: Record<
     icon: "🚪",
     description: "ปุ่มออกจากระบบ (สีแดง)",
   },
-  history_page_header: {
-    label: "History Page Header",
-    icon: "📜",
-    description: "Header gradient ของหน้า /history + นับจำนวนสแกน",
-  },
   history_stat_summary: {
-    label: "History Stat Summary",
+    label: "Stat Summary (4 คอลัมน์)",
     icon: "📊",
     description: "การ์ดสรุป 4-column (สแกนสำเร็จ / แต้มสะสม / ยอดคงเหลือ / ทั้งหมด)",
   },
@@ -199,19 +229,19 @@ export const sectionMeta: Record<
     description: "แถบแท็บนำทาง (สะสม/แลก/คูปอง/ลุ้นโชค)",
   },
   history_scan_list: {
-    label: "History Scan List",
+    label: "Scans",
     icon: "📋",
-    description: "รายการสแกน พร้อม infinite scroll + group by date",
+    description: "รายการสแกน group by date + infinite scroll (ออกแบบสำหรับ History)",
   },
   home_news_banner_carousel: {
-    label: "Home — News Banner",
+    label: "News Banner Carousel",
     icon: "🎠",
-    description: "Banner carousel ดึงข่าวล่าสุดจาก API",
+    description: "Banner carousel ดึงข่าวล่าสุดจาก API (ออกแบบสำหรับหน้า Home)",
   },
   home_section_heading: {
-    label: "Home — หัวข้อ Section",
+    label: "Section Heading",
     icon: "📝",
-    description: "หัวข้อ section (title + subtitle)",
+    description: "หัวข้อ section คั่นกลาง (title + subtitle) ไม่มี gradient",
   },
   home_rewards_tabs: {
     label: "Home — Rewards พร้อม Tabs",
@@ -223,114 +253,69 @@ export const sectionMeta: Record<
     icon: "🏆",
     description: "รายการกิจกรรมลุ้นโชค ดึงจาก API",
   },
-  rewards_page_header: {
-    label: "Rewards — Header",
-    icon: "🎁",
-    description: "Header gradient หน้ารางวัล + ยอดคงเหลือ currency ของผู้ใช้",
-  },
   rewards_tabs_grid: {
     label: "Rewards — Tabs + Grid",
     icon: "🎁",
-    description: "แท็บกรองหมวด + grid ของรางวัล (จุฬาเฮิร์บ/พรีเมียม/ไลฟ์สไตล์)",
+    description: "แท็บกรองหมวด + grid ของรางวัล",
   },
   rewards_history_cta: {
     label: "Rewards — History CTA",
     icon: "⏰",
-    description: "การ์ดลิงก์ไปประวัติการแลกรางวัล (ซ่อนเมื่อยังไม่ login)",
-  },
-  missions_page_header: {
-    label: "Missions — Header",
-    icon: "🎯",
-    description: "Header gradient หน้าภารกิจ (title + subtitle)",
+    description: "การ์ดลิงก์ไปประวัติการแลกรางวัล",
   },
   missions_tabs_list: {
-    label: "Missions — Tabs + List",
+    label: "Missions",
     icon: "🎯",
-    description: "แท็บ (ทั้งหมด/สำเร็จแล้ว) + รายการภารกิจ + login CTA + claim modal",
-  },
-  shop_page_header: {
-    label: "Shop — Header",
-    icon: "🛒",
-    description: "Header gradient หน้าช้อปออนไลน์ (title + subtitle)",
+    description: "แท็บ (ทั้งหมด/สำเร็จแล้ว) + รายการภารกิจ + progress bar + ปุ่ม Claim",
   },
   shop_links_list: {
-    label: "Shop — Links List",
+    label: "Shop Channels",
     icon: "🛒",
-    description: "รายการช่องทางช้อปออนไลน์ (Shopee/Lazada/LINE/Website/Emoji/Image)",
-  },
-  wallet_page_header: {
-    label: "Wallet — Header",
-    icon: "💰",
-    description: "Header gradient หน้ากระเป๋าเงิน (title + subtitle)",
+    description: "การ์ดช่องทางช้อปออนไลน์ (Shopee/Lazada/LINE/Website — มีสี branding แต่ละแพลตฟอร์ม)",
   },
   wallet_balance_cards: {
-    label: "Wallet — Balance Cards",
+    label: "Balance Cards",
     icon: "💳",
-    description: "การ์ดยอดคงเหลือ currency หลัก + รอง (ใช้ useCurrencies)",
+    description: "การ์ดยอดคงเหลือ currency หลัก + รอง (ออกแบบสำหรับหน้า Wallet)",
   },
   wallet_transaction_list: {
-    label: "Wallet — Transaction List",
+    label: "Transactions",
     icon: "📋",
-    description: "รายการธุรกรรมแต้ม + filter ตาม currency + infinite scroll",
-  },
-  news_page_header: {
-    label: "News — Header",
-    icon: "📰",
-    description: "Header gradient หน้าข่าวสาร (title + subtitle + icon emoji)",
+    description: "รายการธุรกรรมแต้ม + filter currency + infinite scroll (ออกแบบสำหรับ Wallet)",
   },
   news_list: {
-    label: "News — List",
+    label: "News",
     icon: "📰",
-    description: "รายการข่าวสารเต็มหน้า + expand อ่านเนื้อหา + loading/error/empty states",
-  },
-  notifications_page_header: {
-    label: "Notifications — Header",
-    icon: "🔔",
-    description: "Sticky header หน้า notifications (back + title)",
+    description: "รายการข่าวสารเต็มหน้า + expand อ่านเนื้อหา + badge BANNER",
   },
   notifications_list: {
-    label: "Notifications — List",
+    label: "Notifications",
     icon: "🔔",
-    description: "รายการแจ้งเตือน + mark-all + login CTA + empty/loading states",
-  },
-  support_page_header: {
-    label: "Support — Header",
-    icon: "❓",
-    description: "Header gradient หน้า support (title + subtitle)",
+    description: "รายการแจ้งเตือน + mark-all read + unread dot + login CTA",
   },
   support_faq_list: {
-    label: "Support — FAQ List",
-    icon: "❓",
-    description: "รายการ FAQ แบบ accordion (admin แก้ items ได้)",
+    label: "Accordion",
+    icon: "📂",
+    description: "รายการแบบ accordion กดเปิด/ปิดได้ (admin ใส่ items เอง — FAQ/How to/เงื่อนไข ฯลฯ)",
   },
   support_contact_cta: {
-    label: "Support — Contact CTA",
+    label: "Contact CTA Card",
     icon: "✉️",
-    description: "การ์ด CTA ลิงก์ไปหน้าแจ้งปัญหา",
-  },
-  settings_page_header: {
-    label: "Settings — Header",
-    icon: "⚙️",
-    description: "Header หน้าตั้งค่า (title + subtitle + back link)",
+    description: "การ์ด CTA ขนาดเล็ก text + ปุ่มลิงก์ (ใช้สำหรับแจ้งปัญหา/ติดต่อเรา)",
   },
   settings_notifications_group: {
-    label: "Settings — Notifications Group",
+    label: "Notification Settings",
     icon: "🔔",
-    description: "กลุ่ม toggle การแจ้งเตือน (admin แก้ items ได้, state local)",
+    description: "กลุ่ม toggle switch สำหรับตั้งค่าการแจ้งเตือน (admin ใส่ items เอง)",
   },
   settings_delete_account_card: {
-    label: "Settings — Delete Account",
+    label: "Delete Account Card",
     icon: "🗑️",
     description: "การ์ดปุ่มลบบัญชี + warning text",
   },
   settings_app_version_footer: {
-    label: "Settings — App Version",
+    label: "App Version Footer",
     icon: "🏷️",
-    description: "ข้อความ version ล่างสุด (admin แก้ได้)",
-  },
-  page_header_basic: {
-    label: "Page Header (Basic)",
-    icon: "📑",
-    description: "Header generic ใช้ซ้ำได้ทุกหน้า (title + subtitle + back link)",
+    description: "ข้อความ version ล่างสุดของหน้า (admin แก้ข้อความได้)",
   },
 };
