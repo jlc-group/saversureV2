@@ -36,6 +36,10 @@ const NewsList = dynamic(() => import("./NewsList"));
 const NotificationsList = dynamic(() => import("./NotificationsList"));
 const SupportFaqList = dynamic(() => import("./SupportFaqList"));
 const SupportContactCta = dynamic(() => import("./SupportContactCta"));
+const SupportCategoryNav = dynamic(() => import("./SupportCategoryNav"));
+const SupportSearchBar = dynamic(() => import("./SupportSearchBar"));
+const SupportTicketForm = dynamic(() => import("./SupportTicketForm"));
+const SupportTicketList = dynamic(() => import("./SupportTicketList"));
 const SettingsNotificationsGroup = dynamic(() => import("./SettingsNotificationsGroup"));
 const SettingsDeleteAccountCard = dynamic(() => import("./SettingsDeleteAccountCard"));
 const SettingsAppVersionFooter = dynamic(() => import("./SettingsAppVersionFooter"));
@@ -112,6 +116,10 @@ export const sectionRegistry: Record<string, ComponentType<any>> = {
   notifications_list: NotificationsList,
   support_faq_list: SupportFaqList,
   support_contact_cta: SupportContactCta,
+  support_category_nav: SupportCategoryNav,
+  support_search_bar: SupportSearchBar,
+  support_ticket_form: SupportTicketForm,
+  support_ticket_list: SupportTicketList,
   settings_notifications_group: SettingsNotificationsGroup,
   settings_delete_account_card: SettingsDeleteAccountCard,
   settings_app_version_footer: SettingsAppVersionFooter,
@@ -315,14 +323,34 @@ export const sectionMeta: Record<
     description: "รายการแจ้งเตือน + mark-all read + unread dot + login CTA",
   },
   support_faq_list: {
-    label: "Accordion",
+    label: "FAQ Accordion",
     icon: "📂",
-    description: "รายการแบบ accordion กดเปิด/ปิดได้ (admin ใส่ items เอง — FAQ/How to/เงื่อนไข ฯลฯ)",
+    description: "รายการคำถาม-คำตอบแบบ accordion กดเปิด/ปิดได้ (มี title + icon สำหรับจัดกลุ่ม)",
   },
   support_contact_cta: {
     label: "Contact CTA Card",
     icon: "✉️",
     description: "การ์ด CTA ขนาดเล็ก text + ปุ่มลิงก์ (ใช้สำหรับแจ้งปัญหา/ติดต่อเรา)",
+  },
+  support_category_nav: {
+    label: "FAQ Category Nav",
+    icon: "🧭",
+    description: "แถว pill chips หมวด FAQ (auto จาก sections support_faq_list ที่มี title)",
+  },
+  support_search_bar: {
+    label: "FAQ Search Bar",
+    icon: "🔍",
+    description: "ช่องค้นหาคำถาม FAQ (ค้นจาก page_config API ไม่ hardcode)",
+  },
+  support_ticket_form: {
+    label: "Ticket Form",
+    icon: "✏️",
+    description: "ฟอร์มแจ้งปัญหาใหม่ (หมวด + หัวข้อ + รายละเอียด + แนบรูป compressed)",
+  },
+  support_ticket_list: {
+    label: "Ticket List",
+    icon: "📋",
+    description: "รายการคำร้องของฉัน (ดึงจาก API, คลิกเข้าดู thread ได้)",
   },
   settings_notifications_group: {
     label: "Notification Settings",

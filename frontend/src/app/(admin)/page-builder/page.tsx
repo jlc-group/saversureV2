@@ -828,14 +828,16 @@ const sectionTypes: Record<string, SectionTypeDef> = {
     ],
   },
   support_faq_list: {
-    label: "Accordion",
+    label: "FAQ Accordion",
     icon: "❓",
-    description: "รายการ FAQ accordion (แก้ items ได้)",
+    description: "รายการคำถาม-คำตอบ accordion (มี title + icon จัดกลุ่มได้)",
     defaultProps: {
+      title: "",
       items: [],
       empty_text: "ยังไม่มีคำถามที่พบบ่อย",
     },
     fields: [
+      { key: "title", label: "ชื่อหมวด (สำหรับ category nav + collapsible header)", type: "text" },
       { key: "empty_text", label: "ข้อความเมื่อว่าง", type: "text" },
       {
         key: "items",
@@ -844,6 +846,7 @@ const sectionTypes: Record<string, SectionTypeDef> = {
         itemFields: [
           { key: "q", label: "คำถาม", type: "text" },
           { key: "a", label: "คำตอบ", type: "textarea" },
+          { key: "image_url", label: "รูปภาพ (URL)", type: "text" },
         ],
       },
     ],
@@ -853,14 +856,80 @@ const sectionTypes: Record<string, SectionTypeDef> = {
     icon: "✉️",
     description: "การ์ด CTA ลิงก์ไปหน้าแจ้งปัญหา",
     defaultProps: {
-      text: "ไม่พบคำตอบที่ต้องการ หรือต้องการแจ้งปัญหา?",
-      cta_label: "ไปหน้าแจ้งปัญหา",
-      cta_href: "/support/history?tab=ticket",
+      text: "ต้องการความช่วยเหลือเพิ่มเติม?",
+      cta_label: "ติดต่อทีมงาน",
+      cta_href: "/support/tickets",
     },
     fields: [
       { key: "text", label: "ข้อความ", type: "text" },
       { key: "cta_label", label: "ข้อความปุ่ม", type: "text" },
       { key: "cta_href", label: "ลิงก์ปุ่ม", type: "text" },
+    ],
+  },
+  support_search_bar: {
+    label: "FAQ Search Bar",
+    icon: "🔍",
+    description: "ช่องค้นหาคำถาม FAQ (ค้นจาก page_config API ไม่ hardcode)",
+    defaultProps: {
+      placeholder: "ค้นหาคำถาม...",
+      page_slug: "support",
+      empty_text: "ไม่พบคำถามที่ตรงกับคำค้นหา",
+    },
+    fields: [
+      { key: "placeholder", label: "Placeholder", type: "text" },
+      { key: "page_slug", label: "Page slug ที่ค้นหา", type: "text" },
+      { key: "empty_text", label: "ข้อความไม่พบผลลัพธ์", type: "text" },
+    ],
+  },
+  support_category_nav: {
+    label: "FAQ Category Nav",
+    icon: "🧭",
+    description: "แถว pill chips หมวด FAQ (auto จาก sections support_faq_list ที่มี title)",
+    defaultProps: {
+      page_slug: "support",
+    },
+    fields: [
+      { key: "page_slug", label: "Page slug ที่อ่าน sections", type: "text" },
+    ],
+  },
+  support_ticket_form: {
+    label: "Ticket Form",
+    icon: "✏️",
+    description: "ฟอร์มแจ้งปัญหาใหม่ (หมวด + หัวข้อ + รายละเอียด + แนบรูป compressed)",
+    defaultProps: {
+      title: "แจ้งปัญหาใหม่",
+      description: "ส่งตั๋วคำร้องถึงทีมงาน",
+      submit_label: "ส่งเรื่องแจ้งปัญหา",
+      success_text: "ส่งเรื่องเรียบร้อยแล้ว ทีมงานจะตอบกลับโดยเร็ว",
+      login_title: "กรุณาเข้าสู่ระบบ",
+      login_text: "เข้าสู่ระบบเพื่อแจ้งปัญหาและติดตามสถานะ",
+    },
+    fields: [
+      { key: "title", label: "หัวข้อ section", type: "text" },
+      { key: "description", label: "คำอธิบาย", type: "text" },
+      { key: "submit_label", label: "ข้อความปุ่ม submit", type: "text" },
+      { key: "success_text", label: "ข้อความสำเร็จ", type: "text" },
+      { key: "login_title", label: "หัวข้อ login prompt", type: "text" },
+      { key: "login_text", label: "คำอธิบาย login prompt", type: "text" },
+    ],
+  },
+  support_ticket_list: {
+    label: "Ticket List",
+    icon: "📋",
+    description: "รายการคำร้องของฉัน (ดึงจาก API, คลิกดู thread ได้)",
+    defaultProps: {
+      title: "คำร้องของฉัน",
+      empty_title: "ยังไม่มีประวัติ",
+      empty_text: "คุณยังไม่เคยแจ้งปัญหา",
+      login_title: "กรุณาเข้าสู่ระบบ",
+      login_text: "เข้าสู่ระบบเพื่อดูประวัติการแจ้งปัญหา",
+    },
+    fields: [
+      { key: "title", label: "หัวข้อ section", type: "text" },
+      { key: "empty_title", label: "หัวข้อเมื่อว่าง", type: "text" },
+      { key: "empty_text", label: "ข้อความเมื่อว่าง", type: "text" },
+      { key: "login_title", label: "หัวข้อ login prompt", type: "text" },
+      { key: "login_text", label: "คำอธิบาย login prompt", type: "text" },
     ],
   },
   settings_notifications_group: {
@@ -1175,6 +1244,10 @@ const sectionCategories: SectionCategory[] = [
       "profile_warning_alert",
       "profile_logout_button",
       "support_contact_cta",
+      "support_search_bar",
+      "support_category_nav",
+      "support_ticket_form",
+      "support_ticket_list",
       "settings_notifications_group",
       "settings_delete_account_card",
       "settings_app_version_footer",

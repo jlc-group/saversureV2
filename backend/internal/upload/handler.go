@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/disintegration/imaging"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
@@ -18,6 +19,19 @@ import (
 
 	"saversure/internal/apperror"
 )
+
+// ── Image upload constants (single source of truth) ──
+
+const ImageMaxSize int64 = 5 * 1024 * 1024 // 5 MB max upload
+
+var ImageAllowedTypes = []string{
+	"image/jpeg", "image/png", "image/gif", "image/webp",
+}
+
+// ── Compression settings ──
+
+const CompressedMaxBytes = 200 * 1024 // 200 KB target
+const CompressMaxDim = 1200           // max width or height in px
 
 type Handler struct {
 	client       *minio.Client
@@ -150,6 +164,111 @@ func (h *Handler) UploadFile(c *gin.Context) {
 
 	url := fmt.Sprintf("%s/%s/%s", strings.TrimRight(h.publicURL, "/"), h.bucket, objectName)
 	c.JSON(http.StatusOK, gin.H{"url": url, "filename": header.Filename, "size": header.Size})
+}
+
+// ── Image compression ──
+
+// compressImage decodes any supported image, resizes to fit within
+// CompressMaxDim, then encodes as JPEG with adaptive quality to
+// guarantee output ≤ CompressedMaxBytes.
+func compressImage(input io.Reader) ([]byte, string, error) {
+	img, err := imaging.Decode(input, imaging.AutoOrientation(true))
+	if err != nil {
+		return nil, "", fmt.Errorf("decode: %w", err)
+	}
+
+	// Resize — fit within max dimension, keep aspect ratio.
+	// imaging.Fit is a no-op when image is already smaller.
+	img = imaging.Fit(img, CompressMaxDim, CompressMaxDim, imaging.Lanczos)
+
+	// Adaptive quality loop: start at 80, step down until ≤ target size.
+	var buf bytes.Buffer
+	for quality := 80; quality >= 30; quality -= 5 {
+		buf.Reset()
+		if err := imaging.Encode(&buf, img, imaging.JPEG,
+			imaging.JPEGQuality(quality)); err != nil {
+			return nil, "", fmt.Errorf("encode q%d: %w", quality, err)
+		}
+		if buf.Len() <= CompressedMaxBytes {
+			return buf.Bytes(), "image/jpeg", nil
+		}
+	}
+
+	// Fallback: resize smaller if quality 30 still exceeds target.
+	img = imaging.Fit(img, 800, 800, imaging.Lanczos)
+	buf.Reset()
+	if err := imaging.Encode(&buf, img, imaging.JPEG,
+		imaging.JPEGQuality(40)); err != nil {
+		return nil, "", fmt.Errorf("encode fallback: %w", err)
+	}
+	return buf.Bytes(), "image/jpeg", nil
+}
+
+// ── User-facing image upload (support tickets) ──
+
+func (h *Handler) UploadUserImage(c *gin.Context) {
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "no file provided"})
+		return
+	}
+	defer file.Close()
+
+	if header.Size > ImageMaxSize {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf("file too large (max %d MB)", ImageMaxSize/(1024*1024)),
+		})
+		return
+	}
+
+	contentType := header.Header.Get("Content-Type")
+	if !allowedTypes[contentType] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "only JPEG, PNG, GIF, WebP allowed"})
+		return
+	}
+
+	compressed, compressedCT, err := compressImage(file)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "image processing failed: " + err.Error()})
+		return
+	}
+
+	userID := c.GetString("user_id")
+	if userID == "" {
+		userID = "anon"
+	}
+	objectName := fmt.Sprintf("user-uploads/%s/%s/%s.jpg",
+		time.Now().Format("2006/01"),
+		userID,
+		uuid.New().String(),
+	)
+
+	_, err = h.client.PutObject(
+		c.Request.Context(), h.bucket, objectName,
+		bytes.NewReader(compressed), int64(len(compressed)),
+		minio.PutObjectOptions{ContentType: compressedCT},
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "upload failed"})
+		return
+	}
+
+	url := fmt.Sprintf("%s/%s/%s", strings.TrimRight(h.publicURL, "/"), h.bucket, objectName)
+	c.JSON(http.StatusOK, gin.H{
+		"url":           url,
+		"filename":      header.Filename,
+		"size":          len(compressed),
+		"original_size": header.Size,
+	})
+}
+
+// ── Public upload config (no hardcode on frontend) ──
+
+func (h *Handler) GetConfig(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"max_size_bytes": ImageMaxSize,
+		"allowed_types":  ImageAllowedTypes,
+	})
 }
 
 type aiGenerateRequest struct {

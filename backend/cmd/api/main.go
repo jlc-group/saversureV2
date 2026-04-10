@@ -652,6 +652,13 @@ func main() {
 		supportUserRoutes.POST("/:id/reply", supportHandler.Reply)
 	}
 
+	// Public support routes (no auth needed — consumer fetches categories)
+	publicSupportRoutes := api.Group("/public/support")
+	publicSupportRoutes.Use(mw.TenantFromHeader())
+	{
+		publicSupportRoutes.GET("/categories", supportHandler.GetCategories)
+	}
+
 	// Lucky Draw (Admin)
 	luckyDrawAdminRoutes := tenanted.Group("/lucky-draw")
 	luckyDrawAdminRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
@@ -830,6 +837,18 @@ func main() {
 			uploadImageRoute.POST("/image", uploadHandler.UploadImage)
 			uploadImageRoute.POST("/ai-generate", uploadHandler.AIGenerateImage)
 		}
+
+		// User-facing image upload (support tickets).
+		// Any authenticated user, rate limited, auto-compressed to ≤ 200KB.
+		userUploadRoute := tenanted.Group("/upload")
+		userUploadRoute.Use(mw.RateLimit(rdb, "upload", cfg.RateLimit.Upload, time.Minute))
+		{
+			userUploadRoute.POST("/user-image", uploadHandler.UploadUserImage)
+		}
+
+		// Public upload config (max size, allowed types) — frontend
+		// fetches these instead of hardcoding limits.
+		api.GET("/public/upload/config", uploadHandler.GetConfig)
 	}
 
 	// Export Management (rate limited)

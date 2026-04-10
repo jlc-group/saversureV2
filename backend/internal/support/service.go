@@ -15,6 +15,24 @@ func NewService(db *pgxpool.Pool) *Service {
 	return &Service{db: db}
 }
 
+// ── Category definitions (single source of truth) ──
+
+type Category struct {
+	Value string `json:"value"`
+	Label string `json:"label"`
+}
+
+// SupportCategories is the canonical list shared by DB CHECK constraint,
+// API validation, and public /categories endpoint.
+var SupportCategories = []Category{
+	{Value: "general", Label: "ทั่วไป"},
+	{Value: "points", Label: "เกี่ยวกับแต้มสะสม"},
+	{Value: "rewards", Label: "เกี่ยวกับของรางวัล"},
+	{Value: "account", Label: "บัญชีผู้ใช้"},
+	{Value: "scan", Label: "การสแกน QR"},
+	{Value: "other", Label: "อื่นๆ"},
+}
+
 type Case struct {
 	ID         string  `json:"id"`
 	TenantID   string  `json:"tenant_id"`

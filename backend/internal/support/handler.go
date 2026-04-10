@@ -18,6 +18,12 @@ func NewHandler(db *pgxpool.Pool) *Handler {
 	return &Handler{svc: NewService(db)}
 }
 
+// GetCategories returns the canonical list of support categories.
+// Used by consumer ticket form (fetches from API, no hardcode).
+func (h *Handler) GetCategories(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"data": SupportCategories})
+}
+
 func (h *Handler) ListCases(c *gin.Context) {
 	tenantID := c.GetString("tenant_id")
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
