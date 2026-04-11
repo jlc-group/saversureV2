@@ -47,6 +47,80 @@ type UpdateInput struct {
 	CustomerFlag *string `json:"customer_flag"`
 }
 
+func committedRedemptionStatusList() string {
+	return "'CONFIRMED','SHIPPING','SHIPPED','COMPLETED'"
+}
+
+func derivedBalanceExpr(userAlias string) string {
+	return fmt.Sprintf(
+		`COALESCE(
+			CASE
+				WHEN EXISTS (
+					SELECT 1
+					FROM point_ledger pl
+					WHERE pl.tenant_id = %[1]s.tenant_id
+					  AND pl.user_id = %[1]s.id
+				)
+				THEN (
+					SELECT CASE
+						WHEN latest.reference_type = 'v1_live_sync_balance'
+						 AND latest.created_at < COALESCE((
+							SELECT MAX(sh.scanned_at)
+							FROM scan_history sh
+							WHERE sh.tenant_id = %[1]s.tenant_id
+							  AND sh.user_id = %[1]s.id
+							  AND COALESCE(sh.scan_type, 'success') = 'success'
+						), latest.created_at)
+						THEN (
+							(SELECT COALESCE(SUM(points_earned), 0)
+							 FROM scan_history
+							 WHERE tenant_id = %[1]s.tenant_id
+							   AND user_id = %[1]s.id
+							   AND COALESCE(scan_type, 'success') = 'success')
+							-
+							COALESCE((
+								SELECT SUM(r.point_cost)
+								FROM reward_reservations rr
+								JOIN rewards r ON r.id = rr.reward_id
+								WHERE rr.tenant_id = %[1]s.tenant_id
+								  AND rr.user_id = %[1]s.id
+								  AND rr.status IN (%[2]s)
+							), 0)
+						)
+						ELSE latest.balance_after
+					END
+					FROM (
+						SELECT balance_after, reference_type, created_at
+						FROM point_ledger
+						WHERE tenant_id = %[1]s.tenant_id AND user_id = %[1]s.id
+						ORDER BY created_at DESC
+						LIMIT 1
+					) latest
+				)
+				ELSE (
+					(SELECT COALESCE(SUM(points_earned), 0)
+					 FROM scan_history
+					 WHERE tenant_id = %[1]s.tenant_id
+					   AND user_id = %[1]s.id
+					   AND COALESCE(scan_type, 'success') = 'success')
+					-
+					COALESCE((
+						SELECT SUM(r.point_cost)
+						FROM reward_reservations rr
+						JOIN rewards r ON r.id = rr.reward_id
+						WHERE rr.tenant_id = %[1]s.tenant_id
+						  AND rr.user_id = %[1]s.id
+						  AND rr.status IN (%[2]s)
+					), 0)
+				)
+			END,
+			0
+		)`,
+		userAlias,
+		committedRedemptionStatusList(),
+	)
+}
+
 func (s *Service) List(ctx context.Context, tenantID string, f ListFilter) ([]Customer, int64, error) {
 	if f.Limit <= 0 {
 		f.Limit = 50
@@ -71,15 +145,15 @@ func (s *Service) List(ctx context.Context, tenantID string, f ListFilter) ([]Cu
 	query := fmt.Sprintf(
 		`SELECT u.id, u.tenant_id, u.email, u.phone, u.display_name, u.first_name, u.last_name, u.avatar_url, u.status,
 		        u.province, u.occupation, COALESCE(u.customer_flag, 'green'),
-		        COALESCE((SELECT balance_after FROM point_ledger WHERE tenant_id = u.tenant_id AND user_id = u.id ORDER BY created_at DESC LIMIT 1), 0),
+		        %s,
 		        COALESCE((SELECT COUNT(*) FROM scan_history WHERE tenant_id = u.tenant_id AND user_id = u.id AND COALESCE(scan_type, 'success') = 'success'), 0),
-		        COALESCE((SELECT COUNT(*) FROM reward_reservations WHERE tenant_id = u.tenant_id AND user_id = u.id AND status = 'CONFIRMED'), 0),
+		        COALESCE((SELECT COUNT(*) FROM reward_reservations WHERE tenant_id = u.tenant_id AND user_id = u.id AND status IN (`+committedRedemptionStatusList()+`)), 0),
 		        u.created_at::text
 		 FROM users u
 		 WHERE %s
 		 ORDER BY u.created_at DESC
 		 LIMIT $%d OFFSET $%d`,
-		where, argN, argN+1,
+		derivedBalanceExpr("u"), where, argN, argN+1,
 	)
 	args = append(args, f.Limit, f.Offset)
 
@@ -107,9 +181,9 @@ func (s *Service) GetByID(ctx context.Context, tenantID, id string) (*Customer, 
 	err := s.db.QueryRow(ctx,
 		`SELECT u.id, u.tenant_id, u.email, u.phone, u.display_name, u.first_name, u.last_name, u.avatar_url, u.status,
 		        u.province, u.occupation, COALESCE(u.customer_flag, 'green'),
-		        COALESCE((SELECT balance_after FROM point_ledger WHERE tenant_id = u.tenant_id AND user_id = u.id ORDER BY created_at DESC LIMIT 1), 0),
+		        `+derivedBalanceExpr("u")+`,
 		        COALESCE((SELECT COUNT(*) FROM scan_history WHERE tenant_id = u.tenant_id AND user_id = u.id AND COALESCE(scan_type, 'success') = 'success'), 0),
-		        COALESCE((SELECT COUNT(*) FROM reward_reservations WHERE tenant_id = u.tenant_id AND user_id = u.id AND status = 'CONFIRMED'), 0),
+		        COALESCE((SELECT COUNT(*) FROM reward_reservations WHERE tenant_id = u.tenant_id AND user_id = u.id AND status IN (`+committedRedemptionStatusList()+`)), 0),
 		        u.created_at::text
 		 FROM users u
 		 WHERE u.id = $1 AND u.tenant_id = $2`,
@@ -191,8 +265,24 @@ type ScanHistoryEntry struct {
 	CampaignID   string   `json:"campaign_id"`
 	PointsEarned int      `json:"points_earned"`
 	ScannedAt    string   `json:"scanned_at"`
+	ScanType     string   `json:"scan_type"`
 	Latitude     *float64 `json:"latitude,omitempty"`
 	Longitude    *float64 `json:"longitude,omitempty"`
+	Province     *string  `json:"province,omitempty"`
+	District     *string  `json:"district,omitempty"`
+	SubDistrict  *string  `json:"sub_district,omitempty"`
+	PostalCode   *string  `json:"postal_code,omitempty"`
+	ProductName  *string  `json:"product_name,omitempty"`
+	ProductSKU   *string  `json:"product_sku,omitempty"`
+	ProductImageURL *string `json:"product_image_url,omitempty"`
+
+	LegacySerial          *string `json:"legacy_serial,omitempty"`
+	LegacyProductName     *string `json:"legacy_product_name,omitempty"`
+	LegacyProductSKU      *string `json:"legacy_product_sku,omitempty"`
+	LegacyProductImageURL *string `json:"legacy_product_image_url,omitempty"`
+	LegacyStatus          *int    `json:"legacy_status,omitempty"`
+
+	DataSource string `json:"data_source"`
 }
 
 // PointLedgerEntry is a single ledger entry for GetDetail.
@@ -207,37 +297,38 @@ type PointLedgerEntry struct {
 
 // RedemptionEntry is a single redemption for GetDetail.
 type RedemptionEntry struct {
-	ID         string `json:"id"`
-	Status     string `json:"status"`
-	CreatedAt  string `json:"created_at"`
-	RewardName string `json:"reward_name"`
-	PointCost  int    `json:"point_cost"`
+	ID             string  `json:"id"`
+	Status         string  `json:"status"`
+	CreatedAt      string  `json:"created_at"`
+	RewardName     string  `json:"reward_name"`
+	RewardImageURL *string `json:"reward_image_url,omitempty"`
+	PointCost      int     `json:"point_cost"`
 }
 
 // AddressEntry is a user address for GetDetail.
 type AddressEntry struct {
-	ID           string  `json:"id"`
-	Label        string  `json:"label"`
-	RecipientName string `json:"recipient_name"`
-	Phone        string `json:"phone"`
-	AddressLine1 string `json:"address_line1"`
-	AddressLine2 *string `json:"address_line2,omitempty"`
-	District     *string `json:"district,omitempty"`
-	SubDistrict  *string `json:"sub_district,omitempty"`
-	Province     *string `json:"province,omitempty"`
-	PostalCode   *string `json:"postal_code,omitempty"`
-	IsDefault    bool    `json:"is_default"`
-	CreatedAt    string  `json:"created_at"`
+	ID            string  `json:"id"`
+	Label         string  `json:"label"`
+	RecipientName string  `json:"recipient_name"`
+	Phone         string  `json:"phone"`
+	AddressLine1  string  `json:"address_line1"`
+	AddressLine2  *string `json:"address_line2,omitempty"`
+	District      *string `json:"district,omitempty"`
+	SubDistrict   *string `json:"sub_district,omitempty"`
+	Province      *string `json:"province,omitempty"`
+	PostalCode    *string `json:"postal_code,omitempty"`
+	IsDefault     bool    `json:"is_default"`
+	CreatedAt     string  `json:"created_at"`
 }
 
 // DetailResult is the full customer detail for GetDetail.
 type DetailResult struct {
-	Profile      DetailProfile       `json:"profile"`
-	Balance      int                 `json:"balance"`
-	ScanHistory  []ScanHistoryEntry  `json:"scan_history"`
-	PointLedger  []PointLedgerEntry  `json:"point_ledger"`
-	Redemptions  []RedemptionEntry   `json:"redemptions"`
-	Addresses    []AddressEntry     `json:"addresses"`
+	Profile     DetailProfile      `json:"profile"`
+	Balance     int                `json:"balance"`
+	ScanHistory []ScanHistoryEntry `json:"scan_history"`
+	PointLedger []PointLedgerEntry `json:"point_ledger"`
+	Redemptions []RedemptionEntry  `json:"redemptions"`
+	Addresses   []AddressEntry     `json:"addresses"`
 }
 
 func (s *Service) GetDetail(ctx context.Context, tenantID, customerID string) (*DetailResult, error) {
@@ -261,19 +352,38 @@ func (s *Service) GetDetail(ctx context.Context, tenantID, customerID string) (*
 
 	var balance int
 	_ = s.db.QueryRow(ctx,
-		`SELECT COALESCE((SELECT balance_after FROM point_ledger WHERE tenant_id = $1 AND user_id = $2 ORDER BY created_at DESC LIMIT 1), 0)`,
+		`SELECT `+derivedBalanceExpr("u")+`
+		 FROM users u
+		 WHERE u.tenant_id = $1 AND u.id = $2`,
 		tenantID, customerID,
 	).Scan(&balance)
 
-	// Scan history: use scan_history so migrated historical records appear immediately.
 	scanRows, err := s.db.Query(ctx,
 		`SELECT sh.id, COALESCE(sh.campaign_id::text, ''),
 		        COALESCE(sh.points_earned, 0),
-		        sh.scanned_at::text
+		        sh.scanned_at::text,
+		        COALESCE(sh.scan_type, 'success'),
+		        sh.latitude, sh.longitude,
+		        sh.province, sh.district, sh.sub_district, sh.postal_code,
+		        COALESCE(rp.name, bp.name, lp.name, sh.legacy_product_name),
+		        COALESCE(rp.sku, bp.sku, lp.sku, sh.legacy_product_sku),
+		        COALESCE(rp.image_url, bp.image_url, lp.image_url, sh.legacy_product_image_url),
+		        sh.legacy_qr_code_serial,
+		        sh.legacy_product_name,
+		        sh.legacy_product_sku,
+		        sh.legacy_product_image_url,
+		        sh.legacy_status,
+		        CASE WHEN sh.legacy_qr_code_id IS NOT NULL THEN 'v1' ELSE 'v2' END
 		 FROM scan_history sh
+		 LEFT JOIN codes c ON c.id = sh.code_id AND c.tenant_id = sh.tenant_id
+		 LEFT JOIN batches b ON b.id = sh.batch_id
+		 LEFT JOIN rolls r ON r.batch_id = sh.batch_id AND c.serial_number BETWEEN r.serial_start AND r.serial_end
+		 LEFT JOIN products rp ON rp.id = r.product_id
+		 LEFT JOIN products bp ON bp.id = b.product_id
+		 LEFT JOIN migration_entity_maps lpm ON lpm.tenant_id = sh.tenant_id AND lpm.entity_type = 'product' AND lpm.source_system = 'v1' AND lpm.source_id = sh.legacy_product_v1_id::text
+		 LEFT JOIN products lp ON lp.id::text = lpm.target_id AND lp.tenant_id = sh.tenant_id
 		 WHERE sh.user_id = $1 AND sh.tenant_id = $2
-		   AND COALESCE(sh.scan_type, 'success') = 'success'
-		 ORDER BY sh.scanned_at DESC LIMIT 10`,
+		 ORDER BY sh.scanned_at DESC LIMIT 50`,
 		customerID, tenantID,
 	)
 	var scans []ScanHistoryEntry
@@ -281,7 +391,19 @@ func (s *Service) GetDetail(ctx context.Context, tenantID, customerID string) (*
 		defer scanRows.Close()
 		for scanRows.Next() {
 			var sh ScanHistoryEntry
-			if err := scanRows.Scan(&sh.ID, &sh.CampaignID, &sh.PointsEarned, &sh.ScannedAt); err != nil {
+			if err := scanRows.Scan(
+				&sh.ID, &sh.CampaignID, &sh.PointsEarned, &sh.ScannedAt,
+				&sh.ScanType,
+				&sh.Latitude, &sh.Longitude,
+				&sh.Province, &sh.District, &sh.SubDistrict, &sh.PostalCode,
+				&sh.ProductName, &sh.ProductSKU, &sh.ProductImageURL,
+				&sh.LegacySerial,
+				&sh.LegacyProductName,
+				&sh.LegacyProductSKU,
+				&sh.LegacyProductImageURL,
+				&sh.LegacyStatus,
+				&sh.DataSource,
+			); err != nil {
 				continue
 			}
 			scans = append(scans, sh)
@@ -308,10 +430,30 @@ func (s *Service) GetDetail(ctx context.Context, tenantID, customerID string) (*
 			ledger = append(ledger, e)
 		}
 	}
+	if len(ledger) == 0 {
+		for _, sh := range scans {
+			if sh.ScanType != "success" || sh.PointsEarned <= 0 {
+				continue
+			}
+			source := "scan_history"
+			description := "Derived from migrated scan history"
+			ledger = append(ledger, PointLedgerEntry{
+				ID:          "scan-" + sh.ID,
+				Type:        "credit",
+				Amount:      sh.PointsEarned,
+				Source:      &source,
+				Description: &description,
+				CreatedAt:   sh.ScannedAt,
+			})
+			if len(ledger) >= 20 {
+				break
+			}
+		}
+	}
 
 	// Redemption history (last 10)
 	redRows, errRed := s.db.Query(ctx,
-		`SELECT rr.id, rr.status, rr.created_at::text, r.name, r.point_cost
+		`SELECT rr.id, rr.status, rr.created_at::text, r.name, r.image_url, r.point_cost
 		 FROM reward_reservations rr
 		 JOIN rewards r ON r.id = rr.reward_id
 		 WHERE rr.user_id = $1 AND rr.tenant_id = $2
@@ -323,7 +465,7 @@ func (s *Service) GetDetail(ctx context.Context, tenantID, customerID string) (*
 		defer redRows.Close()
 		for redRows.Next() {
 			var r RedemptionEntry
-			if err := redRows.Scan(&r.ID, &r.Status, &r.CreatedAt, &r.RewardName, &r.PointCost); err != nil {
+			if err := redRows.Scan(&r.ID, &r.Status, &r.CreatedAt, &r.RewardName, &r.RewardImageURL, &r.PointCost); err != nil {
 				continue
 			}
 			redemptions = append(redemptions, r)

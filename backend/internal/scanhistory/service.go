@@ -42,14 +42,19 @@ type ScanEntry struct {
 	Latitude            *float64 `json:"latitude"`
 	Longitude           *float64 `json:"longitude"`
 	Province            *string  `json:"province"`
+	District            *string  `json:"district,omitempty"`
+	SubDistrict         *string  `json:"sub_district,omitempty"`
+	PostalCode          *string  `json:"postal_code,omitempty"`
+	LegacyQRCodeID      *int64   `json:"legacy_qr_code_id,omitempty"`
+	LegacyQRCodeSerial  *string  `json:"legacy_qr_code_serial,omitempty"`
 	CreatedAt           string   `json:"created_at"`
 }
 
 // allowedSortColumns maps safe frontend sort keys to SQL expressions.
 var allowedSortColumns = map[string]string{
-	"serial_number": "c.serial_number",
-	"ref1":          "c.ref1",
-	"product_name":  "COALESCE(rp.name, bp.name)",
+	"serial_number": "COALESCE(c.serial_number, 0)",
+	"ref1":          "COALESCE(c.ref1, '')",
+	"product_name":  "COALESCE(rp.name, bp.name, lp.name, sh.legacy_product_name)",
 	"scan_type":     "sh.scan_type",
 	"scanner_name":  "COALESCE(NULLIF(u.display_name,''), u.first_name)",
 	"points_earned": "sh.points_earned",
@@ -61,6 +66,7 @@ type ListFilter struct {
 	ScanType string // success, duplicate_self, duplicate_other
 	BatchID  string
 	CodeID   string // filter by code = "by code" view
+	LegacySerial string
 	SortBy   string // column key (see allowedSortColumns)
 	SortDir  string // asc | desc
 	Limit    int
@@ -81,6 +87,11 @@ func (s *Service) List(ctx context.Context, tenantID string, f ListFilter) ([]Sc
 		args = append(args, f.CodeID)
 		argN++
 	}
+	if f.LegacySerial != "" {
+		where += fmt.Sprintf(" AND sh.legacy_qr_code_serial = $%d", argN)
+		args = append(args, f.LegacySerial)
+		argN++
+	}
 	if f.ScanType != "" {
 		where += fmt.Sprintf(" AND sh.scan_type = $%d", argN)
 		args = append(args, f.ScanType)
@@ -92,19 +103,14 @@ func (s *Service) List(ctx context.Context, tenantID string, f ListFilter) ([]Sc
 		argN++
 	}
 	if f.Status != "" {
-		where += fmt.Sprintf(" AND c.status = $%d", argN)
+		where += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM codes c WHERE c.id = sh.code_id AND c.tenant_id = sh.tenant_id AND c.status = $%d)", argN)
 		args = append(args, f.Status)
 		argN++
 	}
 
 	var total int64
 	countQuery := fmt.Sprintf(
-		`SELECT COUNT(*) FROM scan_history sh
-		 LEFT JOIN codes c ON c.id = sh.code_id AND c.tenant_id = sh.tenant_id
-		 LEFT JOIN batches b ON b.id = sh.batch_id
-		 LEFT JOIN campaigns cam ON cam.id = sh.campaign_id
-		 LEFT JOIN users u ON u.id = sh.user_id
-		 WHERE %s`,
+		`SELECT COUNT(*) FROM scan_history sh WHERE %s`,
 		where,
 	)
 	_ = s.db.QueryRow(ctx, countQuery, args...).Scan(&total)
@@ -118,39 +124,93 @@ func (s *Service) List(ctx context.Context, tenantID string, f ListFilter) ([]Sc
 	if f.SortDir == "asc" {
 		orderDir = "ASC"
 	}
+	orderNulls := " NULLS LAST"
+	if orderCol == "sh.scanned_at" {
+		orderNulls = ""
+	}
 
-	// rolls → products takes priority over batch-level product
-	query := fmt.Sprintf(
-		`SELECT sh.id, COALESCE(sh.code_id::text, ''), sh.tenant_id, COALESCE(sh.batch_id::text, ''),
-		        COALESCE(c.serial_number, 0), COALESCE(c.ref1, ''), COALESCE(c.ref2, ''),
-		        COALESCE(c.status, ''),
-		        sh.user_id::text,
-		        COALESCE(NULLIF(u.display_name,''), NULLIF(TRIM(CONCAT(u.first_name,' ',u.last_name)),''), u.email, sh.user_id::text),
-		        u.phone,
-		        COALESCE(b.prefix, ''),
-		        COALESCE(rp.name, bp.name),
-		        COALESCE(rp.sku, bp.sku),
-		        COALESCE(rp.image_url, bp.image_url),
-		        cam.name,
-		        COALESCE(sh.scan_type, 'success'), COALESCE(sh.points_earned, 0),
-		        sh.bonus_currency, COALESCE(sh.bonus_currency_amount, 0),
-		        sh.promotion_id::text, promo.name,
-		        sh.latitude, sh.longitude, sh.province,
-		        sh.scanned_at::text
-		 FROM scan_history sh
-		 LEFT JOIN codes c ON c.id = sh.code_id AND c.tenant_id = sh.tenant_id
-		 LEFT JOIN batches b ON b.id = sh.batch_id
-		 LEFT JOIN campaigns cam ON cam.id = sh.campaign_id
-		 LEFT JOIN users u ON u.id = sh.user_id
-		 LEFT JOIN rolls r ON r.batch_id = sh.batch_id AND c.serial_number BETWEEN r.serial_start AND r.serial_end
-		 LEFT JOIN products rp ON rp.id = r.product_id
-		 LEFT JOIN products bp ON bp.id = b.product_id
-		 LEFT JOIN promotions promo ON promo.id = sh.promotion_id
-		 WHERE %s
-		 ORDER BY %s %s NULLS LAST, sh.scanned_at DESC
-		 LIMIT $%d OFFSET $%d`,
-		where, orderCol, orderDir, argN, argN+1,
-	)
+	fastSortable := f.SortBy == "" || f.SortBy == "scanned_at" || f.SortBy == "scan_type" || f.SortBy == "points_earned" || f.SortBy == "serial_number" || f.SortBy == "ref1"
+	query := ""
+	if fastSortable {
+		finalOrderCol := orderCol
+		query = fmt.Sprintf(
+			`WITH base AS (
+				SELECT sh.id
+				FROM scan_history sh
+				LEFT JOIN codes c ON c.id = sh.code_id AND c.tenant_id = sh.tenant_id
+				WHERE %s
+				ORDER BY %s %s%s, sh.scanned_at DESC
+				LIMIT $%d OFFSET $%d
+			)
+			SELECT sh.id, COALESCE(sh.code_id::text, ''), sh.tenant_id, COALESCE(sh.batch_id::text, ''),
+			       COALESCE(c.serial_number, 0), COALESCE(c.ref1, ''), COALESCE(c.ref2, ''),
+			       COALESCE(c.status, ''),
+			       sh.user_id::text,
+			       COALESCE(NULLIF(u.display_name,''), NULLIF(TRIM(CONCAT(u.first_name,' ',u.last_name)),''), u.email, sh.user_id::text),
+			       u.phone,
+			       COALESCE(b.prefix, ''),
+			       COALESCE(rp.name, bp.name, lp.name, sh.legacy_product_name),
+			       COALESCE(rp.sku, bp.sku, lp.sku, sh.legacy_product_sku),
+			       COALESCE(rp.image_url, bp.image_url, lp.image_url, sh.legacy_product_image_url),
+			       cam.name,
+			       COALESCE(sh.scan_type, 'success'), COALESCE(sh.points_earned, 0),
+			       sh.bonus_currency, COALESCE(sh.bonus_currency_amount, 0),
+			       sh.promotion_id::text, promo.name,
+			       sh.latitude, sh.longitude, sh.province, sh.district, sh.sub_district, sh.postal_code,
+			       sh.legacy_qr_code_id, sh.legacy_qr_code_serial,
+			       sh.scanned_at::text
+			FROM base bse
+			JOIN scan_history sh ON sh.id = bse.id
+			LEFT JOIN codes c ON c.id = sh.code_id AND c.tenant_id = sh.tenant_id
+			LEFT JOIN batches b ON b.id = sh.batch_id
+			LEFT JOIN campaigns cam ON cam.id = sh.campaign_id
+			LEFT JOIN users u ON u.id = sh.user_id
+			LEFT JOIN rolls r ON r.batch_id = sh.batch_id AND c.serial_number BETWEEN r.serial_start AND r.serial_end
+			LEFT JOIN products rp ON rp.id = r.product_id
+			LEFT JOIN products bp ON bp.id = b.product_id
+			LEFT JOIN migration_entity_maps lpm ON lpm.tenant_id = sh.tenant_id AND lpm.entity_type = 'product' AND lpm.source_system = 'v1' AND lpm.source_id = sh.legacy_product_v1_id::text
+			LEFT JOIN products lp ON lp.id::text = lpm.target_id AND lp.tenant_id = sh.tenant_id
+			LEFT JOIN promotions promo ON promo.id = sh.promotion_id
+			ORDER BY %s %s%s, sh.scanned_at DESC`,
+			where, orderCol, orderDir, orderNulls, argN, argN+1, finalOrderCol, orderDir, orderNulls,
+		)
+	} else {
+		// Fallback for sorts that depend on joined tables such as product_name / scanner_name.
+		query = fmt.Sprintf(
+			`SELECT sh.id, COALESCE(sh.code_id::text, ''), sh.tenant_id, COALESCE(sh.batch_id::text, ''),
+			        COALESCE(c.serial_number, 0), COALESCE(c.ref1, ''), COALESCE(c.ref2, ''),
+			        COALESCE(c.status, ''),
+			        sh.user_id::text,
+			        COALESCE(NULLIF(u.display_name,''), NULLIF(TRIM(CONCAT(u.first_name,' ',u.last_name)),''), u.email, sh.user_id::text),
+			        u.phone,
+			        COALESCE(b.prefix, ''),
+			        COALESCE(rp.name, bp.name, lp.name, sh.legacy_product_name),
+			        COALESCE(rp.sku, bp.sku, lp.sku, sh.legacy_product_sku),
+			        COALESCE(rp.image_url, bp.image_url, lp.image_url, sh.legacy_product_image_url),
+			        cam.name,
+			        COALESCE(sh.scan_type, 'success'), COALESCE(sh.points_earned, 0),
+			        sh.bonus_currency, COALESCE(sh.bonus_currency_amount, 0),
+			        sh.promotion_id::text, promo.name,
+			        sh.latitude, sh.longitude, sh.province, sh.district, sh.sub_district, sh.postal_code,
+			        sh.legacy_qr_code_id, sh.legacy_qr_code_serial,
+			        sh.scanned_at::text
+			 FROM scan_history sh
+			 LEFT JOIN codes c ON c.id = sh.code_id AND c.tenant_id = sh.tenant_id
+			 LEFT JOIN batches b ON b.id = sh.batch_id
+			 LEFT JOIN campaigns cam ON cam.id = sh.campaign_id
+			 LEFT JOIN users u ON u.id = sh.user_id
+			 LEFT JOIN rolls r ON r.batch_id = sh.batch_id AND c.serial_number BETWEEN r.serial_start AND r.serial_end
+			 LEFT JOIN products rp ON rp.id = r.product_id
+			 LEFT JOIN products bp ON bp.id = b.product_id
+			 LEFT JOIN migration_entity_maps lpm ON lpm.tenant_id = sh.tenant_id AND lpm.entity_type = 'product' AND lpm.source_system = 'v1' AND lpm.source_id = sh.legacy_product_v1_id::text
+			 LEFT JOIN products lp ON lp.id::text = lpm.target_id AND lp.tenant_id = sh.tenant_id
+			 LEFT JOIN promotions promo ON promo.id = sh.promotion_id
+			 WHERE %s
+			 ORDER BY %s %s%s, sh.scanned_at DESC
+			 LIMIT $%d OFFSET $%d`,
+			where, orderCol, orderDir, orderNulls, argN, argN+1,
+		)
+	}
 	args = append(args, f.Limit, f.Offset)
 
 	rows, err := s.db.Query(ctx, query, args...)
@@ -168,7 +228,7 @@ func (s *Service) List(ctx context.Context, tenantID string, f ListFilter) ([]Sc
 			&e.ProductName, &e.ProductSKU, &e.ProductImageURL, &e.CampaignName,
 			&e.ScanType, &e.PointsEarned, &e.BonusCurrency, &e.BonusCurrencyAmount,
 			&e.PromotionID, &e.PromotionName,
-			&e.Latitude, &e.Longitude, &e.Province, &e.CreatedAt); err != nil {
+			&e.Latitude, &e.Longitude, &e.Province, &e.District, &e.SubDistrict, &e.PostalCode, &e.LegacyQRCodeID, &e.LegacyQRCodeSerial, &e.CreatedAt); err != nil {
 			return nil, 0, fmt.Errorf("scan row: %w", err)
 		}
 		e.ScannedBy = scannedBy
@@ -199,14 +259,15 @@ func (s *Service) ListByUser(ctx context.Context, tenantID, userID string, limit
 		        COALESCE(NULLIF(u.display_name,''), NULLIF(TRIM(CONCAT(u.first_name,' ',u.last_name)),''), u.email, sh.user_id::text),
 		        u.phone,
 		        COALESCE(b.prefix, ''),
-		        COALESCE(rp.name, bp.name),
-		        COALESCE(rp.sku, bp.sku),
-		        COALESCE(rp.image_url, bp.image_url),
+		        COALESCE(rp.name, bp.name, lp.name, sh.legacy_product_name),
+		        COALESCE(rp.sku, bp.sku, lp.sku, sh.legacy_product_sku),
+		        COALESCE(rp.image_url, bp.image_url, lp.image_url, sh.legacy_product_image_url),
 		        cam.name,
 		        COALESCE(sh.scan_type, 'success'), COALESCE(sh.points_earned, 0),
 		        sh.bonus_currency, COALESCE(sh.bonus_currency_amount, 0),
 		        sh.promotion_id::text, promo.name,
-		        sh.latitude, sh.longitude, sh.province,
+		        sh.latitude, sh.longitude, sh.province, sh.district, sh.sub_district, sh.postal_code,
+		        sh.legacy_qr_code_id, sh.legacy_qr_code_serial,
 		        sh.scanned_at::text
 		 FROM scan_history sh
 		 LEFT JOIN codes c ON c.id = sh.code_id AND c.tenant_id = sh.tenant_id
@@ -216,6 +277,8 @@ func (s *Service) ListByUser(ctx context.Context, tenantID, userID string, limit
 		 LEFT JOIN rolls r ON r.batch_id = sh.batch_id AND c.serial_number BETWEEN r.serial_start AND r.serial_end
 		 LEFT JOIN products rp ON rp.id = r.product_id
 		 LEFT JOIN products bp ON bp.id = b.product_id
+		 LEFT JOIN migration_entity_maps lpm ON lpm.tenant_id = sh.tenant_id AND lpm.entity_type = 'product' AND lpm.source_system = 'v1' AND lpm.source_id = sh.legacy_product_v1_id::text
+		 LEFT JOIN products lp ON lp.id::text = lpm.target_id AND lp.tenant_id = sh.tenant_id
 		 LEFT JOIN promotions promo ON promo.id = sh.promotion_id
 		 WHERE sh.tenant_id = $1 AND sh.user_id = $2
 		 ORDER BY sh.scanned_at DESC
@@ -236,7 +299,7 @@ func (s *Service) ListByUser(ctx context.Context, tenantID, userID string, limit
 			&e.ProductName, &e.ProductSKU, &e.ProductImageURL, &e.CampaignName,
 			&e.ScanType, &e.PointsEarned, &e.BonusCurrency, &e.BonusCurrencyAmount,
 			&e.PromotionID, &e.PromotionName,
-			&e.Latitude, &e.Longitude, &e.Province, &e.CreatedAt); err != nil {
+			&e.Latitude, &e.Longitude, &e.Province, &e.District, &e.SubDistrict, &e.PostalCode, &e.LegacyQRCodeID, &e.LegacyQRCodeSerial, &e.CreatedAt); err != nil {
 			return nil, 0, fmt.Errorf("scan row: %w", err)
 		}
 		e.ScannedBy = scannedBy
@@ -302,6 +365,11 @@ func (s *Service) loadPrimaryScanFallback(ctx context.Context, tenantID, codeID 
 			NULL::float8,
 			NULL::float8,
 			NULL::text,
+			NULL::text,
+			NULL::text,
+			NULL::text,
+			NULL::bigint,
+			NULL::text,
 			c.scanned_at::text
 		 FROM codes c
 		 LEFT JOIN batches b ON b.id = c.batch_id
@@ -317,7 +385,8 @@ func (s *Service) loadPrimaryScanFallback(ctx context.Context, tenantID, codeID 
 		&entry.CodeStatus, &scannedBy, &scannerName, &scannerPhone, &entry.BatchPrefix, &entry.ProductName,
 		&entry.ProductSKU, &entry.ProductImageURL, &entry.CampaignName, &entry.ScanType, &entry.PointsEarned,
 		&entry.BonusCurrency, &entry.BonusCurrencyAmount,
-		&entry.Latitude, &entry.Longitude, &entry.Province, &entry.CreatedAt,
+		&entry.PromotionID, &entry.PromotionName,
+		&entry.Latitude, &entry.Longitude, &entry.Province, &entry.District, &entry.SubDistrict, &entry.PostalCode, &entry.LegacyQRCodeID, &entry.LegacyQRCodeSerial, &entry.CreatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -340,12 +409,13 @@ func (s *Service) GetByID(ctx context.Context, tenantID, id string) (*ScanEntry,
 		        COALESCE(NULLIF(u.display_name,''), NULLIF(TRIM(CONCAT(u.first_name,' ',u.last_name)),''), u.email, sh.user_id::text),
 		        u.phone,
 		        COALESCE(b.prefix, ''),
-		        COALESCE(rp.name, bp.name), COALESCE(rp.sku, bp.sku), COALESCE(rp.image_url, bp.image_url),
+		        COALESCE(rp.name, bp.name, lp.name, sh.legacy_product_name), COALESCE(rp.sku, bp.sku, lp.sku, sh.legacy_product_sku), COALESCE(rp.image_url, bp.image_url, lp.image_url, sh.legacy_product_image_url),
 		        cam.name,
 		        COALESCE(sh.scan_type, 'success'), COALESCE(sh.points_earned, 0),
 		        sh.bonus_currency, COALESCE(sh.bonus_currency_amount, 0),
 		        sh.promotion_id::text, promo.name,
-		        sh.latitude, sh.longitude, sh.province,
+		        sh.latitude, sh.longitude, sh.province, sh.district, sh.sub_district, sh.postal_code,
+		        sh.legacy_qr_code_id, sh.legacy_qr_code_serial,
 		        sh.scanned_at::text
 		 FROM scan_history sh
 		 LEFT JOIN codes c ON c.id = sh.code_id AND c.tenant_id = sh.tenant_id
@@ -355,6 +425,8 @@ func (s *Service) GetByID(ctx context.Context, tenantID, id string) (*ScanEntry,
 		 LEFT JOIN rolls r ON r.batch_id = sh.batch_id AND c.serial_number BETWEEN r.serial_start AND r.serial_end
 		 LEFT JOIN products rp ON rp.id = r.product_id
 		 LEFT JOIN products bp ON bp.id = b.product_id
+		 LEFT JOIN migration_entity_maps lpm ON lpm.tenant_id = sh.tenant_id AND lpm.entity_type = 'product' AND lpm.source_system = 'v1' AND lpm.source_id = sh.legacy_product_v1_id::text
+		 LEFT JOIN products lp ON lp.id::text = lpm.target_id AND lp.tenant_id = sh.tenant_id
 		 LEFT JOIN promotions promo ON promo.id = sh.promotion_id
 		 WHERE sh.id = $1 AND sh.tenant_id = $2`,
 		id, tenantID,
@@ -363,7 +435,7 @@ func (s *Service) GetByID(ctx context.Context, tenantID, id string) (*ScanEntry,
 		&e.BatchPrefix, &e.ProductName, &e.ProductSKU, &e.ProductImageURL, &e.CampaignName, &e.ScanType, &e.PointsEarned,
 		&e.BonusCurrency, &e.BonusCurrencyAmount,
 		&e.PromotionID, &e.PromotionName,
-		&e.Latitude, &e.Longitude, &e.Province, &e.CreatedAt)
+		&e.Latitude, &e.Longitude, &e.Province, &e.District, &e.SubDistrict, &e.PostalCode, &e.LegacyQRCodeID, &e.LegacyQRCodeSerial, &e.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("scan not found: %w", err)
 	}
@@ -375,12 +447,12 @@ func (s *Service) GetByID(ctx context.Context, tenantID, id string) (*ScanEntry,
 
 // SuspiciousScanSummary is a code that has duplicate scans (for alerts).
 type SuspiciousScanSummary struct {
-	CodeID       string `json:"code_id"`
-	Ref1         string `json:"ref1"`
-	BatchPrefix  string `json:"batch_prefix"`
-	SerialNumber int64  `json:"serial_number"`
-	TotalScans   int64  `json:"total_scans"`
-	DuplicateCount int64 `json:"duplicate_count"`
+	CodeID         string `json:"code_id"`
+	Ref1           string `json:"ref1"`
+	BatchPrefix    string `json:"batch_prefix"`
+	SerialNumber   int64  `json:"serial_number"`
+	TotalScans     int64  `json:"total_scans"`
+	DuplicateCount int64  `json:"duplicate_count"`
 	FirstScannedAt string `json:"first_scanned_at"`
 }
 

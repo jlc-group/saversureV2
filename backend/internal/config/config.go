@@ -12,6 +12,7 @@ type Config struct {
 	App         AppConfig
 	DB          DBConfig
 	LegacyV1    DBConfig
+	V1Live      V1LiveConfig
 	Redis       RedisConfig
 	NATS        NATSConfig
 	JWT         JWTConfig
@@ -22,6 +23,12 @@ type Config struct {
 	LINE        LINEConfig
 	Google      GoogleConfig
 	CORSOrigins []string
+}
+
+type V1LiveConfig struct {
+	DB           DBConfig
+	SyncEnabled  bool
+	SyncInterval time.Duration
 }
 
 type LINEConfig struct {
@@ -134,6 +141,20 @@ func Load() (*Config, error) {
 			SSLMode:  getEnv("LEGACY_V1_DB_SSLMODE", "disable"),
 			MaxConns: getEnvInt("LEGACY_V1_DB_MAX_CONNS", 5),
 			MinConns: getEnvInt("LEGACY_V1_DB_MIN_CONNS", 1),
+		},
+		V1Live: V1LiveConfig{
+			DB: DBConfig{
+				Host:     getEnv("V1_LIVE_DB_HOST", ""),
+				Port:     getEnvInt("V1_LIVE_DB_PORT", 5432),
+				Name:     getEnv("V1_LIVE_DB_NAME", "saversurejulaherb"),
+				User:     getEnv("V1_LIVE_DB_USER", ""),
+				Password: getEnv("V1_LIVE_DB_PASSWORD", ""),
+				SSLMode:  getEnv("V1_LIVE_DB_SSLMODE", "require"),
+				MaxConns: 3,
+				MinConns: 1,
+			},
+			SyncEnabled:  getEnvBool("V1_SYNC_ENABLED", false),
+			SyncInterval: getEnvDuration("V1_SYNC_INTERVAL", 10*time.Minute),
 		},
 		Redis: RedisConfig{
 			Host:     getEnv("REDIS_HOST", "localhost"),

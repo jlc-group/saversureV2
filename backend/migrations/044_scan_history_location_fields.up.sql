@@ -1,0 +1,4 @@
+ALTER TABLE scan_history ADD COLUMN IF NOT EXISTS district VARCHAR(100);
+ALTER TABLE scan_history ADD COLUMN IF NOT EXISTS sub_district VARCHAR(100);
+ALTER TABLE scan_history ADD COLUMN IF NOT EXISTS postal_code VARCHAR(10);
+ALTER TABLE scan_history ADD COLUMN IF NOT EXISTS location_json JSONB;

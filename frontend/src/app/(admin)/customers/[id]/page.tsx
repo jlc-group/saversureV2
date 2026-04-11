@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
@@ -31,8 +31,22 @@ interface CustomerDetail {
     campaign_id: string;
     points_earned: number;
     scanned_at: string;
+    scan_type: string;
     latitude?: number;
     longitude?: number;
+    province?: string;
+    district?: string;
+    sub_district?: string;
+    postal_code?: string;
+    product_name?: string;
+    product_sku?: string;
+    product_image_url?: string;
+    legacy_serial?: string;
+    legacy_product_name?: string;
+    legacy_product_sku?: string;
+    legacy_product_image_url?: string;
+    legacy_status?: number;
+    data_source: string;
   }>;
   point_ledger: Array<{
     id: string;
@@ -47,6 +61,7 @@ interface CustomerDetail {
     status: string;
     created_at: string;
     reward_name: string;
+    reward_image_url?: string;
     point_cost: number;
   }>;
   addresses: Array<{
@@ -103,6 +118,35 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+function mediaUrl(url?: string | null): string | null {
+  if (!url) return null;
+  if (url.startsWith("http")) return url;
+  return `/media/${url}`;
+}
+
+type DetailTab = "ledger" | "scans" | "redemptions";
+type SortDir = "asc" | "desc";
+type LedgerSortKey = "type" | "amount" | "source" | "description" | "created_at";
+type ScanSortKey = "legacy_serial" | "product_name" | "scan_type" | "points_earned" | "scanned_at" | "location";
+type RedemptionSortKey = "reward_name" | "point_cost" | "status" | "created_at";
+
+function compareText(a?: string | null, b?: string | null, dir: SortDir = "asc"): number {
+  const left = (a || "").toLocaleLowerCase();
+  const right = (b || "").toLocaleLowerCase();
+  if (left === right) return 0;
+  return dir === "asc" ? left.localeCompare(right) : right.localeCompare(left);
+}
+
+function compareNumber(a: number, b: number, dir: SortDir = "asc"): number {
+  return dir === "asc" ? a - b : b - a;
+}
+
+function compareDate(a?: string | null, b?: string | null, dir: SortDir = "asc"): number {
+  const left = a ? new Date(a).getTime() : 0;
+  const right = b ? new Date(b).getTime() : 0;
+  return compareNumber(left, right, dir);
+}
+
 export default function CustomerDetailPage() {
   const params = useParams();
   const id = params.id as string;
@@ -120,6 +164,10 @@ export default function CustomerDetailPage() {
   const [searching, setSearching] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(null);
   const [actionSubmitting, setActionSubmitting] = useState(false);
+  const [activeTab, setActiveTab] = useState<DetailTab>("scans");
+  const [ledgerSort, setLedgerSort] = useState<{ key: LedgerSortKey; dir: SortDir }>({ key: "created_at", dir: "desc" });
+  const [scanSort, setScanSort] = useState<{ key: ScanSortKey; dir: SortDir }>({ key: "scanned_at", dir: "desc" });
+  const [redemptionSort, setRedemptionSort] = useState<{ key: RedemptionSortKey; dir: SortDir }>({ key: "created_at", dir: "desc" });
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -215,6 +263,91 @@ export default function CustomerDetailPage() {
     }
   };
 
+  const scan_history = data?.scan_history || [];
+  const point_ledger = data?.point_ledger || [];
+  const redemptions = data?.redemptions || [];
+  const addresses = data?.addresses || [];
+  const totalEarned = point_ledger.filter((l) => l.type === "credit").reduce((s, l) => s + l.amount, 0);
+  const totalSpent = point_ledger.filter((l) => l.type === "debit").reduce((s, l) => s + l.amount, 0);
+  const successScans = scan_history.filter((s) => s.scan_type === "success").length;
+  const totalScans = scan_history.length;
+  const v1Scans = scan_history.filter((s) => s.data_source === "v1").length;
+  const tabItems: Array<{ id: DetailTab; label: string; count: number }> = [
+    { id: "scans", label: "ประวัติการสแกน", count: scan_history.length },
+    { id: "redemptions", label: "ประวัติการแลกแต้ม", count: redemptions.length },
+    { id: "ledger", label: "Point Ledger", count: point_ledger.length },
+  ];
+  const nextSort = <T extends string>(prev: { key: T; dir: SortDir }, key: T): { key: T; dir: SortDir } => ({
+    key,
+    dir: prev.key === key ? (prev.dir === "asc" ? "desc" : "asc") : "asc",
+  });
+  const sortIndicator = (active: boolean, dir: SortDir) => {
+    if (!active) return <span className="ml-1 opacity-30">⇅</span>;
+    return <span className="ml-1 text-[var(--md-primary)]">{dir === "asc" ? "↑" : "↓"}</span>;
+  };
+  const sortedPointLedger = useMemo(() => {
+    const rows = [...point_ledger];
+    rows.sort((a, b) => {
+      switch (ledgerSort.key) {
+        case "type":
+          return compareText(a.type, b.type, ledgerSort.dir);
+        case "amount":
+          return compareNumber(a.amount, b.amount, ledgerSort.dir);
+        case "source":
+          return compareText(a.source, b.source, ledgerSort.dir);
+        case "description":
+          return compareText(a.description, b.description, ledgerSort.dir);
+        case "created_at":
+        default:
+          return compareDate(a.created_at, b.created_at, ledgerSort.dir);
+      }
+    });
+    return rows;
+  }, [point_ledger, ledgerSort]);
+  const sortedScanHistory = useMemo(() => {
+    const rows = [...scan_history];
+    rows.sort((a, b) => {
+      const aLocation = [a.sub_district, a.district, a.province].filter(Boolean).join(", ");
+      const bLocation = [b.sub_district, b.district, b.province].filter(Boolean).join(", ");
+      switch (scanSort.key) {
+        case "legacy_serial":
+          return compareText(a.legacy_serial, b.legacy_serial, scanSort.dir);
+        case "product_name":
+          return compareText(a.product_name || a.legacy_product_name, b.product_name || b.legacy_product_name, scanSort.dir);
+        case "scan_type":
+          return compareText(a.scan_type, b.scan_type, scanSort.dir);
+        case "points_earned": {
+          const left = a.scan_type === "success" ? a.points_earned : 0;
+          const right = b.scan_type === "success" ? b.points_earned : 0;
+          return compareNumber(left, right, scanSort.dir);
+        }
+        case "location":
+          return compareText(aLocation, bLocation, scanSort.dir);
+        case "scanned_at":
+        default:
+          return compareDate(a.scanned_at, b.scanned_at, scanSort.dir);
+      }
+    });
+    return rows;
+  }, [scan_history, scanSort]);
+  const sortedRedemptions = useMemo(() => {
+    const rows = [...redemptions];
+    rows.sort((a, b) => {
+      switch (redemptionSort.key) {
+        case "reward_name":
+          return compareText(a.reward_name, b.reward_name, redemptionSort.dir);
+        case "point_cost":
+          return compareNumber(a.point_cost, b.point_cost, redemptionSort.dir);
+        case "status":
+          return compareText(a.status, b.status, redemptionSort.dir);
+        case "created_at":
+        default:
+          return compareDate(a.created_at, b.created_at, redemptionSort.dir);
+      }
+    });
+    return rows;
+  }, [redemptions, redemptionSort]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[300px]">
@@ -238,12 +371,6 @@ export default function CustomerDetailPage() {
   }
 
   const { profile, balance } = data;
-  const scan_history = data.scan_history || [];
-  const point_ledger = data.point_ledger || [];
-  const redemptions = data.redemptions || [];
-  const addresses = data.addresses || [];
-  const totalEarned = point_ledger.filter((l) => l.type === "credit").reduce((s, l) => s + l.amount, 0);
-  const totalSpent = point_ledger.filter((l) => l.type === "debit").reduce((s, l) => s + l.amount, 0);
 
   return (
     <div className="space-y-6">
@@ -313,147 +440,350 @@ export default function CustomerDetailPage() {
         </div>
       </div>
 
-      {/* Point balance */}
-      <div className="bg-white dark:bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] border border-gray-200 dark:border-[var(--md-outline-variant)] p-6">
-        <div className="flex items-center justify-between">
+      {/* Stats cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white dark:bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] border border-gray-200 dark:border-[var(--md-outline-variant)] p-5">
+          <p className="text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase tracking-wide">คะแนนคงเหลือ</p>
+          <p className="text-[28px] font-bold text-[var(--md-primary)] mt-1">{balance.toLocaleString()}</p>
+        </div>
+        <div className="bg-white dark:bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] border border-gray-200 dark:border-[var(--md-outline-variant)] p-5">
+          <p className="text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase tracking-wide">ได้รับ / ใช้ไป</p>
+          <p className="text-[20px] font-bold text-green-600 mt-1">+{totalEarned.toLocaleString()}</p>
+          <p className="text-[14px] font-medium text-red-500">-{totalSpent.toLocaleString()}</p>
+        </div>
+        <div className="bg-white dark:bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] border border-gray-200 dark:border-[var(--md-outline-variant)] p-5">
+          <p className="text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase tracking-wide">สแกนทั้งหมด</p>
+          <p className="text-[28px] font-bold text-[var(--md-on-surface)] mt-1">{totalScans}</p>
+          <p className="text-[12px] text-[var(--md-on-surface-variant)]">สำเร็จ {successScans} ครั้ง</p>
+        </div>
+        <div className="bg-white dark:bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] border border-gray-200 dark:border-[var(--md-outline-variant)] p-5 flex flex-col justify-between">
           <div>
-            <h2 className="text-[16px] font-medium text-[var(--md-on-surface)]">Point Balance</h2>
-            <p className="text-[36px] font-bold text-[var(--md-primary)] mt-1">{balance.toLocaleString()}</p>
-            <div className="flex gap-4 mt-2 text-[13px] text-[var(--md-on-surface-variant)]">
-              <span>Earned: {totalEarned.toLocaleString()}</span>
-              <span>Spent: {totalSpent.toLocaleString()}</span>
-            </div>
+            <p className="text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase tracking-wide">แหล่งข้อมูล</p>
+            <p className="text-[13px] text-[var(--md-on-surface)] mt-1">
+              {v1Scans > 0 && <span className="inline-block mr-2 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[11px] font-medium">V1: {v1Scans}</span>}
+              {totalScans - v1Scans > 0 && <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[11px] font-medium">V2: {totalScans - v1Scans}</span>}
+              {totalScans === 0 && <span className="text-[var(--md-on-surface-variant)]">—</span>}
+            </p>
           </div>
           <button
             onClick={() => setRefundModal(true)}
-            className="h-[40px] px-5 bg-[var(--md-primary)] text-white rounded-[var(--md-radius-xl)] text-[14px] font-medium hover:bg-[var(--md-primary-dark)] transition-all"
+            className="mt-3 h-[36px] px-4 bg-[var(--md-primary)] text-white rounded-[var(--md-radius-xl)] text-[13px] font-medium hover:bg-[var(--md-primary-dark)] transition-all w-full"
           >
             Refund Points
           </button>
         </div>
       </div>
 
-      {/* Point Ledger (ประวัติการสะสม/ใช้แต้ม) */}
-      <div className="bg-white dark:bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] border border-gray-200 dark:border-[var(--md-outline-variant)] overflow-x-auto">
-        <h2 className="text-[16px] font-medium text-[var(--md-on-surface)] px-6 py-4 border-b border-[var(--md-outline-variant)]">
-          Point Ledger <span className="font-normal text-[13px] text-[var(--md-on-surface-variant)]">(ประวัติการสะสม/ใช้แต้ม)</span>
-        </h2>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[800px]">
-            <thead>
-              <tr className="border-b border-[var(--md-outline-variant)]">
-                <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase">Type</th>
-                <th className="text-right px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase">Amount</th>
-                <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase">Source</th>
-                <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase">Description</th>
-                <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {point_ledger.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-5 py-8 text-center text-[var(--md-on-surface-variant)]">
-                    No transactions yet
-                  </td>
+      <div className="bg-white dark:bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] border border-gray-200 dark:border-[var(--md-outline-variant)] overflow-hidden">
+        <div className="px-4 pt-4 border-b border-[var(--md-outline-variant)]">
+          <div className="flex flex-wrap gap-2">
+            {tabItems.map((tab) => {
+              const active = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-4 py-2 rounded-t-[12px] text-[13px] font-medium transition-colors ${
+                    active
+                      ? "bg-[var(--md-primary)] text-white"
+                      : "bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)] hover:text-[var(--md-on-surface)]"
+                  }`}
+                >
+                  {tab.label} <span className={`ml-1 ${active ? "text-white/80" : "text-[var(--md-on-surface-variant)]"}`}>({tab.count})</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {activeTab === "ledger" && (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[700px]">
+              <thead>
+                <tr className="border-b border-[var(--md-outline-variant)]">
+                  <th className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-wide">
+                    <button type="button" onClick={() => setLedgerSort((prev) => nextSort(prev, "type"))} className="inline-flex items-center text-[var(--md-on-surface-variant)] hover:text-[var(--md-on-surface)]">
+                      ประเภท{sortIndicator(ledgerSort.key === "type", ledgerSort.dir)}
+                    </button>
+                  </th>
+                  <th className="text-right px-4 py-3 text-[11px] font-medium uppercase tracking-wide">
+                    <button type="button" onClick={() => setLedgerSort((prev) => nextSort(prev, "amount"))} className="inline-flex items-center text-[var(--md-on-surface-variant)] hover:text-[var(--md-on-surface)]">
+                      จำนวน{sortIndicator(ledgerSort.key === "amount", ledgerSort.dir)}
+                    </button>
+                  </th>
+                  <th className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-wide">
+                    <button type="button" onClick={() => setLedgerSort((prev) => nextSort(prev, "source"))} className="inline-flex items-center text-[var(--md-on-surface-variant)] hover:text-[var(--md-on-surface)]">
+                      แหล่งที่มา{sortIndicator(ledgerSort.key === "source", ledgerSort.dir)}
+                    </button>
+                  </th>
+                  <th className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-wide">
+                    <button type="button" onClick={() => setLedgerSort((prev) => nextSort(prev, "description"))} className="inline-flex items-center text-[var(--md-on-surface-variant)] hover:text-[var(--md-on-surface)]">
+                      รายละเอียด{sortIndicator(ledgerSort.key === "description", ledgerSort.dir)}
+                    </button>
+                  </th>
+                  <th className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-wide">
+                    <button type="button" onClick={() => setLedgerSort((prev) => nextSort(prev, "created_at"))} className="inline-flex items-center text-[var(--md-on-surface-variant)] hover:text-[var(--md-on-surface)]">
+                      วันที่{sortIndicator(ledgerSort.key === "created_at", ledgerSort.dir)}
+                    </button>
+                  </th>
                 </tr>
-              ) : (
-                point_ledger.map((l) => (
-                  <tr key={l.id} className="border-b border-[var(--md-outline-variant)] last:border-b-0 hover:bg-[var(--md-surface-dim)]">
-                    <td className="px-5 py-3 text-[13px]">{l.type}</td>
-                    <td className={`px-5 py-3 text-right font-medium ${l.amount >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      {l.amount >= 0 ? "+" : ""}{l.amount}
-                    </td>
-                    <td className="px-5 py-3 text-[13px]">{l.source}</td>
-                    <td className="px-5 py-3 text-[13px] text-[var(--md-on-surface-variant)]">{l.description}</td>
-                    <td className="px-5 py-3 text-[12px] text-[var(--md-on-surface-variant)]">
-                      {new Date(l.created_at).toLocaleString()}
+              </thead>
+              <tbody>
+                {point_ledger.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-5 py-10 text-center text-[var(--md-on-surface-variant)]">
+                      ยังไม่มีรายการ
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                ) : (
+                  sortedPointLedger.map((l) => {
+                    const sourceLabels: Record<string, { label: string; cls: string }> = {
+                      scan_history: { label: "สแกน QR", cls: "bg-blue-100 text-blue-700" },
+                      v1_live_sync_balance: { label: "ยอดจาก V1", cls: "bg-amber-100 text-amber-700" },
+                      v1_live_sync_reconcile: { label: "ปรับยอด V1", cls: "bg-orange-100 text-orange-700" },
+                      redemption: { label: "แลกของรางวัล", cls: "bg-purple-100 text-purple-700" },
+                      refund: { label: "Refund", cls: "bg-red-100 text-red-700" },
+                    };
+                    const src = sourceLabels[l.source] || { label: l.source || "—", cls: "bg-gray-100 text-gray-600" };
+                    const isCredit = l.type === "credit";
 
-      {/* Scan History (ประวัติการสแกน) */}
-      <div className="bg-white dark:bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] border border-gray-200 dark:border-[var(--md-outline-variant)] overflow-x-auto">
-        <h2 className="text-[16px] font-medium text-[var(--md-on-surface)] px-6 py-4 border-b border-[var(--md-outline-variant)]">
-          ประวัติการสแกน (Scan History)
-        </h2>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[800px]">
-            <thead>
-              <tr className="border-b border-[var(--md-outline-variant)]">
-                <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase">Campaign</th>
-                <th className="text-right px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase">Points</th>
-                <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase">Date</th>
-                <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase">Location</th>
-              </tr>
-            </thead>
-            <tbody>
-              {scan_history.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-5 py-8 text-center text-[var(--md-on-surface-variant)]">
-                    No scans yet
-                  </td>
+                    return (
+                      <tr key={l.id} className="border-b border-[var(--md-outline-variant)] last:border-b-0 hover:bg-[var(--md-surface-dim)] transition-colors">
+                        <td className="px-4 py-3">
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${isCredit ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                            {isCredit ? "รับ" : "ใช้"}
+                          </span>
+                        </td>
+                        <td className={`px-4 py-3 text-right font-semibold text-[14px] ${isCredit ? "text-green-600" : "text-red-600"}`}>
+                          {isCredit ? "+" : "-"}{l.amount.toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-medium ${src.cls}`}>
+                            {src.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-[12px] text-[var(--md-on-surface-variant)] max-w-[320px] truncate" title={l.description || ""}>
+                          {l.description || "—"}
+                        </td>
+                        <td className="px-4 py-3 text-[12px] text-[var(--md-on-surface-variant)] whitespace-nowrap">
+                          {new Date(l.created_at).toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "numeric" })}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {activeTab === "scans" && (
+          <div className="overflow-x-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--md-outline-variant)]">
+              <h2 className="text-[16px] font-medium text-[var(--md-on-surface)]">
+                ประวัติการสแกน <span className="font-normal text-[13px] text-[var(--md-on-surface-variant)]">({scan_history.length} รายการล่าสุด)</span>
+              </h2>
+              <div className="flex gap-2 text-[11px]">
+                <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700">V2</span>
+                <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-700">V1</span>
+              </div>
+            </div>
+            <table className="w-full min-w-[1100px]">
+              <thead>
+                <tr className="border-b border-[var(--md-outline-variant)]">
+                  <th className="text-left px-4 py-3 text-[11px] font-medium text-[var(--md-on-surface-variant)] uppercase tracking-wide w-[50px]">แหล่ง</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-medium text-[var(--md-on-surface-variant)] uppercase tracking-wide w-[72px]">รูป</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-wide">
+                    <button type="button" onClick={() => setScanSort((prev) => nextSort(prev, "legacy_serial"))} className="inline-flex items-center text-[var(--md-on-surface-variant)] hover:text-[var(--md-on-surface)]">
+                      รหัส / Serial{sortIndicator(scanSort.key === "legacy_serial", scanSort.dir)}
+                    </button>
+                  </th>
+                  <th className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-wide">
+                    <button type="button" onClick={() => setScanSort((prev) => nextSort(prev, "product_name"))} className="inline-flex items-center text-[var(--md-on-surface-variant)] hover:text-[var(--md-on-surface)]">
+                      สินค้า{sortIndicator(scanSort.key === "product_name", scanSort.dir)}
+                    </button>
+                  </th>
+                  <th className="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wide">
+                    <button type="button" onClick={() => setScanSort((prev) => nextSort(prev, "scan_type"))} className="inline-flex items-center text-[var(--md-on-surface-variant)] hover:text-[var(--md-on-surface)]">
+                      สถานะ{sortIndicator(scanSort.key === "scan_type", scanSort.dir)}
+                    </button>
+                  </th>
+                  <th className="text-right px-4 py-3 text-[11px] font-medium uppercase tracking-wide">
+                    <button type="button" onClick={() => setScanSort((prev) => nextSort(prev, "points_earned"))} className="inline-flex items-center text-[var(--md-on-surface-variant)] hover:text-[var(--md-on-surface)]">
+                      แต้ม{sortIndicator(scanSort.key === "points_earned", scanSort.dir)}
+                    </button>
+                  </th>
+                  <th className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-wide">
+                    <button type="button" onClick={() => setScanSort((prev) => nextSort(prev, "scanned_at"))} className="inline-flex items-center text-[var(--md-on-surface-variant)] hover:text-[var(--md-on-surface)]">
+                      วันที่{sortIndicator(scanSort.key === "scanned_at", scanSort.dir)}
+                    </button>
+                  </th>
+                  <th className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-wide">
+                    <button type="button" onClick={() => setScanSort((prev) => nextSort(prev, "location"))} className="inline-flex items-center text-[var(--md-on-surface-variant)] hover:text-[var(--md-on-surface)]">
+                      พื้นที่{sortIndicator(scanSort.key === "location", scanSort.dir)}
+                    </button>
+                  </th>
                 </tr>
-              ) : (
-                scan_history.map((s) => (
-                  <tr key={s.id} className="border-b border-[var(--md-outline-variant)] last:border-b-0 hover:bg-[var(--md-surface-dim)]">
-                    <td className="px-5 py-3 font-mono text-[13px]">{s.campaign_id}</td>
-                    <td className="px-5 py-3 text-right font-medium text-[var(--md-primary)]">+{s.points_earned}</td>
-                    <td className="px-5 py-3 text-[13px]">{new Date(s.scanned_at).toLocaleString()}</td>
-                    <td className="px-5 py-3 text-[12px] text-[var(--md-on-surface-variant)]">
-                      {s.latitude != null && s.longitude != null
+              </thead>
+              <tbody>
+                {scan_history.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-5 py-10 text-center text-[var(--md-on-surface-variant)]">
+                      ยังไม่มีประวัติการสแกน
+                    </td>
+                  </tr>
+                ) : (
+                  sortedScanHistory.map((s) => {
+                    const isV1 = s.data_source === "v1";
+                    const displayPoints = s.scan_type === "success" ? s.points_earned : 0;
+                    const scanTypeLabel: Record<string, { label: string; cls: string }> = {
+                      success: { label: "สำเร็จ", cls: "bg-green-100 text-green-700" },
+                      duplicate_self: { label: "ซ้ำ (ตัวเอง)", cls: "bg-yellow-100 text-yellow-700" },
+                      duplicate_other: { label: "ซ้ำ (คนอื่น)", cls: "bg-red-100 text-red-700" },
+                    };
+                    const st = scanTypeLabel[s.scan_type] || { label: s.scan_type, cls: "bg-gray-100 text-gray-600" };
+                    const imageSrc = mediaUrl(s.product_image_url || s.legacy_product_image_url);
+                    const productName = s.product_name || s.legacy_product_name;
+                    const productSku = s.product_sku || s.legacy_product_sku;
+                    const locationParts = [s.sub_district, s.district, s.province].filter(Boolean);
+                    const locationText = locationParts.length > 0
+                      ? locationParts.join(", ")
+                      : s.latitude != null && s.longitude != null
                         ? `${s.latitude.toFixed(4)}, ${s.longitude.toFixed(4)}`
-                        : "—"}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                        : "—";
 
-      {/* Redemptions (ประวัติการแลกแต้ม) */}
-      <div className="bg-white dark:bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] border border-gray-200 dark:border-[var(--md-outline-variant)] overflow-x-auto">
-        <h2 className="text-[16px] font-medium text-[var(--md-on-surface)] px-6 py-4 border-b border-[var(--md-outline-variant)]">
-          ประวัติการแลกแต้ม (Redemptions)
-        </h2>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[800px]">
-            <thead>
-              <tr className="border-b border-[var(--md-outline-variant)]">
-                <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase">Reward</th>
-                <th className="text-right px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase">Points</th>
-                <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase">Status</th>
-                <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {redemptions.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-5 py-8 text-center text-[var(--md-on-surface-variant)]">
-                    No redemptions yet
-                  </td>
+                    return (
+                      <tr key={s.id} className="border-b border-[var(--md-outline-variant)] last:border-b-0 hover:bg-[var(--md-surface-dim)] transition-colors">
+                        <td className="px-4 py-3">
+                          <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${isV1 ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
+                            {isV1 ? "V1" : "V2"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {imageSrc ? (
+                            <img src={imageSrc} alt={productName || "product"} className="w-11 h-11 rounded-[10px] object-cover border border-[var(--md-outline-variant)]" />
+                          ) : (
+                            <div className="w-11 h-11 rounded-[10px] border border-[var(--md-outline-variant)] bg-[var(--md-surface-container)] flex items-center justify-center text-[18px]">
+                              🏷️
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {s.legacy_serial ? (
+                            <Link
+                              href={`/scan-history?legacy_serial=${encodeURIComponent(s.legacy_serial)}`}
+                              className="font-mono text-[13px] font-medium text-[var(--md-primary)] hover:underline"
+                              title="ดูว่าใครเคยสแกนรหัสนี้บ้าง"
+                            >
+                              {s.legacy_serial}
+                            </Link>
+                          ) : (
+                            <span className="text-[12px] text-[var(--md-on-surface-variant)]">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {productName ? (
+                            <div>
+                              <div className="text-[13px] text-[var(--md-on-surface)] leading-tight">{productName}</div>
+                              {productSku && (
+                                <div className="text-[11px] text-[var(--md-on-surface-variant)] mt-0.5">SKU: {productSku}</div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-[12px] text-[var(--md-on-surface-variant)]">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${st.cls}`}>
+                            {st.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className={`font-semibold text-[14px] ${displayPoints > 0 ? "text-[var(--md-primary)]" : "text-[var(--md-on-surface-variant)]"}`}>
+                            {displayPoints > 0 ? `+${displayPoints}` : displayPoints}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-[12px] text-[var(--md-on-surface-variant)] whitespace-nowrap">
+                          {new Date(s.scanned_at).toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "numeric" })}
+                          <br />
+                          <span className="text-[11px] opacity-70">{new Date(s.scanned_at).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}</span>
+                        </td>
+                        <td className="px-4 py-3 text-[12px] text-[var(--md-on-surface-variant)] max-w-[180px] truncate" title={locationText}>
+                          {locationText}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {activeTab === "redemptions" && (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[850px]">
+              <thead>
+                <tr className="border-b border-[var(--md-outline-variant)]">
+                  <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase">รูป</th>
+                  <th className="text-left px-5 py-3 text-[12px] font-medium uppercase">
+                    <button type="button" onClick={() => setRedemptionSort((prev) => nextSort(prev, "reward_name"))} className="inline-flex items-center text-[var(--md-on-surface-variant)] hover:text-[var(--md-on-surface)]">
+                      Reward{sortIndicator(redemptionSort.key === "reward_name", redemptionSort.dir)}
+                    </button>
+                  </th>
+                  <th className="text-right px-5 py-3 text-[12px] font-medium uppercase">
+                    <button type="button" onClick={() => setRedemptionSort((prev) => nextSort(prev, "point_cost"))} className="inline-flex items-center text-[var(--md-on-surface-variant)] hover:text-[var(--md-on-surface)]">
+                      Points{sortIndicator(redemptionSort.key === "point_cost", redemptionSort.dir)}
+                    </button>
+                  </th>
+                  <th className="text-left px-5 py-3 text-[12px] font-medium uppercase">
+                    <button type="button" onClick={() => setRedemptionSort((prev) => nextSort(prev, "status"))} className="inline-flex items-center text-[var(--md-on-surface-variant)] hover:text-[var(--md-on-surface)]">
+                      Status{sortIndicator(redemptionSort.key === "status", redemptionSort.dir)}
+                    </button>
+                  </th>
+                  <th className="text-left px-5 py-3 text-[12px] font-medium uppercase">
+                    <button type="button" onClick={() => setRedemptionSort((prev) => nextSort(prev, "created_at"))} className="inline-flex items-center text-[var(--md-on-surface-variant)] hover:text-[var(--md-on-surface)]">
+                      Date{sortIndicator(redemptionSort.key === "created_at", redemptionSort.dir)}
+                    </button>
+                  </th>
                 </tr>
-              ) : (
-                redemptions.map((r) => (
-                  <tr key={r.id} className="border-b border-[var(--md-outline-variant)] last:border-b-0 hover:bg-[var(--md-surface-dim)]">
-                    <td className="px-5 py-3 text-[13px] font-medium">{r.reward_name}</td>
-                    <td className="px-5 py-3 text-right text-[var(--md-primary)]">{r.point_cost}</td>
-                    <td className="px-5 py-3"><StatusBadge status={r.status} /></td>
-                    <td className="px-5 py-3 text-[12px] text-[var(--md-on-surface-variant)]">
-                      {new Date(r.created_at).toLocaleString()}
+              </thead>
+              <tbody>
+                {redemptions.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-5 py-10 text-center text-[var(--md-on-surface-variant)]">
+                      ยังไม่มีประวัติการแลกแต้ม
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  sortedRedemptions.map((r) => {
+                    const rewardImage = mediaUrl(r.reward_image_url);
+                    return (
+                      <tr key={r.id} className="border-b border-[var(--md-outline-variant)] last:border-b-0 hover:bg-[var(--md-surface-dim)]">
+                        <td className="px-5 py-3">
+                          {rewardImage ? (
+                            <img src={rewardImage} alt={r.reward_name} className="w-12 h-12 rounded-[10px] object-cover border border-[var(--md-outline-variant)]" />
+                          ) : (
+                            <div className="w-12 h-12 rounded-[10px] border border-[var(--md-outline-variant)] bg-[var(--md-surface-container)] flex items-center justify-center text-[18px]">
+                              🎁
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-5 py-3 text-[13px] font-medium">{r.reward_name}</td>
+                        <td className="px-5 py-3 text-right text-[var(--md-primary)]">{r.point_cost}</td>
+                        <td className="px-5 py-3"><StatusBadge status={r.status} /></td>
+                        <td className="px-5 py-3 text-[12px] text-[var(--md-on-surface-variant)]">
+                          {new Date(r.created_at).toLocaleString("th-TH")}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Addresses */}

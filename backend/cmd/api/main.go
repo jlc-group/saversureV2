@@ -62,6 +62,7 @@ import (
 	"saversure/internal/tier"
 	"saversure/internal/transaction"
 	"saversure/internal/upload"
+	"saversure/internal/v1sync"
 	"saversure/internal/webhook"
 	"saversure/pkg/cache"
 	"saversure/pkg/database"
@@ -192,6 +193,9 @@ func main() {
 	if err := migrationSvc.RecoverInterruptedJobs(context.Background()); err != nil {
 		slog.Warn("failed to recover interrupted migration jobs", "error", err)
 	}
+
+	v1SyncSvc := v1sync.NewService(db, cfg)
+	v1SyncHandler := v1sync.NewHandler(v1SyncSvc)
 
 	var uploadHandler *upload.Handler
 	var exportHandler *export.Handler
@@ -765,6 +769,15 @@ func main() {
 		migrationRoutes.POST("/:id/retry", migrationHandler.Retry)
 	}
 
+	// V1 Live Sync (Admin)
+	v1SyncRoutes := tenanted.Group("/v1-sync")
+	v1SyncRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		v1SyncRoutes.POST("/trigger", v1SyncHandler.Trigger)
+		v1SyncRoutes.GET("/status", v1SyncHandler.Status)
+		v1SyncRoutes.GET("/health", v1SyncHandler.Health)
+	}
+
 	// Webhooks (Admin)
 	webhookRoutes := tenanted.Group("/webhooks")
 	webhookRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
@@ -957,6 +970,10 @@ func main() {
 		myRoutes.POST("/pdpa/withdraw", authHandler.WithdrawPDPA)
 		myRoutes.GET("/scans", scanHistoryHandler.GetMyScans)
 	}
+
+	// --- V1 Sync Scheduler ---
+	v1SyncSvc.StartScheduler(context.Background())
+	defer v1SyncSvc.StopScheduler()
 
 	// --- Server ---
 	srv := &http.Server{

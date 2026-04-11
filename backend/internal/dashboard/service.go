@@ -34,6 +34,8 @@ type ScanChartPoint struct {
 	Count int64  `json:"count"`
 }
 
+const committedRedemptionStatuses = "'CONFIRMED','SHIPPING','SHIPPED','COMPLETED'"
+
 func (s *Service) GetSummary(ctx context.Context, tenantID string) (*Summary, error) {
 	sum := &Summary{
 		CampaignStats: make(map[string]int64),
@@ -93,12 +95,12 @@ func (s *Service) GetSummary(ctx context.Context, tenantID string) (*Summary, er
 
 	// Points issued (total credits)
 	_ = s.db.QueryRow(ctx,
-		`SELECT COALESCE(SUM(amount), 0) FROM point_ledger WHERE tenant_id = $1 AND type = 'credit'`, tenantID,
+		`SELECT COALESCE(SUM(amount), 0) FROM point_ledger WHERE tenant_id = $1 AND entry_type = 'credit'`, tenantID,
 	).Scan(&sum.PointsIssued)
 
 	// Points redeemed (total debits)
 	_ = s.db.QueryRow(ctx,
-		`SELECT COALESCE(SUM(ABS(amount)), 0) FROM point_ledger WHERE tenant_id = $1 AND type = 'debit'`, tenantID,
+		`SELECT COALESCE(SUM(amount), 0) FROM point_ledger WHERE tenant_id = $1 AND entry_type = 'debit'`, tenantID,
 	).Scan(&sum.PointsRedeemed)
 
 	// Total users (consumers only)
@@ -223,7 +225,7 @@ func (s *Service) GetConversionFunnel(ctx context.Context, tenantID string) (*Fu
 
 	// total_redeemed = COUNT(*) from reward_reservations where status = 'CONFIRMED'
 	_ = s.db.QueryRow(ctx,
-		`SELECT COUNT(*) FROM reward_reservations WHERE tenant_id = $1 AND status = 'CONFIRMED'`, tenantID,
+		`SELECT COUNT(*) FROM reward_reservations WHERE tenant_id = $1 AND status IN (`+committedRedemptionStatuses+`)`, tenantID,
 	).Scan(&f.TotalRedeemed)
 
 	// scan_rate = scanned/generated * 100

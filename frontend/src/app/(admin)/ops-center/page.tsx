@@ -47,23 +47,99 @@ interface DigestSummary {
   redeem_count_today: number;
 }
 
+interface SyncEntityStatus {
+  entity: string;
+  last_synced_id: number;
+  last_run_at?: string | null;
+  status: string;
+  rows_synced: number;
+  total_synced: number;
+  error_message?: string | null;
+}
+
+interface HealthMetric {
+  key: string;
+  label: string;
+  value: number;
+}
+
+interface HealthIssue {
+  key: string;
+  label: string;
+  severity: string;
+  count: number;
+  note?: string;
+}
+
+interface FlowHealth {
+  name: string;
+  status: string;
+  summary: string;
+  metrics: HealthMetric[];
+  issues: HealthIssue[];
+}
+
+interface V1SyncHealth {
+  checked_at: string;
+  tenant_id: string;
+  configured: boolean;
+  sync_enabled: boolean;
+  running: boolean;
+  overall: string;
+  source: {
+    connected: boolean;
+    user_max_id: number;
+    scan_max_id: number;
+    redeem_max_id: number;
+    error?: string;
+  };
+  entities: SyncEntityStatus[];
+  flows: FlowHealth[];
+}
+
 const severityColor: Record<string, { bg: string; text: string; border: string; icon: string }> = {
   critical: { bg: "#fce8e6", text: "#c5221f", border: "#c5221f", icon: "!" },
   warning:  { bg: "#fef7e0", text: "#e37400", border: "#e37400", icon: "⚠" },
   info:     { bg: "#e8f0fe", text: "#1a73e8", border: "#1a73e8", icon: "ℹ" },
 };
 
+const healthStatusStyle: Record<string, { bg: string; text: string }> = {
+  healthy: { bg: "#e6f4ea", text: "#188038" },
+  warning: { bg: "#fef7e0", text: "#e37400" },
+  critical: { bg: "#fce8e6", text: "#c5221f" },
+};
+
 export default function OpsCenterPage() {
   const [digest, setDigest] = useState<DigestSummary | null>(null);
+  const [health, setHealth] = useState<V1SyncHealth | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [healthError, setHealthError] = useState("");
+  const [syncAction, setSyncAction] = useState<string | null>(null);
+  const [syncMessage, setSyncMessage] = useState("");
 
   const fetchDigest = async () => {
     setLoading(true);
     setError("");
+    setHealthError("");
     try {
-      const data = await api.get<DigestSummary>("/api/v1/ops/digest");
-      setDigest(data);
+      const [digestResult, healthResult] = await Promise.allSettled([
+        api.get<DigestSummary>("/api/v1/ops/digest"),
+        api.get<V1SyncHealth>("/api/v1/v1-sync/health"),
+      ]);
+
+      if (digestResult.status === "fulfilled") {
+        setDigest(digestResult.value);
+      } else {
+        throw digestResult.reason;
+      }
+
+      if (healthResult.status === "fulfilled") {
+        setHealth(healthResult.value);
+      } else {
+        setHealth(null);
+        setHealthError(healthResult.reason instanceof Error ? healthResult.reason.message : "Failed to load V1 sync health");
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load ops digest");
     } finally {
@@ -72,6 +148,28 @@ export default function OpsCenterPage() {
   };
 
   useEffect(() => { fetchDigest(); }, []);
+
+  const triggerSync = async (entities: string[], label: string) => {
+    setSyncAction(label);
+    setSyncMessage("");
+    try {
+      const res = await api.post<{ results?: Array<{ entity: string; rows_synced: number; error?: string }> }>(
+        "/api/v1/v1-sync/trigger",
+        { entities, limit: 5000 }
+      );
+      const results = res.results || [];
+      const hasError = results.some((item) => item.error);
+      const summary = results
+        .map((item) => `${item.entity}: ${item.error ? `error` : `+${item.rows_synced}`}`)
+        .join(" · ");
+      setSyncMessage(hasError ? `Sync finished with warnings — ${summary}` : `Sync completed — ${summary}`);
+      await fetchDigest();
+    } catch (e: unknown) {
+      setSyncMessage(e instanceof Error ? e.message : "Sync failed");
+    } finally {
+      setSyncAction(null);
+    }
+  };
 
   const todayCards = digest
     ? [
@@ -119,6 +217,7 @@ export default function OpsCenterPage() {
   const criticals = alerts.filter((a) => a.severity === "critical");
   const warnings = alerts.filter((a) => a.severity === "warning");
   const infos = alerts.filter((a) => a.severity === "info");
+  const healthStyle = healthStatusStyle[health?.overall || "healthy"] || healthStatusStyle.healthy;
 
   return (
     <div>
@@ -173,6 +272,170 @@ export default function OpsCenterPage() {
           })}
         </div>
       )}
+
+      {/* V1 Sync Health */}
+      <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 p-6 mb-6">
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <div>
+            <h2 className="text-[16px] font-medium text-[var(--md-on-surface)]">V1 Sync Health</h2>
+            <p className="text-[12px] text-[var(--md-on-surface-variant)] mt-1">
+              ตรวจ flow สำคัญของ `customer`, `scan`, `redeem`, `point_ledger`
+            </p>
+          {health && (
+            <p className="text-[11px] text-[var(--md-on-surface-variant)] mt-1">
+              checked at {health.checked_at}
+            </p>
+          )}
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => triggerSync(["user", "scan_history", "redeem_history"], "all")}
+            disabled={syncAction !== null}
+            className="h-[36px] px-4 rounded-[var(--md-radius-xl)] text-[12px] font-medium bg-[var(--md-primary)] text-white disabled:opacity-50"
+          >
+            {syncAction === "all" ? "Syncing..." : "Sync All Now"}
+          </button>
+          <button
+            type="button"
+            onClick={() => triggerSync(["redeem_history"], "redeem")}
+            disabled={syncAction !== null}
+            className="h-[36px] px-4 rounded-[var(--md-radius-xl)] text-[12px] font-medium border border-[var(--md-outline-variant)] text-[var(--md-on-surface)] disabled:opacity-50"
+          >
+            {syncAction === "redeem" ? "Syncing..." : "Sync Redeem Now"}
+          </button>
+          {health ? (
+            <div
+              className="px-3 py-1 rounded-full text-[12px] font-semibold"
+              style={{ backgroundColor: healthStyle.bg, color: healthStyle.text }}
+            >
+              {health.overall}
+            </div>
+          ) : (
+            <div className="px-3 py-1 rounded-full text-[12px] font-semibold bg-[#fef7e0] text-[#e37400]">
+              unavailable
+            </div>
+          )}
+          </div>
+        </div>
+
+        {healthError && (
+          <div className="mb-4 rounded-[var(--md-radius-md)] border border-[#fce8e6] bg-[#fce8e6] px-4 py-3 text-[12px] text-[#c5221f]">
+            {healthError}
+          </div>
+        )}
+
+        {syncMessage && (
+          <div className="mb-4 rounded-[var(--md-radius-md)] border border-[var(--md-outline-variant)] bg-[var(--md-surface-container)] px-4 py-3 text-[12px] text-[var(--md-on-surface)]">
+            {syncMessage}
+          </div>
+        )}
+
+        {health && (
+          <>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+              <div className="rounded-[var(--md-radius-md)] bg-[var(--md-surface-container)] p-4">
+                <p className="text-[11px] uppercase tracking-[0.4px] text-[var(--md-on-surface-variant)]">Source</p>
+                <p className="mt-1 text-[18px] font-medium" style={{ color: health.source.connected ? "#188038" : "#c5221f" }}>
+                  {health.source.connected ? "Connected" : "Disconnected"}
+                </p>
+                <p className="mt-1 text-[12px] text-[var(--md-on-surface-variant)]">
+                  user max {health.source.user_max_id.toLocaleString()} · scan max {health.source.scan_max_id.toLocaleString()} · redeem max {health.source.redeem_max_id.toLocaleString()}
+                </p>
+              </div>
+              <div className="rounded-[var(--md-radius-md)] bg-[var(--md-surface-container)] p-4">
+                <p className="text-[11px] uppercase tracking-[0.4px] text-[var(--md-on-surface-variant)]">Scheduler</p>
+                <p className="mt-1 text-[18px] font-medium text-[var(--md-on-surface)]">
+                  {health.sync_enabled ? "Enabled" : "Disabled"}
+                </p>
+                <p className="mt-1 text-[12px] text-[var(--md-on-surface-variant)]">
+                  running: {health.running ? "yes" : "no"}
+                </p>
+              </div>
+              {health.entities.map((entity) => {
+                const style = healthStatusStyle[entity.status] || healthStatusStyle.warning;
+                return (
+                  <div key={entity.entity} className="rounded-[var(--md-radius-md)] bg-[var(--md-surface-container)] p-4">
+                    <p className="text-[11px] uppercase tracking-[0.4px] text-[var(--md-on-surface-variant)]">{entity.entity}</p>
+                    <p className="mt-1 text-[18px] font-medium" style={{ color: style.text }}>{entity.status}</p>
+                    <p className="mt-1 text-[12px] text-[var(--md-on-surface-variant)]">
+                      watermark {entity.last_synced_id.toLocaleString()} · rows {entity.rows_synced.toLocaleString()}
+                    </p>
+                    {entity.last_run_at && (
+                      <p className="mt-1 text-[11px] text-[var(--md-on-surface-variant)]">
+                        last run {entity.last_run_at}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              {health.flows.map((flow) => {
+                const style = healthStatusStyle[flow.status] || healthStatusStyle.warning;
+                return (
+                  <div key={flow.name} className="rounded-[var(--md-radius-md)] border border-[var(--md-outline-variant)] p-4">
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div>
+                        <h3 className="text-[15px] font-medium text-[var(--md-on-surface)]">{flow.name}</h3>
+                        <p className="text-[12px] text-[var(--md-on-surface-variant)] mt-1">{flow.summary}</p>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold" style={{ backgroundColor: style.bg, color: style.text }}>
+                        {flow.status}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      {flow.metrics.map((metric) => (
+                        <div key={metric.key} className="rounded-[10px] bg-[var(--md-surface-container)] px-3 py-2">
+                          <p className="text-[11px] text-[var(--md-on-surface-variant)]">{metric.label}</p>
+                          <p className="mt-1 text-[16px] font-medium text-[var(--md-on-surface)]">
+                            {(metric.value ?? 0).toLocaleString()}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {flow.issues.length > 0 ? (
+                      <div className="space-y-2">
+                        {flow.issues.map((issue) => {
+                          const issueStyle = severityColor[issue.severity] || severityColor.info;
+                          return (
+                            <div
+                              key={issue.key}
+                              className="rounded-[10px] border px-3 py-2"
+                              style={{ backgroundColor: issueStyle.bg, borderColor: issueStyle.border + "33" }}
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <p className="text-[12px] font-medium" style={{ color: issueStyle.text }}>
+                                  {issue.label}
+                                </p>
+                                <span className="text-[12px] font-semibold" style={{ color: issueStyle.text }}>
+                                  {issue.count.toLocaleString()}
+                                </span>
+                              </div>
+                              {issue.note && (
+                                <p className="mt-1 text-[11px]" style={{ color: issueStyle.text }}>
+                                  {issue.note}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="rounded-[10px] bg-[#e6f4ea] px-3 py-2 text-[12px] text-[#188038]">
+                        ยังไม่พบ issue ใน flow นี้
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
 
       {/* Today Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

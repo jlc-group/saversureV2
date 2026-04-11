@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
@@ -24,6 +24,9 @@ interface Customer {
   created_at: string;
 }
 
+type CustomerSortKey = "customer" | "province" | "status" | "points" | "scans" | "redeems" | "joined";
+type SortDir = "asc" | "desc";
+
 const statusStyle: Record<string, { bg: string; text: string }> = {
   active: { bg: "bg-[var(--md-success-light)]", text: "text-[var(--md-success)]" },
   suspended: { bg: "bg-[var(--md-warning-light)]", text: "text-[var(--md-warning)]" },
@@ -43,6 +46,8 @@ export default function CustomersPage() {
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [actionId, setActionId] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<CustomerSortKey>("joined");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
   const limit = 30;
 
   const fetchData = async () => {
@@ -74,6 +79,65 @@ export default function CustomersPage() {
   };
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
+  const handleSort = (key: CustomerSortKey) => {
+    if (sortBy === key) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortBy(key);
+    setSortDir(key === "customer" || key === "province" || key === "status" ? "asc" : "desc");
+  };
+  const sortedCustomers = useMemo(() => {
+    const rows = [...customers];
+    rows.sort((a, b) => {
+      const aName = ([a.first_name, a.last_name].filter(Boolean).join(" ") || a.display_name || a.email || a.phone || "").toLocaleLowerCase();
+      const bName = ([b.first_name, b.last_name].filter(Boolean).join(" ") || b.display_name || b.email || b.phone || "").toLocaleLowerCase();
+      const compareText = (left: string, right: string) => sortDir === "asc" ? left.localeCompare(right) : right.localeCompare(left);
+      const compareNumber = (left: number, right: number) => sortDir === "asc" ? left - right : right - left;
+      switch (sortBy) {
+        case "customer":
+          return compareText(aName, bName);
+        case "province":
+          return compareText((a.province || "").toLocaleLowerCase(), (b.province || "").toLocaleLowerCase());
+        case "status":
+          return compareText(a.status, b.status);
+        case "points":
+          return compareNumber(a.point_balance, b.point_balance);
+        case "scans":
+          return compareNumber(a.scan_count, b.scan_count);
+        case "redeems":
+          return compareNumber(a.redeem_count, b.redeem_count);
+        case "joined":
+        default:
+          return compareNumber(new Date(a.created_at).getTime(), new Date(b.created_at).getTime());
+      }
+    });
+    return rows;
+  }, [customers, sortBy, sortDir]);
+  const sortIcon = (key: CustomerSortKey) => {
+    if (sortBy !== key) return <span className="ml-1 opacity-30">⇅</span>;
+    return <span className="ml-1 text-[var(--md-primary)]">{sortDir === "asc" ? "↑" : "↓"}</span>;
+  };
+  const SortHeader = ({
+    col,
+    label,
+    className = "",
+  }: {
+    col: CustomerSortKey;
+    label: string;
+    className?: string;
+  }) => (
+    <th className={`px-5 py-3 text-[12px] font-medium uppercase tracking-[0.4px] ${className}`}>
+      <button
+        type="button"
+        onClick={() => handleSort(col)}
+        className="inline-flex items-center text-[var(--md-on-surface-variant)] hover:text-[var(--md-on-surface)]"
+      >
+        {label}
+        {sortIcon(col)}
+      </button>
+    </th>
+  );
 
   return (
     <div>
@@ -101,16 +165,19 @@ export default function CustomersPage() {
           <thead>
             <tr className="border-b border-[var(--md-outline-variant)]">
               <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">
-                Customer <span className="font-normal normal-case text-[11px] opacity-80">(คลิกชื่อเพื่อดูประวัติการสแกน/แลกแต้ม)</span>
+                <button type="button" onClick={() => handleSort("customer")} className="inline-flex items-center hover:text-[var(--md-on-surface)]">
+                  Customer {sortIcon("customer")}
+                </button>
+                <span className="ml-1 font-normal normal-case text-[11px] opacity-80">(คลิกชื่อเพื่อดูประวัติการสแกน/แลกแต้ม)</span>
               </th>
               <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Phone</th>
-              <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">จังหวัด</th>
+              <SortHeader col="province" label="จังหวัด" className="text-left" />
               <th className="text-center px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Flag</th>
-              <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Status</th>
-              <th className="text-right px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Points</th>
-              <th className="text-right px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Scans</th>
-              <th className="text-right px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Redeems</th>
-              <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Joined</th>
+              <SortHeader col="status" label="Status" className="text-left" />
+              <SortHeader col="points" label="Points" className="text-right" />
+              <SortHeader col="scans" label="Scans" className="text-right" />
+              <SortHeader col="redeems" label="Redeems" className="text-right" />
+              <SortHeader col="joined" label="Joined" className="text-left" />
               <th className="text-right px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Actions</th>
             </tr>
           </thead>
@@ -119,7 +186,7 @@ export default function CustomersPage() {
               <tr><td colSpan={10} className="px-5 py-12 text-center text-[var(--md-on-surface-variant)]"><svg className="animate-spin w-5 h-5 mx-auto" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg></td></tr>
             ) : customers.length === 0 ? (
               <tr><td colSpan={10} className="px-5 py-12 text-center text-[var(--md-on-surface-variant)]">No customers found</td></tr>
-            ) : customers.map((c) => {
+            ) : sortedCustomers.map((c) => {
               const s = statusStyle[c.status] || statusStyle.active;
               const name = [c.first_name, c.last_name].filter(Boolean).join(" ") || c.display_name;
               return (
@@ -172,7 +239,11 @@ export default function CustomersPage() {
                   <td className="px-5 py-3 text-right text-[14px] font-bold text-[var(--md-primary)]">{c.point_balance.toLocaleString()}</td>
                   <td className="px-5 py-3 text-right text-[13px] text-[var(--md-on-surface)]">{c.scan_count.toLocaleString()}</td>
                   <td className="px-5 py-3 text-right text-[13px] text-[var(--md-on-surface)]">{c.redeem_count.toLocaleString()}</td>
-                  <td className="px-5 py-3 text-[12px] text-[var(--md-on-surface-variant)]">{new Date(c.created_at).toLocaleDateString()}</td>
+                  <td className="px-5 py-3 text-[12px] text-[var(--md-on-surface-variant)] whitespace-nowrap">
+                    {new Date(c.created_at).toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "numeric" })}
+                    <br />
+                    <span className="text-[11px] opacity-70">{new Date(c.created_at).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+                  </td>
                   <td className="px-5 py-3" onClick={(e) => e.stopPropagation()}>
                     <div className="flex gap-1 justify-end">
                       <Link

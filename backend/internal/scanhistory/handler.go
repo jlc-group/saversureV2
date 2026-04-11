@@ -26,6 +26,7 @@ func (h *Handler) List(c *gin.Context) {
 	scanType := c.Query("scan_type") // success, duplicate_self, duplicate_other
 	batchID := c.Query("batch_id")
 	codeID := c.Query("code_id")   // by-code view: all scan attempts for one code
+	legacySerial := c.Query("legacy_serial")
 	sortBy := c.Query("sort_by")   // column key (see allowedSortColumns)
 	sortDir := c.Query("sort_dir") // asc | desc
 
@@ -44,6 +45,7 @@ func (h *Handler) List(c *gin.Context) {
 		ScanType: scanType,
 		BatchID:  batchID,
 		CodeID:   codeID,
+		LegacySerial: legacySerial,
 		SortBy:   sortBy,
 		SortDir:  sortDir,
 		Limit:    limit,
