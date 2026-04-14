@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { api } from "@/lib/api";
@@ -36,10 +36,14 @@ interface ScanEntry {
 }
 
 interface SuspiciousItem {
+  alert_key: string;
+  data_source: string;
   code_id: string;
   ref1: string;
   batch_prefix: string;
   serial_number: number;
+  legacy_serial?: string | null;
+  legacy_qr_code_id?: number | null;
   total_scans: number;
   duplicate_count: number;
   first_scanned_at: string;
@@ -122,13 +126,23 @@ function normalizeSerial(value: string | null | undefined): string {
   return (value || "").trim().toUpperCase();
 }
 
+function buildPageList(current: number, totalPages: number): number[] {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, idx) => idx);
+  }
+  const pages = new Set<number>([0, 1, totalPages - 2, totalPages - 1, current - 1, current, current + 1]);
+  return Array.from(pages).filter((page) => page >= 0 && page < totalPages).sort((a, b) => a - b);
+}
+
 export default function ScanHistoryPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const tableScrollRef = useRef<HTMLDivElement | null>(null);
   const [entries, setEntries] = useState<ScanEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
+  const [pageInput, setPageInput] = useState("1");
   const [statusFilter, setStatusFilter] = useState("");
   const [scanTypeFilter, setScanTypeFilter] = useState("");
   const [sortBy, setSortBy] = useState<SortKey>("scanned_at");
@@ -139,13 +153,15 @@ export default function ScanHistoryPage() {
   const [legacyFallbackActive, setLegacyFallbackActive] = useState(false);
   const limit = 30;
   const legacySerialFilter = (searchParams.get("legacy_serial") || "").trim();
+  const legacyQrIdFilter = Math.max(0, Number(searchParams.get("legacy_qr_code_id") || "0"));
   const normalizedLegacySerialFilter = normalizeSerial(legacySerialFilter);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const requestLimit = legacySerialFilter ? 500 : limit;
-      const requestOffset = legacySerialFilter ? 0 : page * limit;
+      const legacyFilterActive = Boolean(legacySerialFilter) || legacyQrIdFilter > 0;
+      const requestLimit = legacyFilterActive ? 500 : limit;
+      const requestOffset = legacyFilterActive ? 0 : page * limit;
       const params = new URLSearchParams({
         limit: String(requestLimit),
         offset: String(requestOffset),
@@ -155,28 +171,30 @@ export default function ScanHistoryPage() {
       if (statusFilter) params.set("status", statusFilter);
       if (scanTypeFilter) params.set("scan_type", scanTypeFilter);
       if (legacySerialFilter) params.set("legacy_serial", legacySerialFilter);
+      if (legacyQrIdFilter > 0) params.set("legacy_qr_code_id", String(legacyQrIdFilter));
       const data = await api.get<{ data: ScanEntry[]; total: number }>(`/api/v1/scan-history?${params}`);
       const responseRows = data.data || [];
       const matchesLegacySerial = (entry: ScanEntry) => {
-        if (!normalizedLegacySerialFilter) return true;
+        if (!normalizedLegacySerialFilter && legacyQrIdFilter <= 0) return true;
         return [
           normalizeSerial(entry.legacy_qr_code_serial),
           normalizeSerial(entry.ref1),
-        ].includes(normalizedLegacySerialFilter);
+        ].includes(normalizedLegacySerialFilter)
+          || (legacyQrIdFilter > 0 && entry.legacy_qr_code_id === legacyQrIdFilter);
       };
-      const filteredRows = normalizedLegacySerialFilter
+      const filteredRows = normalizedLegacySerialFilter || legacyQrIdFilter > 0
         ? responseRows.filter(matchesLegacySerial)
         : responseRows;
-      const serverAlreadyFiltered = normalizedLegacySerialFilter
+      const serverAlreadyFiltered = normalizedLegacySerialFilter || legacyQrIdFilter > 0
         ? responseRows.length > 0 && responseRows.every(matchesLegacySerial)
         : false;
-      setLegacyFallbackActive(Boolean(normalizedLegacySerialFilter) && !serverAlreadyFiltered);
+      setLegacyFallbackActive(Boolean(normalizedLegacySerialFilter || legacyQrIdFilter > 0) && !serverAlreadyFiltered);
       setEntries(filteredRows);
-      setTotal(normalizedLegacySerialFilter
+      setTotal(normalizedLegacySerialFilter || legacyQrIdFilter > 0
         ? (serverAlreadyFiltered ? (data.total || filteredRows.length) : filteredRows.length)
         : (data.total || 0));
     } catch { /* ignore */ } finally { setLoading(false); }
-  }, [page, statusFilter, scanTypeFilter, sortBy, sortDir, legacySerialFilter, limit, normalizedLegacySerialFilter]);
+  }, [page, statusFilter, scanTypeFilter, sortBy, sortDir, legacySerialFilter, legacyQrIdFilter, limit, normalizedLegacySerialFilter]);
 
   const fetchAlerts = useCallback(async () => {
     try {
@@ -196,6 +214,10 @@ export default function ScanHistoryPage() {
   };
 
   useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { setPageInput(String(page + 1)); }, [page]);
+  useEffect(() => {
+    tableScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  }, [page, sortBy, sortDir, statusFilter, scanTypeFilter, legacySerialFilter, legacyQrIdFilter]);
   useEffect(() => {
     const timer = window.setTimeout(() => {
       fetchAlerts();
@@ -228,12 +250,43 @@ export default function ScanHistoryPage() {
   );
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
+  const pageButtons = useMemo(() => buildPageList(page, totalPages), [page, totalPages]);
+  const pageSummary = useMemo(() => {
+    const summary = {
+      total: entries.length,
+      success: 0,
+      duplicateSelf: 0,
+      duplicateOther: 0,
+      points: 0,
+    };
+    for (const entry of entries) {
+      if (entry.scan_type === "success") {
+        summary.success += 1;
+        summary.points += entry.points_earned;
+      } else if (entry.scan_type === "duplicate_self") {
+        summary.duplicateSelf += 1;
+      } else if (entry.scan_type === "duplicate_other") {
+        summary.duplicateOther += 1;
+      }
+    }
+    return summary;
+  }, [entries]);
   const sel = "h-[36px] px-3 border border-[var(--md-outline-variant)] rounded-[var(--md-radius-sm)] text-[13px] text-[var(--md-on-surface)] bg-transparent outline-none focus:border-[var(--md-primary)]";
   const firstEntry = codeDetail?.entries[0];
   const applyLegacySerialFilter = (serial: string) => {
     if (!serial) return;
     const params = new URLSearchParams(searchParams.toString());
     params.set("legacy_serial", serial);
+    params.delete("legacy_qr_code_id");
+    params.delete("code_id");
+    router.push(`/scan-history?${params.toString()}`);
+    setPage(0);
+  };
+  const applyLegacyQrIdFilter = (qrId: number) => {
+    if (!qrId) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("legacy_qr_code_id", String(qrId));
+    params.delete("legacy_serial");
     params.delete("code_id");
     router.push(`/scan-history?${params.toString()}`);
     setPage(0);
@@ -241,8 +294,37 @@ export default function ScanHistoryPage() {
   const clearLegacySerialFilter = () => {
     const params = new URLSearchParams(searchParams.toString());
     params.delete("legacy_serial");
+    params.delete("legacy_qr_code_id");
     router.push(params.toString() ? `/scan-history?${params.toString()}` : "/scan-history");
     setPage(0);
+  };
+  const openSuspiciousItem = (item: SuspiciousItem) => {
+    if (item.code_id) {
+      openCodeDetail(item.code_id);
+      return;
+    }
+    if (item.legacy_serial) {
+      applyLegacySerialFilter(item.legacy_serial);
+      return;
+    }
+    if (item.legacy_qr_code_id) {
+      applyLegacyQrIdFilter(item.legacy_qr_code_id);
+    }
+  };
+  const suspiciousLabel = (item: SuspiciousItem) => {
+    if (item.batch_prefix || item.serial_number > 0 || item.ref1) {
+      const v2Code = item.batch_prefix || item.serial_number > 0
+        ? `${item.batch_prefix || "—"}-${item.serial_number > 0 ? item.serial_number.toLocaleString() : "—"}`
+        : item.ref1;
+      return `${v2Code} · ${item.ref1 || item.legacy_serial || "ไม่มี REF"}`;
+    }
+    if (item.legacy_serial) return `V1 Code · ${item.legacy_serial}`;
+    if (item.legacy_qr_code_id) return `V1 QR ID · ${item.legacy_qr_code_id.toLocaleString()}`;
+    return item.alert_key;
+  };
+  const goToPage = (nextPage: number) => {
+    const bounded = Math.max(0, Math.min(totalPages - 1, nextPage));
+    setPage(bounded);
   };
 
   // Detect browser's UTC offset for display
@@ -255,23 +337,30 @@ export default function ScanHistoryPage() {
   })();
 
   return (
-    <div>
+    <div className="flex min-h-[calc(100vh-120px)] flex-col gap-4">
       {/* Alert bar */}
       {alerts.length > 0 && (
-        <div className="mb-6 p-4 rounded-[var(--md-radius-lg)] border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700">
-          <p className="text-[14px] font-medium text-amber-800 dark:text-amber-200 mb-2 flex items-center gap-2">
+        <div className="rounded-[var(--md-radius-lg)] border border-amber-200 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950/30">
+          <p className="mb-2 flex items-center gap-2 text-[14px] font-medium text-amber-800 dark:text-amber-200">
             ⚠️ รหัสที่น่าสงสัย — มีการสแกนซ้ำ ({alerts.length} รหัส)
           </p>
-          <div className="flex flex-wrap gap-2">
+          <p className="mb-3 text-[12px] text-amber-700/90 dark:text-amber-200/80">
+            ตอนนี้รวมทั้งรหัส V2 และรหัส V1 ที่ sync เข้ามาแล้ว กดที่รายการเพื่อเปิดรายละเอียดหรือ filter ตารางทันที
+          </p>
+          <div className="flex max-h-[132px] flex-wrap gap-2 overflow-y-auto pr-1">
             {alerts.map((a) => (
               <button
-                key={a.code_id}
+                key={a.alert_key}
                 type="button"
-                onClick={() => openCodeDetail(a.code_id)}
-                className="px-3 py-1 rounded-lg text-[12px] font-mono bg-white dark:bg-gray-800 border border-amber-300 hover:bg-amber-50 transition-colors"
+                onClick={() => openSuspiciousItem(a)}
+                className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-left text-[12px] transition-colors hover:bg-amber-50 dark:bg-gray-800"
+                title={a.code_id ? "เปิดประวัติรหัสนี้" : "filter ตารางตามรหัสนี้"}
               >
-                {a.batch_prefix}-{a.serial_number} · {a.ref1}
+                <span className="font-mono text-[12px]">{suspiciousLabel(a)}</span>
                 <span className="ml-1.5 text-amber-600">({a.duplicate_count} ซ้ำ)</span>
+                <span className="ml-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-amber-700 dark:bg-amber-900/50 dark:text-amber-200">
+                  {a.data_source}
+                </span>
               </button>
             ))}
           </div>
@@ -279,45 +368,77 @@ export default function ScanHistoryPage() {
       )}
 
       {/* Header + filters */}
-      <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-[28px] font-normal text-[var(--md-on-surface)] tracking-[-0.5px]">Scan History</h1>
-          <p className="text-[13px] text-[var(--md-on-surface-variant)] mt-1">
-            {total.toLocaleString()} รายการ — คลิกหัวคอลัมน์เพื่อเรียงลำดับ · คลิก REF1 ดูรายละเอียด · คลิกชื่อผู้สแกนไปหน้าลูกค้า
-          </p>
-          {legacySerialFilter && (
-            <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1.5 text-[12px] text-blue-700">
-              <span>กำลัง filter รหัส</span>
-              <span className="font-mono font-semibold">{legacySerialFilter}</span>
-              {legacyFallbackActive && (
-                <span className="rounded-full bg-white px-2 py-0.5 text-[11px] text-blue-600">fallback</span>
-              )}
-              <button type="button" onClick={clearLegacySerialFilter} className="rounded-full bg-white px-2 py-0.5 text-[11px] hover:bg-blue-100">
-                ล้าง
-              </button>
-            </div>
-          )}
+      <div className="sticky top-0 z-20 -mx-2 border-b border-[var(--md-outline-variant)] bg-[var(--md-background)]/95 px-2 pb-4 pt-1 backdrop-blur">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-[28px] font-normal text-[var(--md-on-surface)] tracking-[-0.5px]">Scan History</h1>
+            <p className="mt-1 text-[13px] text-[var(--md-on-surface-variant)]">
+              {total.toLocaleString()} รายการ — คลิกหัวคอลัมน์เพื่อเรียงลำดับ · คลิก REF1 ดูรายละเอียด · คลิกชื่อผู้สแกนไปหน้าลูกค้า
+            </p>
+            {(legacySerialFilter || legacyQrIdFilter > 0) && (
+              <div className="mt-3 inline-flex flex-wrap items-center gap-2 rounded-full bg-blue-50 px-3 py-1.5 text-[12px] text-blue-700">
+                <span>กำลัง filter รหัส</span>
+                {legacySerialFilter && <span className="font-mono font-semibold">{legacySerialFilter}</span>}
+                {legacyQrIdFilter > 0 && <span className="font-mono font-semibold">QR ID {legacyQrIdFilter.toLocaleString()}</span>}
+                {legacyFallbackActive && (
+                  <span className="rounded-full bg-white px-2 py-0.5 text-[11px] text-blue-600">fallback</span>
+                )}
+                <button type="button" onClick={clearLegacySerialFilter} className="rounded-full bg-white px-2 py-0.5 text-[11px] hover:bg-blue-100">
+                  ล้าง
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }} className={sel}>
+              <option value="">สถานะรหัส: ทั้งหมด</option>
+              <option value="scanned">Scanned</option>
+              <option value="redeemed">Redeemed</option>
+            </select>
+            <select value={scanTypeFilter} onChange={(e) => { setScanTypeFilter(e.target.value); setPage(0); }} className={sel}>
+              <option value="">ประเภทสแกน: ทั้งหมด</option>
+              <option value="success">สำเร็จ</option>
+              <option value="duplicate_self">ซ้ำตัวเอง</option>
+              <option value="duplicate_other">ซ้ำคนอื่น</option>
+            </select>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }} className={sel}>
-            <option value="">สถานะรหัส: ทั้งหมด</option>
-            <option value="scanned">Scanned</option>
-            <option value="redeemed">Redeemed</option>
-          </select>
-          <select value={scanTypeFilter} onChange={(e) => { setScanTypeFilter(e.target.value); setPage(0); }} className={sel}>
-            <option value="">ประเภทสแกน: ทั้งหมด</option>
-            <option value="success">สำเร็จ</option>
-            <option value="duplicate_self">ซ้ำตัวเอง</option>
-            <option value="duplicate_other">ซ้ำคนอื่น</option>
-          </select>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="rounded-[var(--md-radius-md)] border border-[var(--md-outline-variant)] bg-[var(--md-surface)] px-4 py-3">
+            <p className="text-[11px] uppercase tracking-[0.4px] text-[var(--md-on-surface-variant)]">รายการในหน้านี้</p>
+            <p className="mt-1 text-[22px] font-semibold text-[var(--md-on-surface)]">{pageSummary.total.toLocaleString()}</p>
+          </div>
+          <div className="rounded-[var(--md-radius-md)] border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-800 dark:bg-emerald-950/20">
+            <p className="text-[11px] uppercase tracking-[0.4px] text-emerald-700 dark:text-emerald-300">สำเร็จ</p>
+            <p className="mt-1 text-[22px] font-semibold text-emerald-700 dark:text-emerald-300">{pageSummary.success.toLocaleString()}</p>
+          </div>
+          <div className="rounded-[var(--md-radius-md)] border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/20">
+            <p className="text-[11px] uppercase tracking-[0.4px] text-amber-700 dark:text-amber-300">ซ้ำตัวเอง</p>
+            <p className="mt-1 text-[22px] font-semibold text-amber-700 dark:text-amber-300">{pageSummary.duplicateSelf.toLocaleString()}</p>
+          </div>
+          <div className="rounded-[var(--md-radius-md)] border border-orange-200 bg-orange-50 px-4 py-3 dark:border-orange-800 dark:bg-orange-950/20">
+            <p className="text-[11px] uppercase tracking-[0.4px] text-orange-700 dark:text-orange-300">ซ้ำคนอื่น</p>
+            <p className="mt-1 text-[22px] font-semibold text-orange-700 dark:text-orange-300">{pageSummary.duplicateOther.toLocaleString()}</p>
+          </div>
+          <div className="rounded-[var(--md-radius-md)] border border-[var(--md-outline-variant)] bg-[var(--md-surface)] px-4 py-3">
+            <p className="text-[11px] uppercase tracking-[0.4px] text-[var(--md-on-surface-variant)]">แต้มจากสำเร็จ</p>
+            <p className="mt-1 text-[22px] font-semibold text-[var(--md-on-surface)]">+{pageSummary.points.toLocaleString()}</p>
+          </div>
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 overflow-x-auto">
-        <table className="w-full min-w-[1100px]">
-          <thead>
-            <tr className="border-b border-[var(--md-outline-variant)]">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[var(--md-radius-lg)] bg-[var(--md-surface)] md-elevation-1">
+        <div className="border-b border-[var(--md-outline-variant)] px-4 py-3 text-[12px] text-[var(--md-on-surface-variant)]">
+          ตารางนี้เลื่อนในตัวเองได้แล้ว หัวตารางจะค้างไว้ด้านบน และแถบเปลี่ยนหน้าจะอยู่ล่างสุดตลอด
+        </div>
+        <div
+          ref={tableScrollRef}
+          className="min-h-[420px] flex-1 overflow-auto"
+        >
+          <table className="w-full min-w-[1100px]">
+            <thead className="sticky top-0 z-10 bg-[var(--md-surface)] shadow-[0_1px_0_0_var(--md-outline-variant)]">
+              <tr className="border-b border-[var(--md-outline-variant)]">
               <ThSort col="serial_number" label="รหัส / Serial" className="text-left" />
               <ThSort col="product_name" label="สินค้า" className="text-left" />
               <ThSort col="ref1" label="Ref / รหัสอ้างอิง" className="text-left" />
@@ -326,25 +447,25 @@ export default function ScanHistoryPage() {
               <ThSort col="scanner_name" label="ผู้สแกน" className="text-left" />
               <ThSort col="points_earned" label="แต้ม" className="text-right" />
               <ThSort col="scanned_at" label={`เวลา (Local ${tzOffset})`} className="text-left" />
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={8} className="px-4 py-12 text-center">
-                <svg className="animate-spin w-5 h-5 mx-auto text-[var(--md-on-surface-variant)]" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-              </td></tr>
-            ) : entries.length === 0 ? (
-              <tr><td colSpan={8} className="px-4 py-12 text-center text-[var(--md-on-surface-variant)]">ไม่พบข้อมูล</td></tr>
-            ) : entries.map((e) => {
-              const legacy = legacyDisplay(e);
-              const displayPoints = e.scan_type === "success" ? e.points_earned : 0;
-              return (
-              <tr
-                key={e.id}
-                className={`border-b border-[var(--md-outline-variant)] last:border-b-0 transition-colors ${
-                  e.scan_type !== "success" ? "bg-amber-50/50 hover:bg-amber-50 dark:bg-amber-950/10" : "hover:bg-[var(--md-surface-dim)]"
-                }`}
-              >
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={8} className="px-4 py-12 text-center">
+                  <svg className="mx-auto h-5 w-5 animate-spin text-[var(--md-on-surface-variant)]" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                </td></tr>
+              ) : entries.length === 0 ? (
+                <tr><td colSpan={8} className="px-4 py-12 text-center text-[var(--md-on-surface-variant)]">ไม่พบข้อมูล</td></tr>
+              ) : entries.map((e) => {
+                const legacy = legacyDisplay(e);
+                const displayPoints = e.scan_type === "success" ? e.points_earned : 0;
+                return (
+                <tr
+                  key={e.id}
+                  className={`border-b border-[var(--md-outline-variant)] last:border-b-0 transition-colors ${
+                    e.scan_type !== "success" ? "bg-amber-50/50 hover:bg-amber-50 dark:bg-amber-950/10" : "hover:bg-[var(--md-surface-dim)]"
+                  }`}
+                >
                 {/* รหัส / Serial */}
                 <td className="px-4 py-3">
                   <div className="min-w-[150px]">
@@ -420,6 +541,15 @@ export default function ScanHistoryPage() {
                         >
                           {legacy.serial}
                         </button>
+                      ) : e.legacy_qr_code_id != null && e.legacy_qr_code_id > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => applyLegacyQrIdFilter(e.legacy_qr_code_id!)}
+                          className="font-mono text-[12px] font-semibold text-[var(--md-primary)] hover:underline"
+                          title="filter ว่าใครเคยสแกน QR ID นี้บ้าง"
+                        >
+                          QR ID {e.legacy_qr_code_id.toLocaleString()}
+                        </button>
                       ) : (
                         <p className="font-mono text-[12px] font-semibold text-[var(--md-on-surface)]">—</p>
                       )}
@@ -484,19 +614,64 @@ export default function ScanHistoryPage() {
                 <td className="px-4 py-3 font-mono text-[12px] text-[var(--md-on-surface-variant)] whitespace-nowrap">
                   {fmtLocal(e.created_at)}
                 </td>
-              </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--md-outline-variant)]">
-            <p className="text-[12px] text-[var(--md-on-surface-variant)]">หน้า {page + 1} / {totalPages}</p>
-            <div className="flex gap-1.5">
-              <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="h-[30px] px-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] bg-[var(--md-surface-container)] rounded-[var(--md-radius-sm)] disabled:opacity-40 hover:bg-[var(--md-surface-container-high)] transition-all">← ก่อนหน้า</button>
-              <button disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)} className="h-[30px] px-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] bg-[var(--md-surface-container)] rounded-[var(--md-radius-sm)] disabled:opacity-40 hover:bg-[var(--md-surface-container-high)] transition-all">ถัดไป →</button>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--md-outline-variant)] px-4 py-3">
+            <p className="text-[12px] text-[var(--md-on-surface-variant)]">
+              หน้า {page + 1} / {totalPages} · แสดง {entries.length.toLocaleString()} จาก {total.toLocaleString()} รายการ
+            </p>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button disabled={page === 0} onClick={() => goToPage(0)} className="h-[30px] px-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] bg-[var(--md-surface-container)] rounded-[var(--md-radius-sm)] disabled:opacity-40 hover:bg-[var(--md-surface-container-high)] transition-all">« หน้าแรก</button>
+              <button disabled={page === 0} onClick={() => goToPage(page - 1)} className="h-[30px] px-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] bg-[var(--md-surface-container)] rounded-[var(--md-radius-sm)] disabled:opacity-40 hover:bg-[var(--md-surface-container-high)] transition-all">← ก่อนหน้า</button>
+              {pageButtons.map((pageNo, idx) => {
+                const prev = pageButtons[idx - 1];
+                const needsGap = idx > 0 && prev != null && pageNo - prev > 1;
+                return (
+                  <span key={pageNo} className="flex items-center gap-1.5">
+                    {needsGap && <span className="px-1 text-[12px] text-[var(--md-on-surface-variant)]">…</span>}
+                    <button
+                      type="button"
+                      onClick={() => goToPage(pageNo)}
+                      className={`h-[30px] min-w-[32px] rounded-[var(--md-radius-sm)] px-2 text-[12px] font-medium transition-all ${
+                        pageNo === page
+                          ? "bg-[var(--md-primary)] text-white"
+                          : "bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)] hover:bg-[var(--md-surface-container-high)]"
+                      }`}
+                    >
+                      {pageNo + 1}
+                    </button>
+                  </span>
+                );
+              })}
+              <button disabled={page >= totalPages - 1} onClick={() => goToPage(page + 1)} className="h-[30px] px-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] bg-[var(--md-surface-container)] rounded-[var(--md-radius-sm)] disabled:opacity-40 hover:bg-[var(--md-surface-container-high)] transition-all">ถัดไป →</button>
+              <button disabled={page >= totalPages - 1} onClick={() => goToPage(totalPages - 1)} className="h-[30px] px-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] bg-[var(--md-surface-container)] rounded-[var(--md-radius-sm)] disabled:opacity-40 hover:bg-[var(--md-surface-container-high)] transition-all">หน้าสุดท้าย »</button>
             </div>
+            <form
+              className="flex items-center gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const requestedPage = Number(pageInput);
+                if (!Number.isFinite(requestedPage)) return;
+                goToPage(requestedPage - 1);
+              }}
+            >
+              <label className="text-[12px] text-[var(--md-on-surface-variant)]" htmlFor="scan-history-page-input">ไปหน้าที่</label>
+              <input
+                id="scan-history-page-input"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={pageInput}
+                onChange={(e) => setPageInput(e.target.value.replace(/\D/g, ""))}
+                className="h-[32px] w-[76px] rounded-[var(--md-radius-sm)] border border-[var(--md-outline-variant)] bg-transparent px-2 text-[13px] outline-none focus:border-[var(--md-primary)]"
+              />
+              <button type="submit" className="h-[30px] rounded-[var(--md-radius-sm)] bg-[var(--md-primary)] px-3 text-[12px] font-medium text-white hover:opacity-90">ไป</button>
+            </form>
           </div>
         )}
       </div>

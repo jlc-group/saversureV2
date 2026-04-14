@@ -62,15 +62,16 @@ var allowedSortColumns = map[string]string{
 }
 
 type ListFilter struct {
-	Status   string // code status (scanned, redeemed)
-	ScanType string // success, duplicate_self, duplicate_other
-	BatchID  string
-	CodeID   string // filter by code = "by code" view
-	LegacySerial string
-	SortBy   string // column key (see allowedSortColumns)
-	SortDir  string // asc | desc
-	Limit    int
-	Offset   int
+	Status          string // code status (scanned, redeemed)
+	ScanType        string // success, duplicate_self, duplicate_other
+	BatchID         string
+	CodeID          string // filter by code = "by code" view
+	LegacySerial    string
+	LegacyQRCodeID  int64
+	SortBy          string // column key (see allowedSortColumns)
+	SortDir         string // asc | desc
+	Limit           int
+	Offset          int
 }
 
 func (s *Service) List(ctx context.Context, tenantID string, f ListFilter) ([]ScanEntry, int64, error) {
@@ -90,6 +91,11 @@ func (s *Service) List(ctx context.Context, tenantID string, f ListFilter) ([]Sc
 	if f.LegacySerial != "" {
 		where += fmt.Sprintf(" AND sh.legacy_qr_code_serial = $%d", argN)
 		args = append(args, f.LegacySerial)
+		argN++
+	}
+	if f.LegacyQRCodeID > 0 {
+		where += fmt.Sprintf(" AND sh.legacy_qr_code_id = $%d", argN)
+		args = append(args, f.LegacyQRCodeID)
 		argN++
 	}
 	if f.ScanType != "" {
@@ -447,13 +453,17 @@ func (s *Service) GetByID(ctx context.Context, tenantID, id string) (*ScanEntry,
 
 // SuspiciousScanSummary is a code that has duplicate scans (for alerts).
 type SuspiciousScanSummary struct {
-	CodeID         string `json:"code_id"`
-	Ref1           string `json:"ref1"`
-	BatchPrefix    string `json:"batch_prefix"`
-	SerialNumber   int64  `json:"serial_number"`
-	TotalScans     int64  `json:"total_scans"`
-	DuplicateCount int64  `json:"duplicate_count"`
-	FirstScannedAt string `json:"first_scanned_at"`
+	AlertKey         string  `json:"alert_key"`
+	DataSource       string  `json:"data_source"`
+	CodeID           string  `json:"code_id"`
+	Ref1             string  `json:"ref1"`
+	BatchPrefix      string  `json:"batch_prefix"`
+	SerialNumber     int64   `json:"serial_number"`
+	LegacySerial     *string `json:"legacy_serial,omitempty"`
+	LegacyQRCodeID   *int64  `json:"legacy_qr_code_id,omitempty"`
+	TotalScans       int64   `json:"total_scans"`
+	DuplicateCount   int64   `json:"duplicate_count"`
+	FirstScannedAt   string  `json:"first_scanned_at"`
 }
 
 // ListSuspicious returns codes that have at least one duplicate scan (for monitoring).
@@ -462,16 +472,48 @@ func (s *Service) ListSuspicious(ctx context.Context, tenantID string, limit int
 		limit = 50
 	}
 	query := `
-		SELECT sh.code_id::text, c.ref1, b.prefix, c.serial_number,
-		       COUNT(*)::bigint AS total_scans,
-		       COUNT(*) FILTER (WHERE sh.scan_type IN ('duplicate_self', 'duplicate_other'))::bigint AS duplicate_count,
-		       MIN(sh.scanned_at)::text AS first_scanned_at
-		 FROM scan_history sh
-		 JOIN codes c ON c.id = sh.code_id AND c.tenant_id = sh.tenant_id
-		 LEFT JOIN batches b ON b.id = sh.batch_id
-		 WHERE sh.tenant_id = $1 AND sh.code_id IS NOT NULL
-		 GROUP BY sh.code_id, c.ref1, b.prefix, c.serial_number
-		 HAVING COUNT(*) FILTER (WHERE sh.scan_type IN ('duplicate_self', 'duplicate_other')) > 0
+		WITH suspicious_groups AS (
+			SELECT
+				COALESCE(
+					NULLIF(sh.code_id::text, ''),
+					NULLIF(sh.legacy_qr_code_serial, ''),
+					CASE
+						WHEN sh.legacy_qr_code_id IS NOT NULL THEN 'legacy-id:' || sh.legacy_qr_code_id::text
+						ELSE NULL
+					END
+				) AS alert_key,
+				CASE
+					WHEN BOOL_OR(sh.code_id IS NOT NULL) THEN 'v2'
+					WHEN BOOL_OR(NULLIF(sh.legacy_qr_code_serial, '') IS NOT NULL OR sh.legacy_qr_code_id IS NOT NULL) THEN 'v1'
+					ELSE 'unknown'
+				END AS data_source,
+				MAX(COALESCE(sh.code_id::text, '')) AS code_id,
+				MAX(COALESCE(c.ref1, '')) AS ref1,
+				MAX(COALESCE(b.prefix, '')) AS batch_prefix,
+				MAX(COALESCE(c.serial_number, 0)) AS serial_number,
+				MAX(sh.legacy_qr_code_serial) AS legacy_serial,
+				MAX(sh.legacy_qr_code_id) AS legacy_qr_code_id,
+				COUNT(*)::bigint AS total_scans,
+				COUNT(*) FILTER (WHERE sh.scan_type IN ('duplicate_self', 'duplicate_other'))::bigint AS duplicate_count,
+				MIN(sh.scanned_at)::text AS first_scanned_at
+			FROM scan_history sh
+			LEFT JOIN codes c ON c.id = sh.code_id AND c.tenant_id = sh.tenant_id
+			LEFT JOIN batches b ON b.id = sh.batch_id
+			WHERE sh.tenant_id = $1
+			  AND COALESCE(
+				NULLIF(sh.code_id::text, ''),
+				NULLIF(sh.legacy_qr_code_serial, ''),
+				CASE
+					WHEN sh.legacy_qr_code_id IS NOT NULL THEN 'legacy-id:' || sh.legacy_qr_code_id::text
+					ELSE NULL
+				END
+			  ) IS NOT NULL
+			GROUP BY 1
+		)
+		SELECT alert_key, data_source, code_id, ref1, batch_prefix, serial_number,
+		       legacy_serial, legacy_qr_code_id, total_scans, duplicate_count, first_scanned_at
+		  FROM suspicious_groups
+		 WHERE duplicate_count > 0
 		 ORDER BY duplicate_count DESC, first_scanned_at DESC
 		 LIMIT $2`
 	rows, err := s.db.Query(ctx, query, tenantID, limit)
@@ -482,8 +524,8 @@ func (s *Service) ListSuspicious(ctx context.Context, tenantID string, limit int
 	var out []SuspiciousScanSummary
 	for rows.Next() {
 		var r SuspiciousScanSummary
-		if err := rows.Scan(&r.CodeID, &r.Ref1, &r.BatchPrefix, &r.SerialNumber,
-			&r.TotalScans, &r.DuplicateCount, &r.FirstScannedAt); err != nil {
+		if err := rows.Scan(&r.AlertKey, &r.DataSource, &r.CodeID, &r.Ref1, &r.BatchPrefix, &r.SerialNumber,
+			&r.LegacySerial, &r.LegacyQRCodeID, &r.TotalScans, &r.DuplicateCount, &r.FirstScannedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, r)

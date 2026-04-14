@@ -22,6 +22,7 @@ func (h *Handler) List(c *gin.Context) {
 	tenantID := c.GetString("tenant_id")
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	legacyQRCodeID, _ := strconv.ParseInt(c.Query("legacy_qr_code_id"), 10, 64)
 	status := c.Query("status")
 	scanType := c.Query("scan_type") // success, duplicate_self, duplicate_other
 	batchID := c.Query("batch_id")
@@ -46,6 +47,7 @@ func (h *Handler) List(c *gin.Context) {
 		BatchID:  batchID,
 		CodeID:   codeID,
 		LegacySerial: legacySerial,
+		LegacyQRCodeID: legacyQRCodeID,
 		SortBy:   sortBy,
 		SortDir:  sortDir,
 		Limit:    limit,
