@@ -136,6 +136,43 @@ interface AutomationRunSummary {
   };
 }
 
+interface Survey {
+  id: string;
+  title: string;
+  questions: unknown[];
+  trigger_event?: string | null;
+  active: boolean;
+  response_count: number;
+  average_rating?: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ReferralCode {
+  id: string;
+  user_id: string;
+  user_name?: string | null;
+  code: string;
+  uses: number;
+  max_uses?: number | null;
+  reward_referrer: number;
+  reward_referee: number;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ReferralHistoryItem {
+  id: string;
+  referral_code: string;
+  referrer_id: string;
+  referrer_name?: string | null;
+  referee_id: string;
+  referee_name?: string | null;
+  points_given: number;
+  created_at: string;
+}
+
 const defaultSegmentRules = JSON.stringify(
   {
     operator: "AND",
@@ -155,6 +192,9 @@ export default function CRMPage() {
   const [rfmCustomers, setRfmCustomers] = useState<RFMSnapshot[]>([]);
   const [broadcasts, setBroadcasts] = useState<BroadcastCampaign[]>([]);
   const [triggers, setTriggers] = useState<CRMTrigger[]>([]);
+  const [surveys, setSurveys] = useState<Survey[]>([]);
+  const [referralCodes, setReferralCodes] = useState<ReferralCode[]>([]);
+  const [referralHistory, setReferralHistory] = useState<ReferralHistoryItem[]>([]);
   const [selectedRisk, setSelectedRisk] = useState("");
   const [selectedSegmentId, setSelectedSegmentId] = useState<string>("");
   const [previewRows, setPreviewRows] = useState<SegmentPreviewCustomer[]>([]);
@@ -170,6 +210,8 @@ export default function CRMPage() {
   const [triggerSaving, setTriggerSaving] = useState(false);
   const [automationRunning, setAutomationRunning] = useState(false);
   const [lastAutomationRun, setLastAutomationRun] = useState<AutomationRunSummary | null>(null);
+  const [surveySaving, setSurveySaving] = useState(false);
+  const [referralSaving, setReferralSaving] = useState(false);
 
   const [tagName, setTagName] = useState("");
   const [tagColor, setTagColor] = useState("#6366f1");
@@ -191,16 +233,36 @@ export default function CRMPage() {
   const [triggerMessageTitle, setTriggerMessageTitle] = useState("แจ้งเตือนจาก Saversure");
   const [triggerMessageBody, setTriggerMessageBody] = useState("สวัสดี {{first_name}}");
   const [triggerTagID, setTriggerTagID] = useState("");
+  const [surveyTitle, setSurveyTitle] = useState("");
+  const [surveyTriggerEvent, setSurveyTriggerEvent] = useState("manual");
+  const [surveyQuestionsText, setSurveyQuestionsText] = useState(
+    JSON.stringify(
+      [
+        { type: "rating", label: "คุณพึงพอใจกับ Saversure มากแค่ไหน (0-10)?" },
+        { type: "text", label: "มีอะไรที่อยากให้เราปรับปรุงเพิ่มเติม?" },
+      ],
+      null,
+      2,
+    ),
+  );
+  const [referralUserID, setReferralUserID] = useState("");
+  const [referralCodeText, setReferralCodeText] = useState("");
+  const [referralMaxUses, setReferralMaxUses] = useState("");
+  const [referralRewardReferrer, setReferralRewardReferrer] = useState("20");
+  const [referralRewardReferee, setReferralRewardReferee] = useState("20");
 
   const loadAll = async (riskLevel = selectedRisk) => {
     setLoading(true);
     try {
-      const [tagsRes, segmentsRes, distRes, broadcastsRes, triggersRes, customersRes] = await Promise.all([
+      const [tagsRes, segmentsRes, distRes, broadcastsRes, triggersRes, surveysRes, referralCodesRes, referralHistoryRes, customersRes] = await Promise.all([
         api.get<{ data: Tag[] }>("/api/v1/crm/tags"),
         api.get<{ data: Segment[] }>("/api/v1/crm/segments"),
         api.get<{ data: RFMDistributionItem[] }>("/api/v1/crm/rfm/distribution"),
         api.get<{ data: BroadcastCampaign[] }>("/api/v1/crm/broadcasts?limit=20"),
         api.get<{ data: CRMTrigger[] }>("/api/v1/crm/triggers"),
+        api.get<{ data: Survey[] }>("/api/v1/crm/surveys"),
+        api.get<{ data: ReferralCode[] }>("/api/v1/crm/referral-codes?limit=20"),
+        api.get<{ data: ReferralHistoryItem[] }>("/api/v1/crm/referral-history?limit=20"),
         api.get<{ data: RFMSnapshot[] }>(
           `/api/v1/crm/rfm/customers?limit=20${riskLevel ? `&risk_level=${encodeURIComponent(riskLevel)}` : ""}`,
         ),
@@ -210,6 +272,9 @@ export default function CRMPage() {
       setDistribution(distRes.data || []);
       setBroadcasts(broadcastsRes.data || []);
       setTriggers(triggersRes.data || []);
+      setSurveys(surveysRes.data || []);
+      setReferralCodes(referralCodesRes.data || []);
+      setReferralHistory(referralHistoryRes.data || []);
       setRfmCustomers(customersRes.data || []);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "โหลดข้อมูล CRM ไม่สำเร็จ");
@@ -507,6 +572,79 @@ export default function CRMPage() {
       toast.error(err instanceof Error ? err.message : "รัน automation ไม่สำเร็จ");
     } finally {
       setAutomationRunning(false);
+    }
+  };
+
+  const handleCreateSurvey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!surveyTitle.trim()) {
+      toast.error("กรุณาระบุชื่อ survey");
+      return;
+    }
+    let questions: unknown[];
+    try {
+      questions = JSON.parse(surveyQuestionsText) as unknown[];
+      if (!Array.isArray(questions)) throw new Error("invalid");
+    } catch {
+      toast.error("questions JSON ไม่ถูกต้อง");
+      return;
+    }
+    setSurveySaving(true);
+    try {
+      await api.post("/api/v1/crm/surveys", {
+        title: surveyTitle.trim(),
+        questions,
+        trigger_event: surveyTriggerEvent,
+        active: true,
+      });
+      setSurveyTitle("");
+      setSurveyTriggerEvent("manual");
+      setSurveyQuestionsText(
+        JSON.stringify(
+          [
+            { type: "rating", label: "คุณพึงพอใจกับ Saversure มากแค่ไหน (0-10)?" },
+            { type: "text", label: "มีอะไรที่อยากให้เราปรับปรุงเพิ่มเติม?" },
+          ],
+          null,
+          2,
+        ),
+      );
+      await loadAll(selectedRisk);
+      toast.success("สร้าง survey แล้ว");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "สร้าง survey ไม่สำเร็จ");
+    } finally {
+      setSurveySaving(false);
+    }
+  };
+
+  const handleCreateReferralCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!referralUserID.trim()) {
+      toast.error("กรุณาระบุ user id");
+      return;
+    }
+    setReferralSaving(true);
+    try {
+      await api.post("/api/v1/crm/referral-codes", {
+        user_id: referralUserID.trim(),
+        code: referralCodeText.trim(),
+        max_uses: referralMaxUses.trim() === "" ? null : Number(referralMaxUses),
+        reward_referrer: Number(referralRewardReferrer || 0),
+        reward_referee: Number(referralRewardReferee || 0),
+        active: true,
+      });
+      setReferralUserID("");
+      setReferralCodeText("");
+      setReferralMaxUses("");
+      setReferralRewardReferrer("20");
+      setReferralRewardReferee("20");
+      await loadAll(selectedRisk);
+      toast.success("สร้าง referral code แล้ว");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "สร้าง referral code ไม่สำเร็จ");
+    } finally {
+      setReferralSaving(false);
     }
   };
 
@@ -1246,6 +1384,198 @@ export default function CRMPage() {
                 </div>
               ))
             )}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_1fr] gap-6">
+        <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] p-5 md-elevation-1">
+          <div className="mb-4">
+            <h2 className="text-[18px] font-medium text-[var(--md-on-surface)]">Survey / NPS</h2>
+            <p className="mt-1 text-[12px] text-[var(--md-on-surface-variant)]">
+              สร้างแบบสอบถามแบบง่ายสำหรับ manual หรือ after_redeem และเก็บคะแนนความพึงพอใจไว้ใช้วิเคราะห์ต่อ
+            </p>
+          </div>
+
+          <form onSubmit={handleCreateSurvey} className="space-y-3">
+            <input
+              value={surveyTitle}
+              onChange={(e) => setSurveyTitle(e.target.value)}
+              placeholder="ชื่อ survey เช่น NPS หลังแลกรางวัล"
+              className="h-[40px] w-full px-4 border border-[var(--md-outline-variant)] rounded-[var(--md-radius-xl)] bg-transparent text-[13px]"
+            />
+            <select
+              value={surveyTriggerEvent}
+              onChange={(e) => setSurveyTriggerEvent(e.target.value)}
+              className="h-[40px] w-full rounded-[var(--md-radius-xl)] border border-[var(--md-outline-variant)] bg-transparent px-3 text-[13px]"
+            >
+              <option value="manual">manual</option>
+              <option value="after_redeem">after_redeem</option>
+              <option value="popup">popup</option>
+            </select>
+            <textarea
+              value={surveyQuestionsText}
+              onChange={(e) => setSurveyQuestionsText(e.target.value)}
+              className="min-h-[180px] w-full px-4 py-3 border border-[var(--md-outline-variant)] rounded-[var(--md-radius-xl)] bg-transparent text-[12px] font-mono"
+            />
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={surveySaving}
+                className="h-[40px] px-4 rounded-[var(--md-radius-xl)] bg-[var(--md-primary)] text-white text-[13px] font-medium disabled:opacity-60"
+              >
+                {surveySaving ? "Saving..." : "Create Survey"}
+              </button>
+            </div>
+          </form>
+
+          <div className="mt-5 space-y-3">
+            {surveys.length === 0 ? (
+              <p className="text-[13px] text-[var(--md-on-surface-variant)]">ยังไม่มี survey</p>
+            ) : (
+              surveys.map((survey) => (
+                <div key={survey.id} className="rounded-[14px] border border-[var(--md-outline-variant)] p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-[15px] font-medium text-[var(--md-on-surface)]">{survey.title}</p>
+                      <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-[var(--md-on-surface-variant)]">
+                        <span className="rounded-full bg-[var(--md-surface-container)] px-2 py-0.5">{survey.trigger_event || "manual"}</span>
+                        <span className="rounded-full bg-[var(--md-surface-container)] px-2 py-0.5">questions {survey.questions.length}</span>
+                        <span className="rounded-full bg-[var(--md-surface-container)] px-2 py-0.5">responses {survey.response_count.toLocaleString()}</span>
+                        {survey.average_rating != null && (
+                          <span className="rounded-full bg-[var(--md-surface-container)] px-2 py-0.5">
+                            avg rating {survey.average_rating.toFixed(1)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${survey.active ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-700"}`}>
+                      {survey.active ? "active" : "inactive"}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] p-5 md-elevation-1">
+            <div className="mb-4">
+              <h2 className="text-[18px] font-medium text-[var(--md-on-surface)]">Referral Program</h2>
+              <p className="mt-1 text-[12px] text-[var(--md-on-surface-variant)]">
+                สร้าง referral code ให้ลูกค้าและกำหนดแต้มให้ทั้งผู้แนะนำและผู้ถูกแนะนำ
+              </p>
+            </div>
+
+            <form onSubmit={handleCreateReferralCode} className="space-y-3">
+              <input
+                value={referralUserID}
+                onChange={(e) => setReferralUserID(e.target.value)}
+                placeholder="User ID ของเจ้าของ referral code"
+                className="h-[40px] w-full px-4 border border-[var(--md-outline-variant)] rounded-[var(--md-radius-xl)] bg-transparent text-[13px]"
+              />
+              <input
+                value={referralCodeText}
+                onChange={(e) => setReferralCodeText(e.target.value.toUpperCase())}
+                placeholder="Code (ปล่อยว่างเพื่อ generate อัตโนมัติ)"
+                className="h-[40px] w-full px-4 border border-[var(--md-outline-variant)] rounded-[var(--md-radius-xl)] bg-transparent text-[13px]"
+              />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <input
+                  type="number"
+                  min="0"
+                  value={referralMaxUses}
+                  onChange={(e) => setReferralMaxUses(e.target.value)}
+                  placeholder="max uses"
+                  className="h-[40px] rounded-[var(--md-radius-xl)] border border-[var(--md-outline-variant)] bg-transparent px-3 text-[13px]"
+                />
+                <input
+                  type="number"
+                  min="0"
+                  value={referralRewardReferrer}
+                  onChange={(e) => setReferralRewardReferrer(e.target.value)}
+                  placeholder="reward referrer"
+                  className="h-[40px] rounded-[var(--md-radius-xl)] border border-[var(--md-outline-variant)] bg-transparent px-3 text-[13px]"
+                />
+                <input
+                  type="number"
+                  min="0"
+                  value={referralRewardReferee}
+                  onChange={(e) => setReferralRewardReferee(e.target.value)}
+                  placeholder="reward referee"
+                  className="h-[40px] rounded-[var(--md-radius-xl)] border border-[var(--md-outline-variant)] bg-transparent px-3 text-[13px]"
+                />
+              </div>
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={referralSaving}
+                  className="h-[40px] px-4 rounded-[var(--md-radius-xl)] bg-[var(--md-primary)] text-white text-[13px] font-medium disabled:opacity-60"
+                >
+                  {referralSaving ? "Saving..." : "Create Referral Code"}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] p-5 md-elevation-1">
+            <div className="mb-4">
+              <h2 className="text-[18px] font-medium text-[var(--md-on-surface)]">Referral Codes</h2>
+            </div>
+            <div className="space-y-3">
+              {referralCodes.length === 0 ? (
+                <p className="text-[13px] text-[var(--md-on-surface-variant)]">ยังไม่มี referral code</p>
+              ) : (
+                referralCodes.map((item) => (
+                  <div key={item.id} className="rounded-[14px] border border-[var(--md-outline-variant)] p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[15px] font-medium text-[var(--md-on-surface)]">{item.code}</p>
+                        <p className="mt-1 text-[12px] text-[var(--md-on-surface-variant)]">
+                          owner: {item.user_name || item.user_id}
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-[var(--md-on-surface-variant)]">
+                          <span className="rounded-full bg-[var(--md-surface-container)] px-2 py-0.5">uses {item.uses}</span>
+                          <span className="rounded-full bg-[var(--md-surface-container)] px-2 py-0.5">max {item.max_uses ?? "unlimited"}</span>
+                          <span className="rounded-full bg-[var(--md-surface-container)] px-2 py-0.5">referrer +{item.reward_referrer}</span>
+                          <span className="rounded-full bg-[var(--md-surface-container)] px-2 py-0.5">referee +{item.reward_referee}</span>
+                        </div>
+                      </div>
+                      <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${item.active ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-700"}`}>
+                        {item.active ? "active" : "inactive"}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] p-5 md-elevation-1">
+            <div className="mb-4">
+              <h2 className="text-[18px] font-medium text-[var(--md-on-surface)]">Referral History</h2>
+            </div>
+            <div className="space-y-3">
+              {referralHistory.length === 0 ? (
+                <p className="text-[13px] text-[var(--md-on-surface-variant)]">ยังไม่มี referral history</p>
+              ) : (
+                referralHistory.map((item) => (
+                  <div key={item.id} className="rounded-[14px] border border-[var(--md-outline-variant)] p-4">
+                    <p className="text-[14px] font-medium text-[var(--md-on-surface)]">{item.referral_code}</p>
+                    <p className="mt-1 text-[12px] text-[var(--md-on-surface-variant)]">
+                      {item.referrer_name || item.referrer_id} → {item.referee_name || item.referee_id}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-[var(--md-on-surface-variant)]">
+                      <span className="rounded-full bg-[var(--md-surface-container)] px-2 py-0.5">points {item.points_given.toLocaleString()}</span>
+                      <span className="rounded-full bg-[var(--md-surface-container)] px-2 py-0.5">
+                        {new Date(item.created_at).toLocaleString("th-TH")}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       </div>

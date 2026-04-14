@@ -319,3 +319,158 @@ func (h *Handler) RunAutomation(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, summary)
 }
+
+func (h *Handler) ListSurveys(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	items, err := h.svc.ListSurveys(c.Request.Context(), tenantID)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": items})
+}
+
+func (h *Handler) CreateSurvey(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	var input SurveyInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		apperror.RespondValidation(c, err.Error())
+		return
+	}
+	item, err := h.svc.CreateSurvey(c.Request.Context(), tenantID, input)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, item)
+}
+
+func (h *Handler) UpdateSurvey(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	surveyID := c.Param("id")
+	var input SurveyInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		apperror.RespondValidation(c, err.Error())
+		return
+	}
+	item, err := h.svc.UpdateSurvey(c.Request.Context(), tenantID, surveyID, input)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, item)
+}
+
+func (h *Handler) DeleteSurvey(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	surveyID := c.Param("id")
+	if err := h.svc.DeleteSurvey(c.Request.Context(), tenantID, surveyID); err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
+}
+
+func (h *Handler) ListSurveyResponses(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	surveyID := c.Param("id")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	items, err := h.svc.ListSurveyResponses(c.Request.Context(), tenantID, surveyID, limit, offset)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": items})
+}
+
+func (h *Handler) ListReferralCodes(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
+	items, err := h.svc.ListReferralCodes(c.Request.Context(), tenantID, limit)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": items})
+}
+
+func (h *Handler) CreateReferralCode(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	var input ReferralCodeInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		apperror.RespondValidation(c, err.Error())
+		return
+	}
+	item, err := h.svc.CreateReferralCode(c.Request.Context(), tenantID, input)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, item)
+}
+
+func (h *Handler) ListReferralHistory(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
+	items, err := h.svc.ListReferralHistory(c.Request.Context(), tenantID, limit)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": items})
+}
+
+func (h *Handler) ListMySurveys(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	userID := c.GetString("user_id")
+	triggerEvent := c.Query("trigger_event")
+	items, err := h.svc.ListMySurveys(c.Request.Context(), tenantID, userID, triggerEvent)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": items})
+}
+
+func (h *Handler) SubmitMySurveyResponse(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	userID := c.GetString("user_id")
+	surveyID := c.Param("id")
+	var input SurveyResponseInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		apperror.RespondValidation(c, err.Error())
+		return
+	}
+	if err := h.svc.SubmitSurveyResponse(c.Request.Context(), tenantID, userID, surveyID, input); err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "submitted"})
+}
+
+func (h *Handler) GetMyReferralCode(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	userID := c.GetString("user_id")
+	item, err := h.svc.GetMyReferralCode(c.Request.Context(), tenantID, userID)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, item)
+}
+
+func (h *Handler) ApplyMyReferralCode(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	userID := c.GetString("user_id")
+	var input ReferralApplyInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		apperror.RespondValidation(c, err.Error())
+		return
+	}
+	if err := h.svc.ApplyReferralCode(c.Request.Context(), tenantID, userID, input); err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "applied"})
+}

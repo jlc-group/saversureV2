@@ -556,6 +556,14 @@ func main() {
 		crmRoutes.PUT("/triggers/:id", crmHandler.UpdateTrigger)
 		crmRoutes.DELETE("/triggers/:id", crmHandler.DeleteTrigger)
 		crmRoutes.POST("/automation/run", crmHandler.RunAutomation)
+		crmRoutes.GET("/surveys", crmHandler.ListSurveys)
+		crmRoutes.POST("/surveys", crmHandler.CreateSurvey)
+		crmRoutes.PUT("/surveys/:id", crmHandler.UpdateSurvey)
+		crmRoutes.DELETE("/surveys/:id", crmHandler.DeleteSurvey)
+		crmRoutes.GET("/surveys/:id/responses", crmHandler.ListSurveyResponses)
+		crmRoutes.GET("/referral-codes", crmHandler.ListReferralCodes)
+		crmRoutes.POST("/referral-codes", crmHandler.CreateReferralCode)
+		crmRoutes.GET("/referral-history", crmHandler.ListReferralHistory)
 	}
 
 	// Dashboard
@@ -1012,6 +1020,10 @@ func main() {
 		myRoutes.GET("/pdpa", authHandler.GetPDPA)
 		myRoutes.POST("/pdpa/withdraw", authHandler.WithdrawPDPA)
 		myRoutes.GET("/scans", scanHistoryHandler.GetMyScans)
+		myRoutes.GET("/surveys", crmHandler.ListMySurveys)
+		myRoutes.POST("/surveys/:id/respond", crmHandler.SubmitMySurveyResponse)
+		myRoutes.GET("/referral-code", crmHandler.GetMyReferralCode)
+		myRoutes.POST("/referrals/apply", crmHandler.ApplyMyReferralCode)
 	}
 
 	// --- V1 Sync Scheduler ---
