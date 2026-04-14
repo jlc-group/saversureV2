@@ -1,4 +1,4 @@
-﻿BEGIN;
+BEGIN;
 
 UPDATE products
 SET image_url = CASE sku

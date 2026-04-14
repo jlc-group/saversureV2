@@ -81,6 +81,8 @@ next-env.d.ts
 # Docker volumes
 redis-data/
 nats-data/
+minio-data/
+seed-media/
 
 # temp / extracted
 .docx_extract/
@@ -92,4 +94,11 @@ _commit_msg.txt
 # DB backups (kept local only — GitHub 50MB limit)
 backup/*.dump
 backup/*.sql
+backup/legacy_aws_dump_*/
+backup/__pycache__/
 !backup/README.md
+
+# local/generated migration artifacts
+scripts/legacy-image-manifest.json
+__pycache__/
+/qc

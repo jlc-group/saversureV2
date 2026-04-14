@@ -1,9 +1,9 @@
 # Migration Log: saversurejulaherb (V1) → saversure (V2)
 
-**วันที่ดำเนินการ:** 2026-04-03 ~ 2026-04-05
+**วันที่ดำเนินการ:** 2026-04-03 ~ 2026-04-10 (ต่อเนื่อง)
 **ผู้ดำเนินการ:** Super Admin + Claude AI Assistant
 **Branch:** `dev/bugfixes-and-setup`
-**สถานะ:** ✅ **Phase 1 เสร็จสมบูรณ์**
+**สถานะ:** ✅ **Phase 1-3 เสร็จสมบูรณ์** | Phase 4+ รอดำเนินการ
 
 ---
 
@@ -14,18 +14,22 @@
 | **DB Size** | 12 GB | **6.1 GB** | 49% |
 | Schema Migrations | - | 42 (001-041) | - |
 
-### ข้อมูลที่ Migrate สำเร็จ
+### ข้อมูลที่ Migrate สำเร็จ (อัปเดต Phase 3 — 2026-04-10)
 
-| ข้อมูล | V1 | V2 | Success Rate |
+| ข้อมูล | V1 | V2 (ล่าสุด) | Success Rate |
 |--------|---:|---:|:-----------:|
-| Users | 819,185 | 803,195 | 98% |
-| Addresses | 41,577 | 40,911 | 98.4% |
-| Point Ledger | - | 1,241,340 | ✅ |
-| Products | 176 | 149 (กรอง 23 + fail 4) | 85% |
-| Rewards | 154 | 153 | 99.4% |
-| Coupon Codes | - | 1,100 | ✅ |
-| Scan History | 12,094,802 | 11,872,062 | 98.2% |
-| Redeem History | 77,502 | 76,033 | 98.1% |
+| Users | 819,185+ | **821,889** | 99%+ |
+| Addresses | 41,577+ | **51,078** | ✅ |
+| Point Ledger | — | **775,883** | ✅ |
+| Products | 176 | **175** | 99.4% |
+| Rewards | 154 | **161** | ✅ |
+| Coupon Codes | — | 1,100+ | ✅ |
+| Scan History | 12,094,802+ | **12,171,479** | 99%+ |
+| — success | — | 11,036,049 | — |
+| — duplicate_self | — | 925,442 | — |
+| — duplicate_other | — | 209,988 | — |
+| — มี V1 serial | — | 12,170,952 | 99.99% |
+| Redeem History | 77,502 | **78,175** | ✅ |
 
 ### ข้อมูลที่ไม่ Migrate (ตั้งใจตัดออก)
 
@@ -165,10 +169,98 @@
 
 ---
 
-## ต้องทำต่อ (Phase 2)
+## Phase 3: V1 Live Sync + Backfill + UI (2026-04-10)
 
+**สถานะ:** ✅ เสร็จสมบูรณ์
+**แนวทาง:** เปลี่ยนจาก dump-based มาเป็น **V1 Live Sync** (incremental sync จาก AWS RDS) + **gap-only migration** (ไม่ reset baseline)
+
+### ผลลัพธ์ Phase 3
+
+| ข้อมูล | ก่อน Phase 3 | หลัง Phase 3 | เพิ่มขึ้น |
+|--------|---:|---:|---:|
+| Users | 810,918 | 821,889 | +10,971 |
+| Addresses | 40,563 | 51,078 | +10,515 |
+| Scan History | ~11.9M | 12,171,479 | +~270K |
+| Point Ledger | 765,485 | 775,883 | +10,398 |
+| Products | 150 | 175 | +25 |
+| Rewards | 153 | 161 | +8 |
+| Reward Reservations | 2 | 78,175 | +78,173 |
+| Entity Maps | ~12M | 12,291,862 | - |
+
+### Scan History Breakdown
+
+| Scan Type | จำนวน |
+|-----------|---:|
+| success | 11,036,049 |
+| duplicate_self | 925,442 |
+| duplicate_other | 209,988 |
+| **รวม** | **12,171,479** |
+| มี legacy serial | 12,170,952 (99.99%) |
+
+### Point Ledger Breakdown
+
+| Reference Type | จำนวน |
+|----------------|---:|
+| v1_migration (Phase 1) | 775,828 |
+| v1_live_sync_balance (Phase 3) | 42 |
+| scan (V2 native) | 9 |
+| promo_bonus | 2 |
+| redemption | 2 |
+
+### V1 Live Sync State
+
+| Entity | Watermark (last_synced_id) | Updated |
+|--------|---:|---|
+| user | 849,526 | 2026-04-10 08:10 UTC |
+| scan_history | 12,171,755 | 2026-04-10 08:10 UTC |
+
+### งานที่ทำใน Phase 3
+
+| งาน | ผลลัพธ์ |
+|------|---------|
+| สร้าง V1 Live Sync service | `backend/internal/v1sync/` — watermark-based incremental sync |
+| เพิ่ม legacy fields ใน scan_history | 8 columns: serial, product name/sku/image, qr_code_id, status, verify_method |
+| Backfill scan serial จาก V1 | 12.17M rows ← V1 Live (AWS RDS) + V1 backup |
+| Backfill user point snapshots | 42 users ← V1 Live (point > 0 ที่ยังไม่มี ledger) |
+| Dual-source point balance | COALESCE(ledger, scan_history - redemptions) |
+| ปรับ customer detail UI | stats cards + rich scan history + V1/V2 badges |
+| ปรับ scan history admin UI | เพิ่ม serial column + legacy info modal |
+| Optimize scan history query | CTE-based sort → ~50ms จาก ~2s |
+| สร้าง workspace rule | `.cursor/rules/saversure-v2.mdc` |
+| สร้าง migration skill | `saversure-v1v2-migration/SKILL.md` |
+
+### Backfill Tools ที่สร้างใหม่
+
+| Tool | Path | หน้าที่ |
+|------|------|--------|
+| backfillv1scanserial | `backend/cmd/backfillv1scanserial/` | เติม legacy_qr_code_serial จาก V1 ให้ scan_history |
+| backfillv1userpoints | `backend/cmd/backfillv1userpoints/` | เติม point_ledger snapshot จาก V1 users.point |
+
+### Bugs ที่พบและแก้ใน Phase 3
+
+| # | ปัญหา | แก้ไข |
+|---|-------|------|
+| 8 | V1 scan query ใช้ `h.lat` ไม่มี → ต้องใช้ `h.location->>'latitude'` | แก้ SQL ใน v1sync |
+| 9 | INSERT scan ใช้ `points_awarded` → column ชื่อ `points_earned` | แก้ column name |
+| 10 | INSERT scan ใช้ `created_at` → column ชื่อ `scanned_at` | แก้ column name |
+| 11 | syncUserBatch advance watermark แม้ upsert fail | แก้ให้ advance เฉพาะ success |
+| 12 | syncScanBatch ไม่ atomic (insert scan แล้ว fail mapping) | ครอบ transaction |
+| 13 | backfillv1scanserial updated=0 เพราะ pagination ผิด | แก้ afterSourceID logic |
+| 14 | point_ledger CHECK amount > 0 → fail สำหรับ V1 user ที่ point=0 | filter point > 0 |
+| 15 | scan history หน้า admin ช้า ~2s | CTE query + remove NULLS LAST |
+
+---
+
+## ต้องทำต่อ (Phase 4+)
+
+### 🔄 กำลังพิจารณา
+- [ ] เปิด V1 กลับมารัน + V2 Live Sync ดึงข้อมูลล่าสุดต่อเนื่อง
+- [ ] QR V1 compatibility layer (redirect V1 QR → V2 backend)
+
+### ⏳ Phase ถัดไป
+- [ ] QR dataset import (`saversure_legacy_qrcodes_only.dump`)
 - [ ] ทดสอบ Frontend Consumer (LINE login, คะแนน, แลกรางวัล)
-- [ ] ทดสอบ Admin Dashboard (จำนวนลูกค้า, สินค้า, scan)
+- [ ] ทดสอบ Admin Dashboard ครบทุก section
 - [ ] พิจารณา Lucky Draw migration (57 campaigns + 330K histories)
 - [ ] พิจารณา Partner Shops migration (1,237 ร้าน)
 - [ ] พิจารณา News migration (36 บทความ)
