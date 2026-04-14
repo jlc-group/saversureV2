@@ -52,6 +52,16 @@ const navGroups: NavGroup[] = [
           </svg>
         ),
       },
+      {
+        href: "/feature-summary",
+        label: "Feature Summary",
+        roles: ["super_admin", "brand_admin"],
+        icon: (
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
+            <path d="M4 5h16v2H4V5zm0 4h16v2H4V9zm0 4h10v2H4v-2zm0 4h10v2H4v-2zm13-4h3v5h-3v-5z" />
+          </svg>
+        ),
+      },
     ],
   },
   {

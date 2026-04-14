@@ -157,7 +157,34 @@ func (s *Service) GetProductAffinities(ctx context.Context, tenantID string, lim
 	if err := s.RefreshProductAffinities(ctx, tenantID); err != nil {
 		return nil, err
 	}
-	return s.GetProductAffinities(ctx, tenantID, limit)
+
+	refreshedRows, err := s.db.Query(ctx, `
+		SELECT left_product_id, left_product_name, right_product_id, right_product_name, shared_users, support_score, refreshed_at::text
+		FROM analytics_product_affinities
+		WHERE tenant_id = $1
+		ORDER BY shared_users DESC, support_score DESC, left_product_name ASC, right_product_name ASC
+		LIMIT $2
+	`, tenantID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list refreshed product affinities: %w", err)
+	}
+	defer refreshedRows.Close()
+
+	items = nil
+	for refreshedRows.Next() {
+		var item ProductAffinityItem
+		if err := refreshedRows.Scan(&item.LeftProductID, &item.LeftProductName, &item.RightProductID, &item.RightProductName, &item.SharedUsers, &item.SupportScore, &item.RefreshedAt); err != nil {
+			return nil, fmt.Errorf("scan refreshed product affinity: %w", err)
+		}
+		items = append(items, item)
+	}
+	if err := refreshedRows.Err(); err != nil {
+		return nil, fmt.Errorf("refreshed product affinities rows: %w", err)
+	}
+	if items == nil {
+		return []ProductAffinityItem{}, nil
+	}
+	return items, nil
 }
 
 func (s *Service) GetCLVOverview(ctx context.Context, tenantID string, limit int) (*CLVOverview, error) {
@@ -361,7 +388,36 @@ func (s *Service) GetCampaignROI(ctx context.Context, tenantID string, limit int
 	if err := s.RefreshCampaignROI(ctx, tenantID); err != nil {
 		return nil, err
 	}
-	return s.GetCampaignROI(ctx, tenantID, limit)
+
+	refreshedRows, err := s.db.Query(ctx, `
+		SELECT campaign_id::text, campaign_name, target_type, recipient_count,
+		       scans_before, scans_after, redeems_before, redeems_after,
+		       scan_uplift_pct::float8, redeem_uplift_pct::float8, measured_at::text, refreshed_at::text
+		FROM analytics_campaign_roi
+		WHERE tenant_id = $1
+		ORDER BY measured_at DESC NULLS LAST, refreshed_at DESC
+		LIMIT $2
+	`, tenantID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list refreshed campaign roi: %w", err)
+	}
+	defer refreshedRows.Close()
+
+	items = nil
+	for refreshedRows.Next() {
+		var item CampaignROIItem
+		if err := refreshedRows.Scan(&item.CampaignID, &item.CampaignName, &item.TargetType, &item.RecipientCount, &item.ScansBefore, &item.ScansAfter, &item.RedeemsBefore, &item.RedeemsAfter, &item.ScanUpliftPct, &item.RedeemUpliftPct, &item.MeasuredAt, &item.RefreshedAt); err != nil {
+			return nil, fmt.Errorf("scan refreshed campaign roi: %w", err)
+		}
+		items = append(items, item)
+	}
+	if err := refreshedRows.Err(); err != nil {
+		return nil, fmt.Errorf("refreshed campaign roi rows: %w", err)
+	}
+	if items == nil {
+		return []CampaignROIItem{}, nil
+	}
+	return items, nil
 }
 
 func (s *Service) RefreshAdvancedCRMAnalytics(ctx context.Context, tenantID string) error {

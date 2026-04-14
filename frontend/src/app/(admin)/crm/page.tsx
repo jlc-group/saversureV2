@@ -220,6 +220,213 @@ interface ReferralOverview {
   }>;
 }
 
+type CRMTab = "overview" | "broadcasts" | "automation" | "engagement";
+
+interface SegmentConditionRow {
+  id: string;
+  field: string;
+  op: string;
+  value: string;
+}
+
+interface SegmentFieldOption {
+  value: string;
+  label: string;
+  kind: "number" | "text" | "tag";
+  operators: Array<{ value: string; label: string }>;
+  placeholder: string;
+  options?: string[];
+}
+
+interface SuggestedTagTemplate {
+  name: string;
+  color: string;
+  description: string;
+}
+
+interface SegmentPreset {
+  name: string;
+  description: string;
+  operator: "AND" | "OR";
+  conditions: Array<{ field: string; op: string; value: string }>;
+}
+
+const makeSegmentConditionId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const numericOperators = [
+  { value: ">=", label: "มากกว่าหรือเท่ากับ" },
+  { value: ">", label: "มากกว่า" },
+  { value: "<=", label: "น้อยกว่าหรือเท่ากับ" },
+  { value: "<", label: "น้อยกว่า" },
+  { value: "=", label: "เท่ากับ" },
+  { value: "!=", label: "ไม่เท่ากับ" },
+];
+
+const textOperators = [
+  { value: "=", label: "เป็นค่า" },
+  { value: "!=", label: "ไม่เป็นค่า" },
+  { value: "in", label: "อยู่ในชุดค่า" },
+  { value: "not_in", label: "ไม่อยู่ในชุดค่า" },
+];
+
+const tagOperators = [
+  { value: "has", label: "มี tag นี้" },
+  { value: "not_has", label: "ไม่มี tag นี้" },
+];
+
+const segmentFieldOptions: SegmentFieldOption[] = [
+  { value: "scan_count_30d", label: "จำนวนสแกน 30 วันล่าสุด", kind: "number", operators: numericOperators, placeholder: "เช่น 3" },
+  { value: "scan_count_all", label: "จำนวนสแกนทั้งหมด", kind: "number", operators: numericOperators, placeholder: "เช่น 10" },
+  { value: "redeem_count_all", label: "จำนวนแลกรางวัลทั้งหมด", kind: "number", operators: numericOperators, placeholder: "เช่น 1" },
+  { value: "point_balance", label: "แต้มคงเหลือ", kind: "number", operators: numericOperators, placeholder: "เช่น 50" },
+  { value: "last_scan_days_ago", label: "ไม่ได้สแกนมากี่วัน", kind: "number", operators: numericOperators, placeholder: "เช่น 30" },
+  { value: "created_days_ago", label: "สมัครมากี่วันแล้ว", kind: "number", operators: numericOperators, placeholder: "เช่น 14" },
+  {
+    value: "risk_level",
+    label: "กลุ่ม RFM",
+    kind: "text",
+    operators: textOperators,
+    placeholder: "เช่น champion หรือ loyal,at_risk",
+    options: ["champion", "loyal", "potential", "at_risk", "hibernating", "lost", "normal"],
+  },
+  { value: "province", label: "จังหวัด", kind: "text", operators: textOperators, placeholder: "เช่น กรุงเทพมหานคร" },
+  { value: "status", label: "สถานะลูกค้า", kind: "text", operators: textOperators, placeholder: "เช่น active" },
+  { value: "tag_id", label: "Tag ลูกค้า", kind: "tag", operators: tagOperators, placeholder: "" },
+];
+
+const suggestedTags: SuggestedTagTemplate[] = [
+  { name: "VIP", color: "#7c3aed", description: "ลูกค้ามูลค่าสูงหรือมีแต้มคงเหลือสูง ใช้ทำ privilege / campaign พิเศษ" },
+  { name: "New Joiner", color: "#2563eb", description: "ลูกค้าใหม่ที่เพิ่งสมัคร ใช้กับ onboarding flow และ welcome campaign" },
+  { name: "Loyal", color: "#059669", description: "ลูกค้าที่สแกนต่อเนื่อง ควรได้สิทธิพิเศษหรือสะสมต่อยอด" },
+  { name: "At Risk", color: "#d97706", description: "ลูกค้าที่เริ่มห่าง ควรได้รับ win-back campaign" },
+  { name: "Lost", color: "#dc2626", description: "ลูกค้าที่หายไปนาน ใช้แยกกลุ่มสำหรับ re-activation โดยเฉพาะ" },
+  { name: "Redeem Ready", color: "#0f766e", description: "ลูกค้ามีแต้มถึง threshold พร้อมแลกรางวัล" },
+  { name: "Referral Active", color: "#db2777", description: "ลูกค้าที่ใช้ referral หรือชวนเพื่อนเก่ง" },
+  { name: "Survey Detractor", color: "#b91c1c", description: "ลูกค้าที่ให้คะแนนต่ำ ต้องมี service recovery / follow-up" },
+];
+
+const suggestedSegmentPresets: SegmentPreset[] = [
+  {
+    name: "Champions",
+    description: "ลูกค้าที่ active สูงและมีโอกาสตอบรับ campaign ดีที่สุด",
+    operator: "AND",
+    conditions: [{ field: "risk_level", op: "=", value: "champion" }],
+  },
+  {
+    name: "Loyal Scanners",
+    description: "ลูกค้าที่สแกนต่อเนื่อง เหมาะกับ retention campaign",
+    operator: "AND",
+    conditions: [{ field: "risk_level", op: "=", value: "loyal" }],
+  },
+  {
+    name: "New Members 14d",
+    description: "ลูกค้าใหม่ที่เพิ่งสมัครใน 14 วันล่าสุด",
+    operator: "AND",
+    conditions: [{ field: "created_days_ago", op: "<=", value: "14" }],
+  },
+  {
+    name: "At Risk With Balance",
+    description: "ลูกค้าที่เริ่มห่างแต่ยังมีแต้มคงเหลือ น่าดึงกลับมาง่าย",
+    operator: "AND",
+    conditions: [
+      { field: "last_scan_days_ago", op: ">=", value: "30" },
+      { field: "point_balance", op: ">=", value: "20" },
+    ],
+  },
+  {
+    name: "Redeem Ready",
+    description: "มีแต้มพร้อมแลก ใช้กระตุ้น conversion ไปหน้า rewards",
+    operator: "AND",
+    conditions: [{ field: "point_balance", op: ">=", value: "100" }],
+  },
+  {
+    name: "Frequent But Never Redeemed",
+    description: "สแกนเยอะแล้วแต่ยังไม่เคยแลกรางวัล",
+    operator: "AND",
+    conditions: [
+      { field: "scan_count_all", op: ">=", value: "5" },
+      { field: "redeem_count_all", op: "=", value: "0" },
+    ],
+  },
+];
+
+const createSegmentCondition = (field = "scan_count_30d", op = ">=", value = "3"): SegmentConditionRow => ({
+  id: makeSegmentConditionId(),
+  field,
+  op,
+  value,
+});
+
+const parseSegmentRulesToBuilder = (rules: Record<string, unknown>) => {
+  const operator = String(rules.operator || "AND").toUpperCase() === "OR" ? "OR" : "AND";
+  const conditionsRaw = Array.isArray(rules.conditions) ? rules.conditions : [];
+  const conditions = conditionsRaw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const condition = item as Record<string, unknown>;
+      const value = Array.isArray(condition.value) ? condition.value.join(", ") : String(condition.value ?? "");
+      return createSegmentCondition(String(condition.field || "scan_count_30d"), String(condition.op || "="), value);
+    })
+    .filter((item): item is SegmentConditionRow => Boolean(item));
+
+  return {
+    operator: operator as "AND" | "OR",
+    conditions: conditions.length > 0 ? conditions : [createSegmentCondition()],
+  };
+};
+
+const buildSegmentRulesFromBuilder = (operator: "AND" | "OR", conditions: SegmentConditionRow[]) => {
+  const prepared = conditions
+    .map((condition) => {
+      const fieldConfig = segmentFieldOptions.find((item) => item.value === condition.field);
+      const rawValue = condition.value.trim();
+      if (!fieldConfig || !condition.op || rawValue === "") return null;
+
+      if (fieldConfig.kind === "number") {
+        const numericValue = Number(rawValue);
+        if (Number.isNaN(numericValue)) {
+          throw new Error(`ค่าในเงื่อนไข "${fieldConfig.label}" ต้องเป็นตัวเลข`);
+        }
+        return { field: condition.field, op: condition.op, value: numericValue };
+      }
+
+      if (condition.op === "in" || condition.op === "not_in") {
+        const items = rawValue
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean);
+        if (items.length === 0) return null;
+        return { field: condition.field, op: condition.op, value: items };
+      }
+
+      return { field: condition.field, op: condition.op, value: rawValue };
+    })
+    .filter(Boolean) as Array<{ field: string; op: string; value: number | string | string[] }>;
+
+  return {
+    operator,
+    conditions: prepared,
+  };
+};
+
+const summarizeSegmentRules = (rules: Record<string, unknown>) => {
+  const operator = String(rules.operator || "AND").toUpperCase() === "OR" ? "OR" : "AND";
+  const conditions = Array.isArray(rules.conditions) ? rules.conditions : [];
+
+  return conditions
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const condition = item as Record<string, unknown>;
+      const fieldConfig = segmentFieldOptions.find((option) => option.value === String(condition.field || ""));
+      const operatorLabel = fieldConfig?.operators.find((option) => option.value === String(condition.op || ""))?.label || String(condition.op || "");
+      const valueText = Array.isArray(condition.value) ? condition.value.join(", ") : String(condition.value ?? "");
+      if (!fieldConfig) return valueText ? `${String(condition.field)} ${operatorLabel} ${valueText}` : String(condition.field);
+      return `${fieldConfig.label} ${operatorLabel} ${valueText}`;
+    })
+    .filter((item): item is string => Boolean(item))
+    .map((item, index) => (index === 0 ? item : `${operator} ${item}`));
+};
+
 const defaultSegmentRules = JSON.stringify(
   {
     operator: "AND",
@@ -231,6 +438,8 @@ const defaultSegmentRules = JSON.stringify(
   null,
   2,
 );
+
+const defaultSegmentBuilder = parseSegmentRulesToBuilder(JSON.parse(defaultSegmentRules) as Record<string, unknown>);
 
 export default function CRMPage() {
   const [tags, setTags] = useState<Tag[]>([]);
@@ -264,6 +473,7 @@ export default function CRMPage() {
   const [referralSaving, setReferralSaving] = useState(false);
   const [segmentExporting, setSegmentExporting] = useState(false);
   const [segmentExportRunning, setSegmentExportRunning] = useState(false);
+  const [activeTab, setActiveTab] = useState<CRMTab>("overview");
 
   const [tagName, setTagName] = useState("");
   const [tagColor, setTagColor] = useState("#6366f1");
@@ -271,6 +481,9 @@ export default function CRMPage() {
   const [segmentName, setSegmentName] = useState("");
   const [segmentDescription, setSegmentDescription] = useState("");
   const [segmentRulesText, setSegmentRulesText] = useState(defaultSegmentRules);
+  const [segmentOperator, setSegmentOperator] = useState<"AND" | "OR">(defaultSegmentBuilder.operator);
+  const [segmentConditions, setSegmentConditions] = useState<SegmentConditionRow[]>(defaultSegmentBuilder.conditions);
+  const [showAdvancedSegmentRules, setShowAdvancedSegmentRules] = useState(false);
   const [broadcastName, setBroadcastName] = useState("");
   const [broadcastTargetType, setBroadcastTargetType] = useState<"segment" | "tag" | "all">("segment");
   const [broadcastTargetValue, setBroadcastTargetValue] = useState("");
@@ -328,10 +541,24 @@ export default function CRMPage() {
       setBroadcasts(broadcastsRes.data || []);
       setTriggers(triggersRes.data || []);
       setSurveys(surveysRes.data || []);
-      setSurveyInsights(surveyInsightsRes);
+      setSurveyInsights(
+        surveyInsightsRes
+          ? {
+              ...surveyInsightsRes,
+              recent_responses: surveyInsightsRes.recent_responses ?? [],
+            }
+          : null,
+      );
       setReferralCodes(referralCodesRes.data || []);
       setReferralHistory(referralHistoryRes.data || []);
-      setReferralOverview(referralOverviewRes);
+      setReferralOverview(
+        referralOverviewRes
+          ? {
+              ...referralOverviewRes,
+              top_referrers: referralOverviewRes.top_referrers ?? [],
+            }
+          : null,
+      );
       setSegmentExports(segmentExportsRes.data || []);
       setRfmCustomers(customersRes.data || []);
     } catch (err) {
@@ -350,6 +577,12 @@ export default function CRMPage() {
       void loadAll(selectedRisk);
     }
   }, [selectedRisk]);
+
+  useEffect(() => {
+    setSegmentRulesText(
+      JSON.stringify(buildSegmentRulesFromBuilder(segmentOperator, segmentConditions), null, 2),
+    );
+  }, [segmentOperator, segmentConditions]);
 
   const totalTaggedSegments = useMemo(
     () => segments.reduce((sum, item) => sum + (item.cached_count || 0), 0),
@@ -387,35 +620,101 @@ export default function CRMPage() {
     }
   };
 
+  const handleApplySuggestedTag = (item: SuggestedTagTemplate) => {
+    setTagName(item.name);
+    setTagColor(item.color);
+  };
+
+  const handleSegmentConditionChange = (
+    conditionID: string,
+    patch: Partial<Pick<SegmentConditionRow, "field" | "op" | "value">>,
+  ) => {
+    setSegmentConditions((prev) =>
+      prev.map((item) => {
+        if (item.id !== conditionID) return item;
+        const nextField = patch.field ?? item.field;
+        const fieldConfig = segmentFieldOptions.find((option) => option.value === nextField) || segmentFieldOptions[0];
+        const nextOp = patch.field ? fieldConfig.operators[0]?.value || item.op : patch.op ?? item.op;
+        const nextValue =
+          patch.field && fieldConfig.kind === "tag"
+            ? tags[0]?.id || ""
+            : patch.field
+              ? ""
+              : patch.value ?? item.value;
+        return {
+          ...item,
+          ...patch,
+          field: nextField,
+          op: nextOp,
+          value: nextValue,
+        };
+      }),
+    );
+  };
+
+  const handleAddSegmentCondition = () => {
+    setSegmentConditions((prev) => [...prev, createSegmentCondition()]);
+  };
+
+  const handleRemoveSegmentCondition = (conditionID: string) => {
+    setSegmentConditions((prev) => {
+      if (prev.length === 1) return prev;
+      return prev.filter((item) => item.id !== conditionID);
+    });
+  };
+
+  const handleApplySegmentPreset = (preset: SegmentPreset) => {
+    setSegmentName(preset.name);
+    setSegmentDescription(preset.description);
+    setSegmentOperator(preset.operator);
+    setSegmentConditions(
+      preset.conditions.map((item) => createSegmentCondition(item.field, item.op, item.value)),
+    );
+  };
+
+  const handleApplyAdvancedRules = () => {
+    try {
+      const parsed = JSON.parse(segmentRulesText) as Record<string, unknown>;
+      const builder = parseSegmentRulesToBuilder(parsed);
+      setSegmentOperator(builder.operator);
+      setSegmentConditions(builder.conditions);
+      toast.success("ใช้ค่า JSON กับตัวสร้าง segment แล้ว");
+    } catch {
+      toast.error("JSON ของ rules ไม่ถูกต้อง");
+    }
+  };
+
   const handleCreateSegment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!segmentName.trim()) {
       toast.error("กรุณาระบุชื่อ segment");
       return;
     }
-    let rules: Record<string, unknown>;
     try {
-      rules = JSON.parse(segmentRulesText) as Record<string, unknown>;
-    } catch {
-      toast.error("JSON ของ rules ไม่ถูกต้อง");
-      return;
-    }
-    setSavingSegment(true);
-    try {
-      await api.post("/api/v1/crm/segments", {
-        name: segmentName.trim(),
-        description: segmentDescription.trim(),
-        rules,
-      });
-      setSegmentName("");
-      setSegmentDescription("");
-      setSegmentRulesText(defaultSegmentRules);
-      await loadAll(selectedRisk);
-      toast.success("สร้าง segment แล้ว");
+      const rules = buildSegmentRulesFromBuilder(segmentOperator, segmentConditions) as Record<string, unknown>;
+      setSegmentRulesText(JSON.stringify(rules, null, 2));
+      setSavingSegment(true);
+      try {
+        await api.post("/api/v1/crm/segments", {
+          name: segmentName.trim(),
+          description: segmentDescription.trim(),
+          rules,
+        });
+        setSegmentName("");
+        setSegmentDescription("");
+        setSegmentOperator(defaultSegmentBuilder.operator);
+        setSegmentConditions(defaultSegmentBuilder.conditions.map((item) => ({ ...item, id: makeSegmentConditionId() })));
+        setSegmentRulesText(defaultSegmentRules);
+        await loadAll(selectedRisk);
+        toast.success("สร้าง segment แล้ว");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "สร้าง segment ไม่สำเร็จ");
+      } finally {
+        setSavingSegment(false);
+      }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "สร้าง segment ไม่สำเร็จ");
-    } finally {
-      setSavingSegment(false);
+      toast.error(err instanceof Error ? err.message : "เงื่อนไข segment ไม่ถูกต้อง");
+      return;
     }
   };
 
@@ -733,6 +1032,14 @@ export default function CRMPage() {
   };
 
   const riskLevels = ["", "champion", "loyal", "potential", "at_risk", "hibernating", "lost", "normal"];
+  const recentResponses = surveyInsights?.recent_responses ?? [];
+  const topReferrers = referralOverview?.top_referrers ?? [];
+  const tabs: Array<{ id: CRMTab; label: string; description: string }> = [
+    { id: "overview", label: "Overview", description: "tags, segments, exports, RFM" },
+    { id: "broadcasts", label: "Broadcast", description: "LINE composer + history" },
+    { id: "automation", label: "Automation", description: "triggers + lifecycle" },
+    { id: "engagement", label: "Engagement", description: "survey, NPS, referrals" },
+  ];
 
   return (
     <div className="space-y-6">
@@ -772,6 +1079,33 @@ export default function CRMPage() {
         </div>
       </div>
 
+      <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] p-3 md:p-4 md-elevation-1">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          {tabs.map((tab) => {
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`rounded-[16px] border px-4 py-3 text-left transition-colors ${
+                  active
+                    ? "border-[var(--md-primary)] bg-[var(--md-primary-light)]"
+                    : "border-[var(--md-outline-variant)] bg-[var(--md-surface)] hover:border-[var(--md-primary)]"
+                }`}
+              >
+                <p className={`text-[14px] font-medium ${active ? "text-[var(--md-primary)]" : "text-[var(--md-on-surface)]"}`}>
+                  {tab.label}
+                </p>
+                <p className="mt-1 text-[11px] text-[var(--md-on-surface-variant)]">{tab.description}</p>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {activeTab === "overview" && (
+        <>
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] p-5 md-elevation-1">
           <div className="flex items-center justify-between mb-4">
@@ -822,6 +1156,33 @@ export default function CRMPage() {
               ))
             )}
           </div>
+
+          <div className="mt-5 border-t border-[var(--md-outline-variant)] pt-4">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <h3 className="text-[14px] font-medium text-[var(--md-on-surface)]">Suggested Tags</h3>
+              <span className="text-[11px] text-[var(--md-on-surface-variant)]">คลิกเพื่อเอาไปใส่ในฟอร์มด้านบน</span>
+            </div>
+            <div className="space-y-2">
+              {suggestedTags.map((item) => (
+                <button
+                  key={item.name}
+                  type="button"
+                  onClick={() => handleApplySuggestedTag(item)}
+                  className="w-full rounded-[12px] border border-[var(--md-outline-variant)] px-3 py-3 text-left hover:border-[var(--md-primary)]"
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium text-white"
+                      style={{ backgroundColor: item.color }}
+                    >
+                      {item.name}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-[12px] text-[var(--md-on-surface-variant)]">{item.description}</p>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] p-5 md-elevation-1">
@@ -839,11 +1200,166 @@ export default function CRMPage() {
               placeholder="คำอธิบาย"
               className="h-[40px] w-full px-4 border border-[var(--md-outline-variant)] rounded-[var(--md-radius-xl)] bg-transparent text-[13px]"
             />
-            <textarea
-              value={segmentRulesText}
-              onChange={(e) => setSegmentRulesText(e.target.value)}
-              className="min-h-[220px] w-full px-4 py-3 border border-[var(--md-outline-variant)] rounded-[var(--md-radius-xl)] bg-transparent text-[12px] font-mono"
-            />
+            <div className="rounded-[16px] bg-[var(--md-surface-container-low)] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[13px] font-medium text-[var(--md-on-surface)]">Suggested Segments</p>
+                  <p className="text-[11px] text-[var(--md-on-surface-variant)]">เลือก preset แล้วค่อยปรับเงื่อนไขต่อได้</p>
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-1 gap-2">
+                {suggestedSegmentPresets.map((preset) => (
+                  <button
+                    key={preset.name}
+                    type="button"
+                    onClick={() => handleApplySegmentPreset(preset)}
+                    className="rounded-[12px] border border-[var(--md-outline-variant)] bg-[var(--md-surface)] px-3 py-3 text-left hover:border-[var(--md-primary)]"
+                  >
+                    <p className="text-[13px] font-medium text-[var(--md-on-surface)]">{preset.name}</p>
+                    <p className="mt-1 text-[11px] text-[var(--md-on-surface-variant)]">{preset.description}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-[16px] border border-[var(--md-outline-variant)] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[13px] font-medium text-[var(--md-on-surface)]">Rule Builder</p>
+                  <p className="text-[11px] text-[var(--md-on-surface-variant)]">
+                    สร้างเงื่อนไขแบบคนอ่านเข้าใจได้ ไม่ต้องพิมพ์ JSON เอง
+                  </p>
+                </div>
+                <select
+                  value={segmentOperator}
+                  onChange={(e) => setSegmentOperator(e.target.value as "AND" | "OR")}
+                  className="h-[36px] rounded-[var(--md-radius-xl)] border border-[var(--md-outline-variant)] bg-transparent px-3 text-[12px]"
+                >
+                  <option value="AND">ตรงทุกข้อ (AND)</option>
+                  <option value="OR">ตรงข้อใดข้อหนึ่ง (OR)</option>
+                </select>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {segmentConditions.map((condition, index) => {
+                  const fieldConfig = segmentFieldOptions.find((item) => item.value === condition.field) || segmentFieldOptions[0];
+                  const usesListInput = condition.op === "in" || condition.op === "not_in";
+                  return (
+                    <div
+                      key={condition.id}
+                      className="rounded-[14px] border border-[var(--md-outline-variant)] bg-[var(--md-surface-container-low)] p-3"
+                    >
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <span className="text-[11px] font-medium text-[var(--md-on-surface-variant)]">เงื่อนไขที่ {index + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveSegmentCondition(condition.id)}
+                          disabled={segmentConditions.length === 1}
+                          className="text-[11px] text-red-500 hover:underline disabled:opacity-40"
+                        >
+                          ลบเงื่อนไข
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-[1.2fr_1fr_1.2fr] gap-3">
+                        <select
+                          value={condition.field}
+                          onChange={(e) => handleSegmentConditionChange(condition.id, { field: e.target.value })}
+                          className="h-[40px] rounded-[var(--md-radius-xl)] border border-[var(--md-outline-variant)] bg-transparent px-3 text-[13px]"
+                        >
+                          {segmentFieldOptions.map((item) => (
+                            <option key={item.value} value={item.value}>
+                              {item.label}
+                            </option>
+                          ))}
+                        </select>
+
+                        <select
+                          value={condition.op}
+                          onChange={(e) => handleSegmentConditionChange(condition.id, { op: e.target.value })}
+                          className="h-[40px] rounded-[var(--md-radius-xl)] border border-[var(--md-outline-variant)] bg-transparent px-3 text-[13px]"
+                        >
+                          {fieldConfig.operators.map((operator) => (
+                            <option key={operator.value} value={operator.value}>
+                              {operator.label}
+                            </option>
+                          ))}
+                        </select>
+
+                        {fieldConfig.kind === "tag" ? (
+                          <select
+                            value={condition.value}
+                            onChange={(e) => handleSegmentConditionChange(condition.id, { value: e.target.value })}
+                            className="h-[40px] rounded-[var(--md-radius-xl)] border border-[var(--md-outline-variant)] bg-transparent px-3 text-[13px]"
+                          >
+                            <option value="">เลือก tag</option>
+                            {tags.map((tag) => (
+                              <option key={tag.id} value={tag.id}>
+                                {tag.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type={fieldConfig.kind === "number" ? "number" : "text"}
+                            value={condition.value}
+                            onChange={(e) => handleSegmentConditionChange(condition.id, { value: e.target.value })}
+                            placeholder={fieldConfig.placeholder}
+                            className="h-[40px] w-full rounded-[var(--md-radius-xl)] border border-[var(--md-outline-variant)] bg-transparent px-3 text-[13px]"
+                          />
+                        )}
+                      </div>
+                      {usesListInput && (
+                        <p className="mt-2 text-[11px] text-[var(--md-on-surface-variant)]">
+                          ใส่หลายค่าได้โดยคั่นด้วย comma เช่น `champion, loyal`
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={handleAddSegmentCondition}
+                  className="h-[36px] px-3 rounded-[var(--md-radius-xl)] border border-[var(--md-outline-variant)] text-[12px] font-medium"
+                >
+                  + เพิ่มเงื่อนไข
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedSegmentRules((prev) => !prev)}
+                  className="text-[12px] text-[var(--md-primary)] hover:underline"
+                >
+                  {showAdvancedSegmentRules ? "ซ่อน Advanced JSON" : "เปิด Advanced JSON"}
+                </button>
+              </div>
+            </div>
+
+            {showAdvancedSegmentRules && (
+              <div className="rounded-[16px] border border-[var(--md-outline-variant)] p-4">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div>
+                    <p className="text-[13px] font-medium text-[var(--md-on-surface)]">Advanced JSON</p>
+                    <p className="text-[11px] text-[var(--md-on-surface-variant)]">
+                      สำหรับกรณีที่ต้องการแก้ rule โดยตรง แล้วค่อยกด apply กลับเข้าตัว builder
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleApplyAdvancedRules}
+                    className="h-[36px] px-3 rounded-[var(--md-radius-xl)] border border-[var(--md-outline-variant)] text-[12px] font-medium"
+                  >
+                    ใช้ JSON นี้
+                  </button>
+                </div>
+                <textarea
+                  value={segmentRulesText}
+                  onChange={(e) => setSegmentRulesText(e.target.value)}
+                  className="min-h-[180px] w-full px-4 py-3 border border-[var(--md-outline-variant)] rounded-[var(--md-radius-xl)] bg-transparent text-[12px] font-mono"
+                />
+              </div>
+            )}
             <button
               type="submit"
               disabled={savingSegment}
@@ -854,7 +1370,6 @@ export default function CRMPage() {
           </form>
         </div>
       </div>
-
       <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-6">
         <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] p-5 md-elevation-1">
           <div className="flex items-center justify-between mb-4">
@@ -896,9 +1411,26 @@ export default function CRMPage() {
                       </button>
                     </div>
                   </div>
-                  <pre className="mt-3 overflow-x-auto rounded-[12px] bg-[var(--md-surface-container)] p-3 text-[11px] text-[var(--md-on-surface-variant)]">
-                    {JSON.stringify(segment.rules, null, 2)}
-                  </pre>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {summarizeSegmentRules(segment.rules).length === 0 ? (
+                      <span className="text-[11px] text-[var(--md-on-surface-variant)]">ยังไม่มีเงื่อนไข</span>
+                    ) : (
+                      summarizeSegmentRules(segment.rules).map((item) => (
+                        <span
+                          key={`${segment.id}-${item}`}
+                          className="rounded-full bg-[var(--md-surface-container)] px-2.5 py-1 text-[11px] text-[var(--md-on-surface-variant)]"
+                        >
+                          {item}
+                        </span>
+                      ))
+                    )}
+                  </div>
+                  <details className="mt-3">
+                    <summary className="cursor-pointer text-[11px] text-[var(--md-primary)]">ดู JSON ของ segment</summary>
+                    <pre className="mt-2 overflow-x-auto rounded-[12px] bg-[var(--md-surface-container)] p-3 text-[11px] text-[var(--md-on-surface-variant)]">
+                      {JSON.stringify(segment.rules, null, 2)}
+                    </pre>
+                  </details>
                 </div>
               ))
             )}
@@ -1107,6 +1639,10 @@ export default function CRMPage() {
         </div>
       </div>
 
+        </>
+      )}
+
+      {activeTab === "broadcasts" && (
       <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-6">
         <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] p-5 md-elevation-1">
           <div className="flex items-start justify-between gap-3 mb-4">
@@ -1355,6 +1891,9 @@ export default function CRMPage() {
         </div>
       </div>
 
+      )}
+
+      {activeTab === "automation" && (
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_1fr] gap-6">
         <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] p-5 md-elevation-1">
           <div className="flex items-start justify-between gap-3 mb-4">
@@ -1529,6 +2068,9 @@ export default function CRMPage() {
         </div>
       </div>
 
+      )}
+
+      {activeTab === "engagement" && (
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_1fr] gap-6">
         <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] p-5 md-elevation-1">
           <div className="mb-4">
@@ -1587,6 +2129,42 @@ export default function CRMPage() {
               <div className="rounded-[14px] bg-[var(--md-surface-container)] p-3">
                 <p className="text-[11px] text-[var(--md-on-surface-variant)]">promoters</p>
                 <p className="mt-1 text-[20px] font-bold text-[var(--md-primary)]">{surveyInsights.promoters.toLocaleString()}</p>
+              </div>
+            </div>
+          )}
+
+          {surveyInsights && recentResponses.length > 0 && (
+            <div className="mt-4 rounded-[14px] border border-[var(--md-outline-variant)] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-[14px] font-medium text-[var(--md-on-surface)]">Recent Responses</h3>
+                <span className="text-[11px] text-[var(--md-on-surface-variant)]">
+                  ล่าสุด {recentResponses.length} รายการ
+                </span>
+              </div>
+              <div className="mt-3 space-y-2">
+                {recentResponses.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between gap-3 rounded-[12px] bg-[var(--md-surface-container)] px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-[13px] font-medium text-[var(--md-on-surface)]">
+                        {item.user_name || item.user_id}
+                      </p>
+                      <p className="text-[11px] text-[var(--md-on-surface-variant)]">
+                        survey: {item.survey_id.slice(0, 8)}...
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[12px] font-medium text-[var(--md-primary)]">
+                        {item.rating != null ? `${item.rating}/10` : "no rating"}
+                      </p>
+                      <p className="text-[11px] text-[var(--md-on-surface-variant)]">
+                        {new Date(item.created_at).toLocaleString("th-TH")}
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -1700,6 +2278,39 @@ export default function CRMPage() {
                 </div>
               </div>
             )}
+
+            {referralOverview && topReferrers.length > 0 && (
+              <div className="mt-4 rounded-[14px] border border-[var(--md-outline-variant)] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-[14px] font-medium text-[var(--md-on-surface)]">Top Referrers</h3>
+                  <span className="text-[11px] text-[var(--md-on-surface-variant)]">
+                    leaderboard {topReferrers.length} อันดับ
+                  </span>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {topReferrers.map((item, index) => (
+                    <div
+                      key={item.user_id}
+                      className="flex items-center justify-between gap-3 rounded-[12px] bg-[var(--md-surface-container)] px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-[13px] font-medium text-[var(--md-on-surface)]">
+                          #{index + 1} {item.user_name || item.user_id}
+                        </p>
+                        <p className="text-[11px] text-[var(--md-on-surface-variant)]">
+                          referrals {item.referral_count.toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[12px] font-medium text-[var(--md-primary)]">
+                          +{item.points_earned.toLocaleString()} points
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] p-5 md-elevation-1">
@@ -1762,6 +2373,7 @@ export default function CRMPage() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

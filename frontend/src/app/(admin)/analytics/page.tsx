@@ -122,7 +122,7 @@ export default function AnalyticsPage() {
   const loadAll = async (selectedPeriod = period) => {
     setLoading(true);
     try {
-      const [distRes, cohortRes, productRes, rewardRes, affinityRes, clvRes, roiRes] = await Promise.all([
+      const results = await Promise.allSettled([
         api.get<{ data: RFMDistributionPoint[] }>("/api/v1/dashboard/crm/rfm-distribution"),
         api.get<{ data: CustomerCohortPoint[] }>("/api/v1/dashboard/crm/customer-cohorts"),
         api.get<{ data: TopProduct[] }>(`/api/v1/dashboard/crm/top-products?period=${encodeURIComponent(selectedPeriod)}&limit=10`),
@@ -131,16 +131,65 @@ export default function AnalyticsPage() {
         api.get<CLVOverview>("/api/v1/dashboard/crm/clv-overview?limit=10"),
         api.get<{ data: CampaignROIItem[] }>("/api/v1/dashboard/crm/campaign-roi?limit=12"),
       ]);
+      const [distRes, cohortRes, productRes, rewardRes, affinityRes, clvRes, roiRes] = results;
 
-      setDistribution(distRes.data || []);
-      setCohorts(cohortRes.data || []);
-      setTopProducts(productRes.data || []);
-      setTopRewards(rewardRes.data || []);
-      setAffinities(affinityRes.data || []);
-      setClvOverview(clvRes);
-      setCampaignROI(roiRes.data || []);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "โหลด analytics ไม่สำเร็จ");
+      const failed: string[] = [];
+
+      if (distRes.status === "fulfilled") {
+        setDistribution(distRes.value.data || []);
+      } else {
+        setDistribution([]);
+        failed.push("RFM");
+      }
+
+      if (cohortRes.status === "fulfilled") {
+        setCohorts(cohortRes.value.data || []);
+      } else {
+        setCohorts([]);
+        failed.push("Cohorts");
+      }
+
+      if (productRes.status === "fulfilled") {
+        setTopProducts(productRes.value.data || []);
+      } else {
+        setTopProducts([]);
+        failed.push("Top Products");
+      }
+
+      if (rewardRes.status === "fulfilled") {
+        setTopRewards(rewardRes.value.data || []);
+      } else {
+        setTopRewards([]);
+        failed.push("Top Rewards");
+      }
+
+      if (affinityRes.status === "fulfilled") {
+        setAffinities(affinityRes.value.data || []);
+      } else {
+        setAffinities([]);
+        failed.push("Product Affinity");
+      }
+
+      if (clvRes.status === "fulfilled") {
+        setClvOverview({
+          ...clvRes.value,
+          top_customers: clvRes.value.top_customers || [],
+        });
+      } else {
+        setClvOverview(null);
+        failed.push("CLV");
+      }
+
+      if (roiRes.status === "fulfilled") {
+        setCampaignROI(roiRes.value.data || []);
+      } else {
+        setCampaignROI([]);
+        failed.push("Campaign ROI");
+      }
+
+      if (failed.length > 0) {
+        toast.error(`โหลด analytics ไม่ครบ: ${failed.join(", ")}`);
+      }
     } finally {
       setLoading(false);
     }
